@@ -1,0 +1,47 @@
+FROM ubuntu:22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NVM_DIR=/root/.nvm
+ENV NODE_VERSION={{NODE_VERSION}}
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    ca-certificates \
+    tar \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download and install JDK from provided URL
+RUN curl -fsSL "{{JVM_URL}}" -o /tmp/jdk.tar.gz && \
+    mkdir -p /usr/lib/jvm && \
+    tar -xzf /tmp/jdk.tar.gz -C /usr/lib/jvm && \
+    rm /tmp/jdk.tar.gz && \
+    mv /usr/lib/jvm/jdk-* /usr/lib/jvm/java
+
+ENV JAVA_HOME=/usr/lib/jvm/java
+ENV PATH=${JAVA_HOME}/bin:${PATH}
+
+# Install nvm
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+
+# Install Node.js using nvm
+RUN . "${NVM_DIR}/nvm.sh" && \
+    nvm install ${NODE_VERSION} && \
+    nvm alias default ${NODE_VERSION} && \
+    nvm use default
+
+# Install claude-code
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH=/root/.local/bin:${PATH}
+
+# Update PATH to include nvm's default node
+RUN echo '. "${NVM_DIR}/nvm.sh"' >> /root/.bashrc
+ENV PATH=${NVM_DIR}/versions/node/default/bin:${PATH}
+
+# Set working directory
+WORKDIR /workspace
+
+# Default command
+CMD ["/bin/bash"]

@@ -1,0 +1,38 @@
+{
+  "name": "docker-sandbox",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CLI tool for running code and commands in isolated Docker containers",
+  "main": "dist/index.js",
+  "bin": {
+    "docker-sandbox": "dist/cli.js"
+  },
+  "repository": "git@github.com:rickihastings/docker-sandbox.git",
+  "author": "Ricki Hastings",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "test": "bash tests/run.sh"
+  },
+  "dependencies": {
+    "ink": "^6.6.0",
+    "react": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "@types/react": "^19.2.8",
+    "@typescript-eslint/eslint-plugin": "^8.53.0",
+    "@typescript-eslint/parser": "^8.53.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "prettier": "^3.8.0",
+    "typescript": "^5.9.3"
+  }
+}
