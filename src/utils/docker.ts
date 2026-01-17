@@ -1,8 +1,12 @@
 import { execSync } from 'child_process';
-import { writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync, mkdirSync, copyFileSync } from 'fs';
+import { join, dirname } from 'path';
 import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 import { generateDockerfile, DockerfileConfig } from './dockerfile.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface BuildConfig extends DockerfileConfig {
   name: string;
@@ -18,6 +22,14 @@ export function buildImage(config: BuildConfig): void {
     jvmUrl: config.jvmUrl,
   });
   writeFileSync(dockerfilePath, dockerfile);
+
+  // Copy skill templates to build context
+  const templatesDir = join(buildContext, 'templates');
+  mkdirSync(templatesDir, { recursive: true });
+
+  const skillTemplateSrc = join(__dirname, '../../templates/task-implementation-lifecycle.skill.md');
+  const skillTemplateDest = join(templatesDir, 'task-implementation-lifecycle.skill.md');
+  copyFileSync(skillTemplateSrc, skillTemplateDest);
 
   const imageName = `docker-sandbox:${config.name}`;
   execSync(`docker build --no-cache -t ${imageName} .`, {

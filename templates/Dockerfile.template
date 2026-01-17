@@ -43,5 +43,9 @@ ENV PATH=${NVM_DIR}/versions/node/default/bin:${PATH}
 # Set working directory
 WORKDIR /workspace
 
+# Copy skill templates
+RUN mkdir -p /root/.claude/skills
+COPY templates/task-implementation-lifecycle.skill.md /root/.claude/skills/
+
 # Default command
 CMD ["/bin/bash"]
