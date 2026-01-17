@@ -45,7 +45,7 @@ Compare implementation against spec. If divergence exists, update the relevant s
 
 ### 9. Commit
 
-Stage changes and create a git commit with a meaningful message.
+Stage changes and create a git commit with a meaningful message. Push changes.
 
 ### 10. Halt
 
