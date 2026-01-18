@@ -6,14 +6,14 @@
 - [x] 1.4 Check SSH_AUTH_SOCK environment variable and socket existence
 - [x] 1.5 Check if ~/.npmrc exists and prepare mount configuration
 - [x] 1.6 Generate unique container name from repository name + timestamp/random suffix
-- [ ] 1.7 Build Docker run command with:
+- [x] 1.7 Build Docker run command with:
   - [x] Detached mode (-d)
   - [x] SSH agent socket mount (-v $SSH_AUTH_SOCK:/ssh-agent)
   - [x] SSH_AUTH_SOCK environment variable (-e SSH_AUTH_SOCK=/ssh-agent)
   - [x] .npmrc mount if file exists (-v ~/.npmrc:/root/.npmrc)
   - [x] Container name (--name)
-  - [ ] REPO_URL environment variable (-e REPO_URL=<repo-url>)
-  - [ ] No explicit startup command (use image's built-in startup.sh)
+  - [x] REPO_URL environment variable (-e REPO_URL=<repo-url>)
+  - [x] No explicit startup command (use image's built-in startup.sh)
 - [x] 1.8 Execute docker run command and capture output
 - [x] 1.9 Display success message with container management instructions
 - [x] 1.10 Handle errors and display appropriate messages

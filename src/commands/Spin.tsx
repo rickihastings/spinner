@@ -11,7 +11,9 @@ export interface SpinProps {
 }
 
 export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
-  const [status, setStatus] = useState<'validating' | 'creating' | 'success' | 'error'>('validating');
+  const [status, setStatus] = useState<'validating' | 'creating' | 'success' | 'error'>(
+    'validating',
+  );
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [containerName, setContainerName] = useState<string>('');
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -43,7 +45,11 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
         }
 
         // Generate container name from repo
-        const repoName = repo.split('/').pop()?.replace(/\.git$/, '') || 'sandbox';
+        const repoName =
+          repo
+            .split('/')
+            .pop()
+            ?.replace(/\.git$/, '') || 'sandbox';
         const timestamp = Date.now();
         const generatedName = `${repoName}-${timestamp}`;
         setContainerName(generatedName);
@@ -55,10 +61,14 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
         const dockerArgs = [
           'run',
           '-d',
-          '--name', generatedName,
-          '-v', `${sshAuthSock}:/ssh-agent`,
-          '-e', 'SSH_AUTH_SOCK=/ssh-agent',
-          '-e', `REPO_URL=${repo}`,
+          '--name',
+          generatedName,
+          '-v',
+          `${sshAuthSock}:/ssh-agent`,
+          '-e',
+          'SSH_AUTH_SOCK=/ssh-agent',
+          '-e',
+          `REPO_URL=${repo}`,
         ];
 
         // Add .npmrc mount if it exists
@@ -75,7 +85,7 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
             stdio: 'pipe',
             encoding: 'utf-8',
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Container may have started but clone failed
           // Try to get the git error message from container logs
           try {
@@ -85,16 +95,21 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
             });
             throw new Error(`Git clone failed: ${logs.trim()}`);
           } catch {
-            throw new Error(error.stderr || error.message || 'Failed to create container');
+            const message = error instanceof Error ? error.message : 'Failed to create container';
+            const stderr = error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : '';
+            throw new Error(stderr || message);
           }
         }
 
         // Verify container is running
         try {
-          const containerStatus = execSync(`docker inspect -f '{{.State.Status}}' ${generatedName}`, {
-            encoding: 'utf-8',
-            stdio: 'pipe',
-          }).trim();
+          const containerStatus = execSync(
+            `docker inspect -f '{{.State.Status}}' ${generatedName}`,
+            {
+              encoding: 'utf-8',
+              stdio: 'pipe',
+            },
+          ).trim();
 
           if (containerStatus !== 'running') {
             // Get logs to show what went wrong
@@ -104,8 +119,8 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
             });
             throw new Error(`Container exited. Logs: ${logs.trim()}`);
           }
-        } catch (error: any) {
-          if (error.message.includes('Container exited')) {
+        } catch (error: unknown) {
+          if (error instanceof Error && error.message.includes('Container exited')) {
             throw error;
           }
           throw new Error('Failed to verify container status');
@@ -138,7 +153,9 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
       <Box flexDirection="column">
         <Text color="green">✓ Prerequisites validated</Text>
         {warnings.map((warning, idx) => (
-          <Text key={idx} color="yellow">⚠ Warning: {warning}</Text>
+          <Text key={idx} color="yellow">
+            ⚠ Warning: {warning}
+          </Text>
         ))}
         <Text>Creating container: {containerName}</Text>
         <Text>Cloning repository...</Text>
@@ -151,7 +168,9 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
       <Box flexDirection="column">
         <Text color="green">✓ Prerequisites validated</Text>
         {warnings.map((warning, idx) => (
-          <Text key={idx} color="yellow">⚠ Warning: {warning}</Text>
+          <Text key={idx} color="yellow">
+            ⚠ Warning: {warning}
+          </Text>
         ))}
         <Text color="green">✓ Container created successfully: {containerName}</Text>
         <Text></Text>

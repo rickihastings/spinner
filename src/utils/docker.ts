@@ -27,7 +27,10 @@ export function buildImage(config: BuildConfig): void {
   const templatesDir = join(buildContext, 'templates');
   mkdirSync(templatesDir, { recursive: true });
 
-  const skillTemplateSrc = join(__dirname, '../../templates/task-implementation-lifecycle.skill.md');
+  const skillTemplateSrc = join(
+    __dirname,
+    '../../templates/task-implementation-lifecycle.skill.md',
+  );
   const skillTemplateDest = join(templatesDir, 'task-implementation-lifecycle.skill.md');
   copyFileSync(skillTemplateSrc, skillTemplateDest);
 

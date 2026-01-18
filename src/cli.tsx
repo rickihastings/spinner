@@ -29,6 +29,16 @@ for (let i = 0; i < args.length; i++) {
 render(
   <App
     command={command}
-    flags={flags as { name?: string; nodeVersion?: string; jvmUrl?: string; image?: string; repo?: string; help?: boolean; version?: boolean }}
+    flags={
+      flags as {
+        name?: string;
+        nodeVersion?: string;
+        jvmUrl?: string;
+        image?: string;
+        repo?: string;
+        help?: boolean;
+        version?: boolean;
+      }
+    }
   />,
 );

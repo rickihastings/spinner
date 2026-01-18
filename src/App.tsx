@@ -65,8 +65,16 @@ export const App: React.FC<AppProps> = ({ command, flags }) => {
     if (!flags.name || !flags.jvmUrl) {
       return (
         <Box flexDirection="column">
-          <Text color="red">Error: Missing required flag{!flags.name && !flags.jvmUrl ? 's' : ''}: {!flags.name ? '--name' : ''}{!flags.name && !flags.jvmUrl ? ' and ' : ''}{!flags.jvmUrl ? '--jvm-url' : ''}</Text>
-          <Text>Usage: spinner setup --name &lt;name&gt; --jvm-url &lt;url&gt; [--node-version &lt;version&gt;]</Text>
+          <Text color="red">
+            Error: Missing required flag{!flags.name && !flags.jvmUrl ? 's' : ''}:{' '}
+            {!flags.name ? '--name' : ''}
+            {!flags.name && !flags.jvmUrl ? ' and ' : ''}
+            {!flags.jvmUrl ? '--jvm-url' : ''}
+          </Text>
+          <Text>
+            Usage: spinner setup --name &lt;name&gt; --jvm-url &lt;url&gt; [--node-version
+            &lt;version&gt;]
+          </Text>
         </Box>
       );
     }
