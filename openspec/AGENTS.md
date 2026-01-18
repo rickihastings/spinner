@@ -42,16 +42,16 @@ Skip proposal for:
 
 **Workflow**
 1. Review `openspec/project.md`, `openspec list`, and `openspec list --specs` to understand current context.
-2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas under `openspec/changes/<id>/`.
+2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `design.md`, `tasks.md`, and spec deltas under `openspec/changes/<id>/`.
 3. Draft spec deltas using `## ADDED|MODIFIED|REMOVED Requirements` with at least one `#### Scenario:` per requirement.
 4. Run `openspec validate <id> --strict --no-interactive` and resolve any issues before sharing the proposal.
 
 ### Stage 2: Implementing Changes
 Track these steps as TODOs and complete them one by one.
 1. **Read proposal.md** - Understand what's being built
-2. **Read design.md** (if exists) - Review technical decisions
+2. **Read design.md** - Review the Technical Implementation Plan for guidance on approach, affected components, and patterns to follow
 3. **Read tasks.md** - Get implementation checklist
-4. **Implement tasks sequentially** - Complete in order
+4. **Implement tasks sequentially** - Complete in order, using design.md as guidance
 5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
 6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
 7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
@@ -133,7 +133,7 @@ openspec/
 │   ├── [change-name]/
 │   │   ├── proposal.md     # Why, what, impact
 │   │   ├── tasks.md        # Implementation checklist
-│   │   ├── design.md       # Technical decisions (optional; see criteria)
+│   │   ├── design.md       # Technical implementation plan and decisions
 │   │   └── specs/          # Delta changes
 │   │       └── [capability]/
 │   │           └── spec.md # ADDED/MODIFIED/REMOVED
@@ -204,14 +204,10 @@ If multiple capabilities are affected, create multiple delta files under `change
 - [ ] 1.4 Write tests
 ```
 
-5. **Create design.md when needed:**
-Create `design.md` if any of the following apply; otherwise omit it:
-- Cross-cutting change (multiple services/modules) or a new architectural pattern
-- New external dependency or significant data model changes
-- Security, performance, or migration complexity
-- Ambiguity that benefits from technical decisions before coding
+5. **Create design.md:**
+Every change MUST include a `design.md` with a Technical Implementation Plan. This provides implementing agents with guidance on how to approach the work.
 
-Minimal `design.md` skeleton:
+`design.md` template:
 ```markdown
 ## Context
 [Background, constraints, stakeholders]
@@ -220,19 +216,31 @@ Minimal `design.md` skeleton:
 - Goals: [...]
 - Non-Goals: [...]
 
-## Decisions
-- Decision: [What and why]
-- Alternatives considered: [Options + rationale]
+## Technical Implementation Plan
+
+### Component Map
+- `path/to/file.ts` - [what changes] (create|modify|delete)
+- `path/to/other.ts` - [what changes]
+
+### Approach
+[High-level strategy for implementation - what order, what patterns]
+
+### Patterns to Follow
+- See `path/to/example.ts:45-60` for [pattern name]
+- [Other patterns to reference]
+
+### Key Decisions
+- [Decision]: [rationale]
+- [Decision]: [rationale]
 
 ## Risks / Trade-offs
 - [Risk] → Mitigation
 
-## Migration Plan
-[Steps, rollback]
-
 ## Open Questions
 - [...]
 ```
+
+The Technical Implementation Plan section is critical for guiding agents during implementation. At minimum, include Component Map and Approach.
 
 ## Spec File Format
 
@@ -441,8 +449,8 @@ Only add complexity with:
 
 ### File Purposes
 - `proposal.md` - Why and what
-- `tasks.md` - Implementation steps
-- `design.md` - Technical decisions
+- `design.md` - Technical implementation plan (how to approach)
+- `tasks.md` - Implementation checklist (what to do)
 - `spec.md` - Requirements and behavior
 
 ### CLI Essentials
