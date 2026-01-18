@@ -7,17 +7,17 @@ clone URL). The CLI SHALL validate that both flags are provided before proceedin
 
 #### Scenario: All required flags provided
 
-- **WHEN** user runs `spin --image docker-sandbox:my-env --repo git@github.com:user/project.git`
+- **WHEN** user runs `spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git`
 - **THEN** the CLI proceeds with container creation
 
 #### Scenario: Missing image flag
 
-- **WHEN** user runs `spin --repo git@github.com:user/project.git` without --image
+- **WHEN** user runs `spin --repo git@github.com:octocat/Hello-World.git` without --image
 - **THEN** the CLI exits with error code 1 and displays "Error: --image flag is required"
 
 #### Scenario: Missing repo flag
 
-- **WHEN** user runs `spin --image docker-sandbox:my-env` without --repo
+- **WHEN** user runs `spin --image spinner:my-env` without --repo
 - **THEN** the CLI exits with error code 1 and displays "Error: --repo flag is required"
 
 #### Scenario: Invalid image name
@@ -69,26 +69,29 @@ the CLI SHALL proceed without mounting and display a warning message.
 ### Requirement: Repository Cloning
 
 The container SHALL automatically clone the repository specified by --repo into /workspace during startup. The CLI SHALL
-configure the container to execute `git clone <repo-url> /workspace` as the startup command. If the clone fails, the
+pass the repository URL to the container via the REPO_URL environment variable. The container's startup script (baked into
+the image at /usr/local/bin/startup.sh) SHALL handle the cloning, verification, and initialization. If the clone fails, the
 container SHALL exit with a non-zero status.
 
 #### Scenario: Successful repository clone
 
-- **WHEN** the container starts with a valid --repo URL
-- **THEN** the repository is cloned into /workspace
+- **WHEN** the container starts with a valid --repo URL passed as REPO_URL environment variable
+- **THEN** the repository is cloned into /workspace by the startup script
+- **AND** the startup script runs `git status` to verify the clone
+- **AND** the startup script outputs "hello world" to confirm successful initialization
 - **AND** the container remains running after clone completes
 
 #### Scenario: Clone failure due to authentication
 
 - **WHEN** SSH agent cannot authenticate to the repository
-- **THEN** git clone fails
+- **THEN** git clone fails in the startup script
 - **AND** the container exits with a non-zero status
 - **AND** the CLI displays the git error message
 
 #### Scenario: Clone failure due to invalid URL
 
 - **WHEN** the --repo URL is malformed or repository does not exist
-- **THEN** git clone fails
+- **THEN** git clone fails in the startup script
 - **AND** the container exits with a non-zero status
 - **AND** the CLI displays the git error message
 
@@ -143,19 +146,19 @@ instructions on how to manage the container after creation.
 
 ### Requirement: Container Startup Command
 
-After cloning the repository, the container SHALL remain running by executing a long-running process. The CLI SHALL
-configure the container to run `tail -f /dev/null` after the git clone completes, keeping the container alive for exec
-sessions.
+The container SHALL use the baked-in startup script at /usr/local/bin/startup.sh as its entrypoint. The CLI SHALL configure
+the container to execute this script, which handles repository cloning, verification, and keeps the container running with
+`tail -f /dev/null` after successful initialization.
 
 #### Scenario: Container keeps running after clone
 
-- **WHEN** git clone completes successfully
-- **THEN** the container executes `tail -f /dev/null`
+- **WHEN** git clone completes successfully in the startup script
+- **THEN** the startup script executes `tail -f /dev/null`
 - **AND** the container status is "Up" when checked with `docker ps`
 
-#### Scenario: Container keeps running after clone failure
+#### Scenario: Container exits after clone failure
 
-- **WHEN** git clone fails
-- **THEN** the container does NOT execute `tail -f /dev/null`
+- **WHEN** git clone fails in the startup script
+- **THEN** the startup script does NOT execute `tail -f /dev/null`
 - **AND** the container exits immediately
 - **AND** the container status shows as "Exited" with non-zero exit code

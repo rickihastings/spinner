@@ -50,7 +50,7 @@ export const Setup: React.FC<SetupProps> = ({ name, nodeVersion, jvmUrl }) => {
     return (
       <Box flexDirection="column">
         <Text color="green">✓ Prerequisites checked</Text>
-        <Text>Building Docker image: docker-sandbox:{name}</Text>
+        <Text>Building Docker image: spinner:{name}</Text>
       </Box>
     );
   }
@@ -59,7 +59,7 @@ export const Setup: React.FC<SetupProps> = ({ name, nodeVersion, jvmUrl }) => {
     return (
       <Box flexDirection="column">
         <Text color="green">✓ Prerequisites checked</Text>
-        <Text color="green">✓ Docker image built successfully: docker-sandbox:{name}</Text>
+        <Text color="green">✓ Docker image built successfully: spinner:{name}</Text>
       </Box>
     );
   }

@@ -47,5 +47,9 @@ WORKDIR /workspace
 RUN mkdir -p /root/.claude/skills
 COPY templates/task-implementation-lifecycle.skill.md /root/.claude/skills/
 
+# Copy and set up startup script
+COPY templates/startup.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh
+
 # Default command
-CMD ["/bin/bash"]
+CMD ["/usr/local/bin/startup.sh"]

@@ -24,7 +24,7 @@
 - [x] 4.2 Validate required flags are provided
 - [x] 4.3 Generate Dockerfile dynamically with JVM URL template variable
 - [x] 4.4 Execute docker build with appropriate context
-- [x] 4.5 Tag image as docker-sandbox:<name>
+- [x] 4.5 Tag image as spinner:<name>
 
 ## 5. Dockerfile Template
 - [x] 5.1 Base image: Ubuntu 22.04
@@ -32,6 +32,10 @@
 - [x] 5.3 Install nvm and specified Node.js version
 - [x] 5.4 Install git via apt
 - [x] 5.5 Install claude-code via curl install script
+- [ ] 5.6 Create startup.sh script template
+- [ ] 5.7 Copy startup.sh to /usr/local/bin/startup.sh in Docker image
+- [ ] 5.8 Make startup.sh executable (chmod +x)
+- [ ] 5.9 Set startup.sh as container CMD
 
 ## 6. Integration Tests
 - [x] 6.1 Create test script directory structure
@@ -40,3 +44,4 @@
 - [x] 6.4 Test successful Docker image build with --jvm-url parameter
 - [x] 6.5 Verify container can start from built image
 - [x] 6.6 Verify java, node, git, claude --version work inside container
+- [ ] 6.7 Verify startup.sh exists and is executable in built image

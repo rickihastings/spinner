@@ -1,147 +1,85 @@
 #!/bin/bash
+# Master test runner for Spinner CLI
+# Runs all integration tests: setup and spin commands
 
 set -e
 
-echo "Running integration tests for docker-sandbox"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Test counter
-TESTS_RUN=0
-TESTS_PASSED=0
+# Overall test counters
+TOTAL_SUITES=0
+PASSED_SUITES=0
+FAILED_SUITES=0
 
-# Track cleanup
-TEST_IMAGE=""
-TEST_CONTAINER=""
+echo ""
+echo "=========================================="
+echo "  Spinner Integration Test Suite"
+echo "=========================================="
+echo ""
 
-# Cleanup function
-cleanup() {
-    if [ -n "$TEST_CONTAINER" ]; then
-        echo -e "${BLUE}Cleaning up container: $TEST_CONTAINER${NC}"
-        docker rm -f "$TEST_CONTAINER" > /dev/null 2>&1 || true
-    fi
-    if [ -n "$TEST_IMAGE" ]; then
-        echo -e "${BLUE}Cleaning up image: $TEST_IMAGE${NC}"
-        docker rmi -f "$TEST_IMAGE" > /dev/null 2>&1 || true
-    fi
-}
+# Function to run a test suite
+run_suite() {
+    local suite_name="$1"
+    local suite_script="$2"
 
-# Set up trap to cleanup on exit
-trap cleanup EXIT
+    TOTAL_SUITES=$((TOTAL_SUITES + 1))
 
-# Helper function to run a test
-run_test() {
-    local test_name="$1"
-    local test_command="$2"
+    echo ""
+    echo -e "${CYAN}=== Running $suite_name ===${NC}"
+    echo ""
 
-    echo -e "${YELLOW}Running: $test_name${NC}"
-    TESTS_RUN=$((TESTS_RUN + 1))
-
-    if eval "$test_command"; then
-        echo -e "${GREEN}✓ PASSED: $test_name${NC}"
-        TESTS_PASSED=$((TESTS_PASSED + 1))
+    if bash "$suite_script"; then
+        PASSED_SUITES=$((PASSED_SUITES + 1))
+        echo ""
+        echo -e "${GREEN}✓ $suite_name: PASSED${NC}"
         return 0
     else
-        echo -e "${RED}✗ FAILED: $test_name${NC}"
-        return 1
+        FAILED_SUITES=$((FAILED_SUITES + 1))
+        echo ""
+        echo -e "${RED}✗ $suite_name: FAILED${NC}"
+        echo ""
+        echo "=========================================="
+        echo "  Test Suite Summary"
+        echo "=========================================="
+        echo -e "Total suites: $TOTAL_SUITES"
+        echo -e "${GREEN}Passed: $PASSED_SUITES${NC}"
+        echo -e "${RED}Failed: $FAILED_SUITES${NC}"
+        echo ""
+        echo -e "${RED}Exiting due to test suite failure.${NC}"
+        exit 1
     fi
 }
 
-# Prerequisite check tests
-echo ""
-echo "=== Testing Prerequisite Checks ==="
-echo ""
+# Run setup command tests
+# This creates the spinner:test-env image that spin tests will use
+run_suite "Setup Command Tests" "./setup/run-all.sh"
 
-run_test "Check Docker is installed" "docker --version > /dev/null 2>&1"
-run_test "Check Git is installed" "git --version > /dev/null 2>&1"
-run_test "Check Claude is installed" "claude --version > /dev/null 2>&1"
+# Run spin command tests
+run_suite "Spin Command Tests" "./spin/run-all.sh"
 
-# CLI basic tests
+# Print overall results
 echo ""
-echo "=== Testing CLI Basics ==="
-echo ""
-
-run_test "CLI --help flag" "node dist/cli.js --help | grep -q 'docker-sandbox'"
-run_test "CLI --version flag" "node dist/cli.js --version | grep -q 'version'"
-run_test "CLI unknown command shows error" "node dist/cli.js invalid-cmd 2>&1 | grep -q 'Unknown command'"
-
-# Setup command validation tests
-echo ""
-echo "=== Testing Setup Command Validation ==="
+echo "=========================================="
+echo "  Test Suite Summary"
+echo "=========================================="
+echo -e "Total suites: $TOTAL_SUITES"
+echo -e "${GREEN}Passed: $PASSED_SUITES${NC}"
+echo -e "${RED}Failed: $FAILED_SUITES${NC}"
 echo ""
 
-# Detect architecture for JVM URL
-ARCH=$(uname -m)
-if [ "$ARCH" = "x86_64" ]; then
-    JVM_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.6%2B7/OpenJDK21U-jdk_x64_linux_hotspot_21.0.6_7.tar.gz"
-elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-    JVM_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.6%2B7/OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.6_7.tar.gz"
-else
-    echo -e "${RED}Unsupported architecture: $ARCH${NC}"
-    exit 1
-fi
-
-run_test "Setup without flags shows error" "node dist/cli.js setup 2>&1 | grep -q 'Missing required flag'"
-run_test "Setup with --name but no --jvm-url shows error" "node dist/cli.js setup --name test 2>&1 | grep -q 'Missing required flag'"
-
-# Docker image build and verification tests
-echo ""
-echo "=== Testing Docker Image Build and Tool Installation ==="
-echo ""
-
-# Set the test image name
-TEST_IMAGE="docker-sandbox:test-integration"
-
-# Test building the Docker image with JDK from provided URL
-echo ""
-if run_test "Build Docker image with setup command" \
-    "node dist/cli.js setup --name test-integration --node-version 20 --jvm-url \"$JVM_URL\""; then
-
-    # Verify the image exists
-    run_test "Docker image exists" "docker images -q \"$TEST_IMAGE\" | grep -q ."
-
-    # Start a container from the image
-    echo ""
-    TEST_CONTAINER="test-sandbox-container-$$"
-    if run_test "Start container from built image" \
-        "docker run -d --name \"$TEST_CONTAINER\" \"$TEST_IMAGE\" tail -f /dev/null"; then
-
-        # Verify tools are installed in the container
-        echo ""
-        run_test "Java is installed in container" \
-            "docker exec \"$TEST_CONTAINER\" java --version > /dev/null 2>&1"
-
-        run_test "Node.js is installed in container" \
-            "docker exec \"$TEST_CONTAINER\" bash -c 'source ~/.nvm/nvm.sh && node --version' > /dev/null 2>&1"
-
-        run_test "npm is installed in container" \
-            "docker exec \"$TEST_CONTAINER\" bash -c 'source ~/.nvm/nvm.sh && npm --version' > /dev/null 2>&1"
-
-        run_test "Git is installed in container" \
-            "docker exec \"$TEST_CONTAINER\" git --version > /dev/null 2>&1"
-
-        run_test "Claude is installed in container" \
-            "docker exec \"$TEST_CONTAINER\" claude --version > /dev/null 2>&1"
-    fi
-fi
-
-# Print results
-echo ""
-echo "==================================="
-echo -e "Tests run: $TESTS_RUN"
-echo -e "${GREEN}Tests passed: $TESTS_PASSED${NC}"
-echo -e "${RED}Tests failed: $((TESTS_RUN - TESTS_PASSED))${NC}"
-echo ""
-
-if [ "$TESTS_PASSED" -eq "$TESTS_RUN" ]; then
-    echo -e "${GREEN}All tests passed!${NC}"
+if [ $FAILED_SUITES -eq 0 ]; then
+    echo -e "${GREEN}✓ All test suites passed!${NC}"
     exit 0
 else
-    echo -e "${RED}Some tests failed!${NC}"
+    echo -e "${RED}✗ Some test suites failed.${NC}"
     exit 1
 fi

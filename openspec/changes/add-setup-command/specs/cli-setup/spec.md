@@ -48,12 +48,12 @@ The setup command SHALL accept the following CLI flags: --name (required), --jvm
 ### Requirement: Docker Image Build
 
 The CLI SHALL build a Docker image based on Ubuntu 22.04 containing JDK, nvm with Node.js, git, and
-claude-code. The JDK SHALL be downloaded from the URL provided via the --jvm-url flag during build. The image SHALL be tagged as docker-sandbox:<name>.
+claude-code. The JDK SHALL be downloaded from the URL provided via the --jvm-url flag during build. The image SHALL be tagged as spinner:<name>.
 
 #### Scenario: Successful image build
 
 - **WHEN** setup command completes successfully
-- **THEN** a Docker image named docker-sandbox:<name> exists locally
+- **THEN** a Docker image named spinner:<name> exists locally
 
 #### Scenario: JDK inclusion
 
@@ -74,6 +74,28 @@ claude-code. The JDK SHALL be downloaded from the URL provided via the --jvm-url
 
 - **WHEN** the Docker image is built
 - **THEN** the container can execute `claude --version` successfully
+
+### Requirement: Startup Script Inclusion
+
+The Docker image SHALL include a startup script at /usr/local/bin/startup.sh that handles repository cloning and container initialization. The script SHALL accept a REPO_URL environment variable, clone the repository to /workspace, verify the clone with `git status`, output a hello message, and keep the container running with `tail -f /dev/null`.
+
+#### Scenario: Startup script exists in image
+
+- **WHEN** the Docker image is built
+- **THEN** the file /usr/local/bin/startup.sh exists and is executable
+
+#### Scenario: Startup script clones repository
+
+- **WHEN** the container starts with REPO_URL environment variable set
+- **THEN** the startup script clones the repository to /workspace
+- **AND** runs `git status` to verify the clone
+- **AND** outputs a hello message
+
+#### Scenario: Startup script keeps container running
+
+- **WHEN** the repository clone completes successfully
+- **THEN** the startup script executes `tail -f /dev/null`
+- **AND** the container remains in running state
 
 ### Requirement: No Secrets in Image
 

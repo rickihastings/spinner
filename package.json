@@ -1,13 +1,13 @@
 {
-  "name": "docker-sandbox",
+  "name": "spinner",
   "version": "0.1.0",
   "type": "module",
   "description": "CLI tool for running code and commands in isolated Docker containers",
   "main": "dist/index.js",
   "bin": {
-    "docker-sandbox": "dist/cli.js"
+    "spinner": "dist/cli.js"
   },
-  "repository": "git@github.com:rickihastings/docker-sandbox.git",
+  "repository": "git@github.com:rickihastings/spinner.git",
   "author": "Ricki Hastings",
   "license": "MIT",
   "engines": {
@@ -18,7 +18,7 @@
     "dev": "tsc --watch",
     "lint": "eslint src --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "test": "bash tests/run.sh"
+    "test": "yarn build && bash tests/run.sh"
   },
   "dependencies": {
     "ink": "^6.6.0",

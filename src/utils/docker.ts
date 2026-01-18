@@ -13,7 +13,7 @@ export interface BuildConfig extends DockerfileConfig {
 }
 
 export function buildImage(config: BuildConfig): void {
-  const buildContext = join(tmpdir(), `docker-sandbox-${Date.now()}`);
+  const buildContext = join(tmpdir(), `spinner-${Date.now()}`);
   mkdirSync(buildContext, { recursive: true });
 
   const dockerfilePath = join(buildContext, 'Dockerfile');
@@ -23,7 +23,7 @@ export function buildImage(config: BuildConfig): void {
   });
   writeFileSync(dockerfilePath, dockerfile);
 
-  // Copy skill templates to build context
+  // Copy skill templates and startup script to build context
   const templatesDir = join(buildContext, 'templates');
   mkdirSync(templatesDir, { recursive: true });
 
@@ -31,7 +31,11 @@ export function buildImage(config: BuildConfig): void {
   const skillTemplateDest = join(templatesDir, 'task-implementation-lifecycle.skill.md');
   copyFileSync(skillTemplateSrc, skillTemplateDest);
 
-  const imageName = `docker-sandbox:${config.name}`;
+  const startupScriptSrc = join(__dirname, '../../templates/startup.sh');
+  const startupScriptDest = join(templatesDir, 'startup.sh');
+  copyFileSync(startupScriptSrc, startupScriptDest);
+
+  const imageName = `spinner:${config.name}`;
   execSync(`docker build --no-cache -t ${imageName} .`, {
     cwd: buildContext,
     stdio: 'inherit',
