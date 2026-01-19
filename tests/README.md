@@ -74,12 +74,11 @@ Before running tests, ensure:
 
 ### Setup Command Tests
 - Missing required flags validation
-- Docker image building (creates `spinner:test-env`)
+- Mutually exclusive flags validation (--base-image and --dockerfile)
+- Docker image building with default ubuntu:22.04 base (creates `spinner:test-env`)
+- Docker image building with custom --base-image flag
 - Image existence verification
 - Tool installation verification in container:
-  - Java (JDK 21)
-  - Node.js (via nvm)
-  - npm
   - Git
   - Claude CLI
 
@@ -97,8 +96,9 @@ Before running tests, ensure:
 
 The setup tests create a Docker image named `spinner:test-env` that is **reused** by all spin tests. This image:
 - Is created once during setup tests (test 03-successful-build.sh)
+- Uses the default ubuntu:22.04 base image
 - Persists between test runs for efficiency
-- Contains all required tools (Java, Node.js, Git, Claude)
+- Contains Git and Claude CLI (installed automatically by spinner)
 
 To clean up the test image:
 

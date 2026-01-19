@@ -7,8 +7,8 @@ export interface AppProps {
   command?: string;
   flags: {
     name?: string;
-    nodeVersion?: string;
-    jvmUrl?: string;
+    baseImage?: string;
+    dockerfile?: string;
     image?: string;
     repo?: string;
     help?: boolean;
@@ -20,17 +20,17 @@ const HELP_TEXT = `
 Spinner - CLI tool for running code in isolated Docker containers
 
 USAGE:
-  spinner setup --name <name> --jvm-url <url> [--node-version <version>]
+  spinner setup --name <name> [--base-image <image> | --dockerfile <path>]
   spinner spin --image <image> --repo <repo>
 
 COMMANDS:
-  setup    Build a Docker sandbox image with JDK and Node.js
+  setup    Build a Docker sandbox image with custom base image or Dockerfile
   spin     Spin up a development container from a pre-built image
 
 SETUP OPTIONS:
   --name <name>              Name for the Docker image (required)
-  --jvm-url <url>            URL to download JDK tarball (required)
-  --node-version <version>   Node.js version (default: 20)
+  --base-image <image>       Base Docker image (optional, default: ubuntu:22.04)
+  --dockerfile <path>        Path to custom Dockerfile (optional, mutually exclusive with --base-image)
 
 SPIN OPTIONS:
   --image <image>            Docker image name (required)
@@ -41,13 +41,16 @@ GENERAL OPTIONS:
   --version                  Show version information
 
 EXAMPLES:
-  spinner setup --name my-sandbox --jvm-url https://download.oracle.com/java/25/latest/jdk-25_linux-aarch64_bin.tar.gz
+  spinner setup --name my-sandbox
+  spinner setup --name my-sandbox --base-image ubuntu:22.04
+  spinner setup --name node-env --base-image node:20-bullseye
+  spinner setup --name custom-env --dockerfile ./Dockerfile.custom
   spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git
 
 NOTES:
-  - Setup: You must provide a JVM URL compatible with the target container architecture
-  - Setup: For ARM64/aarch64: use jdk-*_linux-aarch64_bin.tar.gz
-  - Setup: For x86_64: use jdk-*_linux-x64_bin.tar.gz
+  - Setup: Only Ubuntu/Debian-based images are supported (requires apt-get)
+  - Setup: The CLI ensures git and claude-code are installed in the final image
+  - Setup: If using --dockerfile, the custom Dockerfile is built first and used as base
   - Spin: SSH agent must be running on host system
   - Spin: Containers are persistent and must be manually stopped/removed
 `;
@@ -62,27 +65,36 @@ export const App: React.FC<AppProps> = ({ command, flags }) => {
   }
 
   if (command === 'setup') {
-    if (!flags.name || !flags.jvmUrl) {
+    if (!flags.name) {
       return (
         <Box flexDirection="column">
-          <Text color="red">
-            Error: Missing required flag{!flags.name && !flags.jvmUrl ? 's' : ''}:{' '}
-            {!flags.name ? '--name' : ''}
-            {!flags.name && !flags.jvmUrl ? ' and ' : ''}
-            {!flags.jvmUrl ? '--jvm-url' : ''}
-          </Text>
+          <Text color="red">Error: Missing required flag: --name</Text>
           <Text>
-            Usage: spinner setup --name &lt;name&gt; --jvm-url &lt;url&gt; [--node-version
-            &lt;version&gt;]
+            Usage: spinner setup --name &lt;name&gt; [--base-image &lt;image&gt; |
+            --dockerfile &lt;path&gt;]
           </Text>
         </Box>
       );
     }
 
-    // Default to Node.js LTS version 20 if not specified
-    const nodeVersion = flags.nodeVersion || '20';
+    if (flags.baseImage && flags.dockerfile) {
+      return (
+        <Box flexDirection="column">
+          <Text color="red">
+            Error: --base-image and --dockerfile are mutually exclusive
+          </Text>
+          <Text>Please provide only one of these flags</Text>
+        </Box>
+      );
+    }
 
-    return <Setup name={flags.name} nodeVersion={nodeVersion} jvmUrl={flags.jvmUrl} />;
+    return (
+      <Setup
+        name={flags.name}
+        baseImage={flags.baseImage}
+        dockerfile={flags.dockerfile}
+      />
+    );
   }
 
   if (command === 'spin') {

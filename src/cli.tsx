@@ -32,8 +32,8 @@ render(
     flags={
       flags as {
         name?: string;
-        nodeVersion?: string;
-        jvmUrl?: string;
+        baseImage?: string;
+        dockerfile?: string;
         image?: string;
         repo?: string;
         help?: boolean;

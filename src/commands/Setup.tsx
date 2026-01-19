@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
+import { existsSync } from 'fs';
 import { checkPrerequisites, PrerequisiteError } from '../utils/prerequisites.js';
 import { buildImage } from '../utils/docker.js';
 
 export interface SetupProps {
   name: string;
-  nodeVersion: string;
-  jvmUrl: string;
+  baseImage?: string;
+  dockerfile?: string;
 }
 
-export const Setup: React.FC<SetupProps> = ({ name, nodeVersion, jvmUrl }) => {
+export const Setup: React.FC<SetupProps> = ({ name, baseImage, dockerfile }) => {
   const [status, setStatus] = useState<'checking' | 'building' | 'success' | 'error'>('checking');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
@@ -19,8 +20,13 @@ export const Setup: React.FC<SetupProps> = ({ name, nodeVersion, jvmUrl }) => {
         setStatus('checking');
         checkPrerequisites();
 
+        // Validate Dockerfile path if provided
+        if (dockerfile && !existsSync(dockerfile)) {
+          throw new Error(`Dockerfile not found at path: ${dockerfile}`);
+        }
+
         setStatus('building');
-        buildImage({ name, nodeVersion, jvmUrl });
+        buildImage({ name, baseImage, dockerfile });
 
         setStatus('success');
       } catch (error) {
@@ -36,7 +42,7 @@ export const Setup: React.FC<SetupProps> = ({ name, nodeVersion, jvmUrl }) => {
     }
 
     run();
-  }, [name, nodeVersion, jvmUrl]);
+  }, [name, baseImage, dockerfile]);
 
   if (status === 'checking') {
     return (

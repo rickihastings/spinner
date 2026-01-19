@@ -4,7 +4,7 @@ CLI tool for running code in isolated Docker containers.
 
 ## Features
 
-- **Setup Command**: Build Docker sandbox images with JDK and Node.js
+- **Setup Command**: Build Docker sandbox images with custom base images or Dockerfiles
 - **Spin Command**: Spin up development containers from pre-built images with repository cloning
 
 ## Installation
@@ -19,15 +19,30 @@ npm link  # Optional: to use globally as 'spinner'
 
 ### Setup Command
 
-Build a Docker sandbox image with JDK and Node.js:
+Build a Docker sandbox image with a custom base image or Dockerfile:
 
 ```bash
-spinner setup --name my-sandbox --jvm-url <jdk-url> [--node-version 20]
+spinner setup --name my-sandbox [--base-image <image> | --dockerfile <path>]
 ```
 
-Example:
+The setup command ensures git and claude-code are installed in the final image. You can:
+- Use the default ubuntu:22.04 base (no flags needed)
+- Specify a custom base image with `--base-image`
+- Provide your own Dockerfile with `--dockerfile`
+
+**Note**: Only Ubuntu/Debian-based images are supported (requires apt-get).
+
+Examples:
+
 ```bash
-spinner setup --name my-env --jvm-url https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.6%2B7/OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.6_7.tar.gz
+# Use default ubuntu:22.04 base
+spinner setup --name my-env
+
+# Use a Node.js base image
+spinner setup --name node-env --base-image node:20-bullseye
+
+# Use a custom Dockerfile
+spinner setup --name custom-env --dockerfile ./Dockerfile.custom
 ```
 
 ### Spin Command
