@@ -15,43 +15,60 @@ The Ralph loop is named after the ghuntley/how-to-ralph-wiggum methodology where
 ## Goals / Non-Goals
 
 ### Goals
-- Enable autonomous feature implementation via Ralph loop
-- Container lifecycle tied to task completion (not indefinite)
+- Enable autonomous feature implementation via Ralph loop when prompt provided
+- Maintain backward compatibility (containers can still be idle without prompt)
+- Ralph loop runs on default branch when branch not specified
 - Support passing prompt string via CLI argument
-- Support branch selection via CLI argument
+- Support branch selection via CLI argument (optional)
 - Configurable max iterations with sensible default (100)
 - Detect completion via `~~ FEATURE_COMPLETED ~~` signal
+- Refactor spin logic to follow SOLID principles
 
 ### Non-Goals
 - Planning phase (tasks must pre-exist in repo)
 - Automatic git push (user handles pushing)
 - Health monitoring or external status reporting
 - Prompt file support (prompt is passed as string)
+- Breaking changes to existing idle container behavior
 
 ## Technical Implementation Plan
 
 ### Component Map
 
-| File | Change | Type |
-|------|--------|------|
-| `src/commands/Spin.tsx` | Add `--prompt`, `--branch`, `--max-iterations` flags | modify |
-| `templates/startup.sh` | Add branch checkout and Ralph loop execution | modify |
-| `templates/ralph-loop.sh` | New script containing the loop logic | create |
+| File                      | Change                                               | Type   |
+|---------------------------|------------------------------------------------------|--------|
+| `src/commands/Spin.tsx`   | Add `--prompt`, `--branch`, `--max-iterations` flags | modify |
+| `templates/startup.sh`    | Add branch checkout and Ralph loop execution         | modify |
+| `templates/ralph-loop.sh` | New script containing the loop logic                 | create |
 
 ### Approach
 
-1. **CLI changes** (Spin.tsx):
-   - Add required `--prompt` flag that accepts a prompt string
-   - Add required `--branch` flag that accepts a branch name
+1. **CLI changes**:
+   - Add optional `--prompt` flag that accepts a prompt string
+   - Add optional `--branch` flag that accepts a branch name
    - Add optional `--max-iterations` flag (default: 100)
-   - Pass as `PROMPT`, `BRANCH`, `MAX_ITERATIONS` environment variables to container
+   - Remove validation requiring both prompt and branch together
+   - Pass as `PROMPT`, `BRANCH` (if provided), `MAX_ITERATIONS` environment variables to container
 
-2. **Startup script** (startup.sh):
-   - After successful clone, checkout the specified branch
-   - If branch doesn't exist, create it from default branch
-   - Execute ralph-loop.sh
+2. **Refactor to SOLID principles** (utils/docker.ts):
+   - Extract spin logic from Spin.tsx into focused utility functions:
+     - `validatePrerequisites()` - Single responsibility: validation
+     - `generateContainerName()` - Single responsibility: name generation
+     - `buildDockerRunCommand()` - Single responsibility: command building
+     - `executeDockerRun()` - Single responsibility: execution
+     - `verifyContainerStatus()` - Single responsibility: status checking
+   - Define TypeScript interfaces for inputs/outputs (Dependency Inversion)
+   - Spin.tsx becomes thin orchestration layer (UI only)
 
-3. **Ralph loop** (ralph-loop.sh):
+3. **Startup script** (startup.sh):
+   - Check if `PROMPT` is set
+   - If set:
+     - If `BRANCH` is set: checkout or create the branch
+     - If `BRANCH` not set: stay on default branch
+     - Execute ralph-loop.sh
+   - If not set: idle with `tail -f /dev/null`
+
+4. **Ralph loop** (ralph-loop.sh):
    - Read prompt from `$PROMPT` environment variable
    - Loop: pipe prompt to `claude --dangerously-skip-permissions`
    - Track iteration count
@@ -92,21 +109,24 @@ exit 0
 
 ### Key Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| Separate ralph-loop.sh script | Cleaner separation, easier testing |
-| Prompt as string, not file | Simpler, more flexible - prompt doesn't need to exist in repo |
-| Max iterations default 100 | Safety limit to prevent runaway loops |
-| No git push on completion | User controls when to push; simpler implementation |
-| Use `--dangerously-skip-permissions` | Required for autonomous operation |
+| Decision                                     | Rationale                                                                        |
+|----------------------------------------------|----------------------------------------------------------------------------------|
+| Separate ralph-loop.sh script                | Cleaner separation, easier testing                                               |
+| Prompt as string, not file                   | Simpler, more flexible - prompt doesn't need to exist in repo                    |
+| Prompt and branch both optional              | Maintains backward compatibility; Ralph loop runs on default when branch omitted |
+| Max iterations default 100                   | Safety limit to prevent runaway loops                                            |
+| No git push on completion                    | User controls when to push; simpler implementation                               |
+| Use `--dangerously-skip-permissions`         | Required for autonomous operation                                                |
+| Extract spin logic to utils/docker.ts        | Follows SOLID principles; improves testability and maintainability               |
+| Use TypeScript interfaces for data contracts | Enables type safety and clear API boundaries                                     |
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|------|------------|
+| Risk                                              | Mitigation                                         |
+|---------------------------------------------------|----------------------------------------------------|
 | Loop exits at max iterations with incomplete work | 100 is generous default; work is committed locally |
-| Large Claude output memory usage | Stream output rather than capture all |
-| Branch doesn't exist | Auto-create from default branch |
+| Large Claude output memory usage                  | Stream output rather than capture all              |
+| Branch doesn't exist                              | Auto-create from default branch                    |
 
 ## Open Questions
 

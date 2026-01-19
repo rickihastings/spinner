@@ -11,6 +11,9 @@ export interface AppProps {
     dockerfile?: string;
     image?: string;
     repo?: string;
+    prompt?: string;
+    branch?: string;
+    maxIterations?: string;
     help?: boolean;
     version?: boolean;
   };
@@ -21,7 +24,7 @@ Spinner - CLI tool for running code in isolated Docker containers
 
 USAGE:
   spinner setup --name <name> [--base-image <image> | --dockerfile <path>]
-  spinner spin --image <image> --repo <repo>
+  spinner spin --image <image> --repo <repo> [--prompt <prompt> --branch <branch> [--max-iterations <num>]]
 
 COMMANDS:
   setup    Build a Docker sandbox image with custom base image or Dockerfile
@@ -35,6 +38,9 @@ SETUP OPTIONS:
 SPIN OPTIONS:
   --image <image>            Docker image name (required)
   --repo <repo>              Git SSH clone URL (required)
+  --prompt <prompt>          Prompt string for autonomous implementation (optional)
+  --branch <branch>          Branch to work on (optional, uses default branch if not specified)
+  --max-iterations <num>     Maximum Ralph loop iterations (optional, default: 100)
 
 GENERAL OPTIONS:
   --help                     Show this help message
@@ -46,6 +52,8 @@ EXAMPLES:
   spinner setup --name node-env --base-image node:20-bullseye
   spinner setup --name custom-env --dockerfile ./Dockerfile.custom
   spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git
+  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X"
+  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X" --branch feature/x
 
 NOTES:
   - Setup: Only Ubuntu/Debian-based images are supported (requires apt-get)
@@ -70,8 +78,8 @@ export const App: React.FC<AppProps> = ({ command, flags }) => {
         <Box flexDirection="column">
           <Text color="red">Error: Missing required flag: --name</Text>
           <Text>
-            Usage: spinner setup --name &lt;name&gt; [--base-image &lt;image&gt; |
-            --dockerfile &lt;path&gt;]
+            Usage: spinner setup --name &lt;name&gt; [--base-image &lt;image&gt; | --dockerfile
+            &lt;path&gt;]
           </Text>
         </Box>
       );
@@ -80,21 +88,13 @@ export const App: React.FC<AppProps> = ({ command, flags }) => {
     if (flags.baseImage && flags.dockerfile) {
       return (
         <Box flexDirection="column">
-          <Text color="red">
-            Error: --base-image and --dockerfile are mutually exclusive
-          </Text>
+          <Text color="red">Error: --base-image and --dockerfile are mutually exclusive</Text>
           <Text>Please provide only one of these flags</Text>
         </Box>
       );
     }
 
-    return (
-      <Setup
-        name={flags.name}
-        baseImage={flags.baseImage}
-        dockerfile={flags.dockerfile}
-      />
-    );
+    return <Setup name={flags.name} baseImage={flags.baseImage} dockerfile={flags.dockerfile} />;
   }
 
   if (command === 'spin') {
@@ -118,7 +118,15 @@ export const App: React.FC<AppProps> = ({ command, flags }) => {
       );
     }
 
-    return <Spin image={flags.image} repo={flags.repo} />;
+    return (
+      <Spin
+        image={flags.image}
+        repo={flags.repo}
+        prompt={flags.prompt}
+        branch={flags.branch}
+        maxIterations={flags.maxIterations}
+      />
+    );
   }
 
   return (

@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
-import { execSync } from 'child_process';
-import { existsSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
+import {
+  validatePrerequisites,
+  generateContainerName,
+  buildDockerRunCommand,
+  executeDockerRun,
+  verifyContainerStatus,
+  type SpinConfig,
+} from '../utils/docker.js';
 
 export interface SpinProps {
   image: string;
   repo: string;
+  prompt?: string;
+  branch?: string;
+  maxIterations?: string;
 }
 
-export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
+export const Spin: React.FC<SpinProps> = ({ image, repo, prompt, branch, maxIterations }) => {
   const [status, setStatus] = useState<'validating' | 'creating' | 'success' | 'error'>(
     'validating',
   );
@@ -22,108 +29,46 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
     async function run() {
       try {
         setStatus('validating');
-        const warningsList: string[] = [];
 
-        // Check if Docker image exists
-        try {
-          execSync(`docker image inspect ${image}`, { stdio: 'ignore' });
-        } catch {
-          throw new Error(`Docker image '${image}' not found`);
+        const config: SpinConfig = {
+          image,
+          repo,
+          prompt,
+          branch,
+          maxIterations,
+        };
+
+        // Validate prerequisites
+        const validationResult = validatePrerequisites(config);
+        if (!validationResult.valid) {
+          throw new Error(validationResult.error);
         }
 
-        // Check SSH_AUTH_SOCK
-        const sshAuthSock = process.env.SSH_AUTH_SOCK;
-        if (!sshAuthSock || !existsSync(sshAuthSock)) {
-          throw new Error('SSH agent not running. Start ssh-agent and add your key.');
-        }
-
-        // Check ~/.npmrc
-        const npmrcPath = join(homedir(), '.npmrc');
-        const hasNpmrc = existsSync(npmrcPath);
-        if (!hasNpmrc) {
-          warningsList.push('~/.npmrc not found, npm will use default registry');
-        }
-
-        // Generate container name from repo
-        const repoName =
-          repo
-            .split('/')
-            .pop()
-            ?.replace(/\.git$/, '') || 'sandbox';
-        const timestamp = Date.now();
-        const generatedName = `${repoName}-${timestamp}`;
+        // Generate container name
+        const generatedName = generateContainerName(repo);
         setContainerName(generatedName);
 
         setStatus('creating');
-        setWarnings(warningsList);
+        setWarnings(validationResult.warnings);
 
         // Build docker run command
-        const dockerArgs = [
-          'run',
-          '-d',
-          '--name',
+        const dockerArgs = buildDockerRunCommand(
+          config,
           generatedName,
-          '-v',
-          `${sshAuthSock}:/ssh-agent`,
-          '-e',
-          'SSH_AUTH_SOCK=/ssh-agent',
-          '-e',
-          `REPO_URL=${repo}`,
-        ];
+          validationResult.sshAuthSock!,
+          validationResult.hasNpmrc,
+        );
 
-        // Add .npmrc mount if it exists
-        if (hasNpmrc) {
-          dockerArgs.push('-v', `${npmrcPath}:/root/.npmrc`);
-        }
-
-        // Add image
-        dockerArgs.push(image);
-
-        // Execute docker run (no explicit command - uses image's built-in startup.sh)
-        try {
-          execSync(`docker ${dockerArgs.join(' ')}`, {
-            stdio: 'pipe',
-            encoding: 'utf-8',
-          });
-        } catch (error: unknown) {
-          // Container may have started but clone failed
-          // Try to get the git error message from container logs
-          try {
-            const logs = execSync(`docker logs ${generatedName}`, {
-              encoding: 'utf-8',
-              stdio: 'pipe',
-            });
-            throw new Error(`Git clone failed: ${logs.trim()}`);
-          } catch {
-            const message = error instanceof Error ? error.message : 'Failed to create container';
-            const stderr = error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : '';
-            throw new Error(stderr || message);
-          }
+        // Execute docker run
+        const runResult = executeDockerRun(dockerArgs, generatedName);
+        if (!runResult.success) {
+          throw new Error(runResult.error);
         }
 
         // Verify container is running
-        try {
-          const containerStatus = execSync(
-            `docker inspect -f '{{.State.Status}}' ${generatedName}`,
-            {
-              encoding: 'utf-8',
-              stdio: 'pipe',
-            },
-          ).trim();
-
-          if (containerStatus !== 'running') {
-            // Get logs to show what went wrong
-            const logs = execSync(`docker logs ${generatedName}`, {
-              encoding: 'utf-8',
-              stdio: 'pipe',
-            });
-            throw new Error(`Container exited. Logs: ${logs.trim()}`);
-          }
-        } catch (error: unknown) {
-          if (error instanceof Error && error.message.includes('Container exited')) {
-            throw error;
-          }
-          throw new Error('Failed to verify container status');
+        const statusResult = verifyContainerStatus(generatedName);
+        if (!statusResult.success) {
+          throw new Error(statusResult.error);
         }
 
         setStatus('success');
@@ -138,7 +83,7 @@ export const Spin: React.FC<SpinProps> = ({ image, repo }) => {
     }
 
     run();
-  }, [image, repo]);
+  }, [image, repo, prompt, branch, maxIterations]);
 
   if (status === 'validating') {
     return (

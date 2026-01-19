@@ -7,6 +7,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN command -v git > /dev/null 2>&1 || \
     (apt-get update && apt-get install -y git ca-certificates curl && rm -rf /var/lib/apt/lists/*)
 
+# Add GitHub's SSH host keys to known_hosts
+RUN mkdir -p /root/.ssh && \
+    ssh-keyscan -H github.com >> /root/.ssh/known_hosts && \
+    chmod 700 /root/.ssh && \
+    chmod 600 /root/.ssh/known_hosts
+
 # Install claude-code if not present
 RUN command -v claude > /dev/null 2>&1 || \
     (curl -fsSL https://claude.ai/install.sh | bash)
@@ -16,10 +22,14 @@ WORKDIR /workspace
 
 # Copy skill templates
 RUN mkdir -p /root/.claude/skills
-COPY templates/skills/task-implementation-lifecycle.skill.md /root/.claude/skills/
+COPY templates/skills/task-implementation-lifecycle/SKILL.md /root/.claude/skills/task-implementation-lifecycle
 
 # Copy and set up startup script
 COPY templates/scripts/startup.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
+
+# Copy and set up Ralph loop script
+COPY templates/scripts/ralph-loop.sh /usr/local/bin/ralph-loop.sh
+RUN chmod +x /usr/local/bin/ralph-loop.sh
 
 CMD ["/usr/local/bin/startup.sh"]

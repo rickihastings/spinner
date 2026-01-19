@@ -4,21 +4,28 @@
 
 The spin command SHALL accept a required `--prompt` flag containing the prompt string to feed to Claude in each iteration of the Ralph loop.
 
-#### Scenario: Prompt provided
+#### Scenario: Prompt provided with branch
 
 - **WHEN** user runs `spin --image spinner:my-env --repo git@github.com:user/repo.git --prompt "study and implement plan for feature-x" --branch feature-x`
 - **THEN** the CLI passes `PROMPT="study and implement plan for feature-x"` as an environment variable to the container
-- **AND** the container runs in Ralph loop mode after cloning
+- **AND** the CLI passes `BRANCH=feature-x` as an environment variable to the container
+- **AND** the container runs in Ralph loop mode on the specified branch after cloning
+
+#### Scenario: Prompt provided without branch
+
+- **WHEN** user runs `spin --image spinner:my-env --repo git@github.com:user/repo.git --prompt "study and implement plan for feature-x"` without `--branch`
+- **THEN** the CLI passes `PROMPT="study and implement plan for feature-x"` as an environment variable to the container
+- **AND** the container runs in Ralph loop mode on the default branch after cloning
 
 #### Scenario: Prompt not provided
 
 - **WHEN** user runs `spin --image spinner:my-env --repo git@github.com:user/repo.git` without `--prompt`
-- **THEN** the CLI exits with an error message: "Error: --prompt is required"
-- **AND** no container is created
+- **THEN** the container clones the repository and stays idle
+- **AND** no Ralph loop is executed
 
 ### Requirement: Branch Flag
 
-The spin command SHALL accept a required `--branch` flag specifying which branch to checkout and work on after cloning the repository.
+The spin command SHALL accept an optional `--branch` flag specifying which branch to checkout and work on after cloning the repository. If not provided and `--prompt` is present, the Ralph loop runs on the default branch.
 
 #### Scenario: Branch provided
 
@@ -31,6 +38,13 @@ The spin command SHALL accept a required `--branch` flag specifying which branch
 - **WHEN** the container attempts to checkout a branch that does not exist
 - **THEN** the container creates the branch from the default branch
 - **AND** continues with Ralph loop execution
+
+#### Scenario: Branch not provided but prompt provided
+
+- **WHEN** user runs `spin --repo git@... --prompt "..."` without `--branch`
+- **THEN** the CLI does not pass a `BRANCH` environment variable to the container
+- **AND** after cloning, the container stays on the default branch
+- **AND** the Ralph loop executes on the default branch
 
 ### Requirement: Max Iterations Flag
 
@@ -89,13 +103,27 @@ The Ralph loop SHALL monitor Claude's output for the `~~ FEATURE_COMPLETED ~~` s
 
 The container SHALL use the baked-in startup script at /usr/local/bin/startup.sh as its entrypoint. The startup script handles repository cloning, branch checkout, and Ralph loop execution.
 
-#### Scenario: Container startup sequence
+#### Scenario: Container startup sequence with branch
 
-- **WHEN** the container starts
+- **WHEN** the container starts with `PROMPT` and `BRANCH` environment variables set
 - **THEN** the startup script clones the repository from `REPO_URL`
 - **AND** checks out the branch specified in `BRANCH` (creating it if it doesn't exist)
 - **AND** executes the Ralph loop with the prompt from `PROMPT`
 - **AND** runs until `~~ FEATURE_COMPLETED ~~` is detected or `MAX_ITERATIONS` is reached
+
+#### Scenario: Container startup sequence without branch
+
+- **WHEN** the container starts with `PROMPT` environment variable set but `BRANCH` is not set
+- **THEN** the startup script clones the repository from `REPO_URL`
+- **AND** stays on the default branch
+- **AND** executes the Ralph loop with the prompt from `PROMPT`
+- **AND** runs until `~~ FEATURE_COMPLETED ~~` is detected or `MAX_ITERATIONS` is reached
+
+#### Scenario: Container startup without prompt
+
+- **WHEN** the container starts without `PROMPT` environment variable set
+- **THEN** the startup script clones the repository from `REPO_URL`
+- **AND** the container stays idle without executing Ralph loop
 
 #### Scenario: Clone failure
 

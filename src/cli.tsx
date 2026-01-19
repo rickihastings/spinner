@@ -36,6 +36,9 @@ render(
         dockerfile?: string;
         image?: string;
         repo?: string;
+        prompt?: string;
+        branch?: string;
+        maxIterations?: string;
         help?: boolean;
         version?: boolean;
       }
