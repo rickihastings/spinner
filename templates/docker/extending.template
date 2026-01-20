@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install git if not present
 RUN command -v git > /dev/null 2>&1 || \
-    (apt-get update && apt-get install -y git ca-certificates curl && rm -rf /var/lib/apt/lists/*)
+    (apt-get update && apt-get install -y git ca-certificates curl sudo && rm -rf /var/lib/apt/lists/*)
 
 # Install GitHub CLI (gh)
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
@@ -15,23 +15,37 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
+# Create non-root user
+RUN useradd -m -s /bin/bash spinner && \
+    echo "spinner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Switch to spinner user for Claude installation
+USER spinner
+WORKDIR /home/spinner
+
 # Install claude-code if not present
 RUN command -v claude > /dev/null 2>&1 || \
     (curl -fsSL https://claude.ai/install.sh | bash)
-ENV PATH=/root/.local/bin:${PATH}
-
-WORKDIR /workspace
+ENV PATH=/home/spinner/.local/bin:${PATH}
 
 # Copy skill templates
-RUN mkdir -p /root/.claude/skills
-COPY templates/skills/task-implementation-lifecycle/SKILL.md /root/.claude/skills/task-implementation-lifecycle
+RUN mkdir -p /home/spinner/.claude/skills
+COPY --chown=spinner:spinner templates/skills/task-implementation-lifecycle/SKILL.md /home/spinner/.claude/skills/task-implementation-lifecycle
 
 # Copy and set up startup script
+USER root
 COPY templates/scripts/startup.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
 
 # Copy and set up Ralph loop script
 COPY templates/scripts/ralph-loop.sh /usr/local/bin/ralph-loop.sh
 RUN chmod +x /usr/local/bin/ralph-loop.sh
+
+# Set up workspace directory with correct ownership
+RUN mkdir -p /workspace && chown spinner:spinner /workspace
+
+# Switch back to spinner user
+USER spinner
+WORKDIR /workspace
 
 CMD ["/usr/local/bin/startup.sh"]

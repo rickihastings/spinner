@@ -43,6 +43,17 @@ function escapeShellArg(arg: string): string {
   return `'${arg.replace(/'/g, "'\\''")}'`;
 }
 
+/**
+ * Converts SSH Git URLs to HTTPS format for GitHub PAT authentication.
+ * Example: git@github.com:user/repo.git -> https://github.com/user/repo.git
+ */
+function convertSshToHttps(repoUrl: string): string {
+  if (repoUrl.startsWith('git@github.com:')) {
+    return repoUrl.replace(/^git@github\.com:/, 'https://github.com/');
+  }
+  return repoUrl;
+}
+
 export function buildImage(config: BuildConfig): void {
   const buildContext = join(tmpdir(), `spinner-${Date.now()}`);
   mkdirSync(buildContext, { recursive: true });
@@ -87,7 +98,7 @@ export function buildImage(config: BuildConfig): void {
   copyFileSync(ralphLoopScriptSrc, ralphLoopScriptDest);
 
   const imageName = `spinner:${config.name}`;
-  execSync(`docker build --no-cache -t ${imageName} .`, {
+  execSync(`docker build -t ${imageName} .`, {
     cwd: buildContext,
     stdio: 'inherit',
   });
@@ -95,7 +106,7 @@ export function buildImage(config: BuildConfig): void {
 
 /**
  * Validates prerequisites for spinning up a container.
- * Checks: Docker image exists, valid git repo URL, GITHUB_TOKEN is set, npmrc availability.
+ * Checks: Docker image exists, valid git repo URL, GITHUB_TOKEN is set, CLAUDE_CODE_OAUTH_TOKEN is set, npmrc availability.
  */
 export function validatePrerequisites(config: SpinConfig): ValidationResult {
   const warnings: string[] = [];
@@ -138,6 +149,18 @@ export function validatePrerequisites(config: SpinConfig): ValidationResult {
     };
   }
 
+  // Check CLAUDE_CODE_OAUTH_TOKEN
+  const claudeToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  if (!claudeToken) {
+    return {
+      valid: false,
+      error:
+        'CLAUDE_CODE_OAUTH_TOKEN environment variable not set. Please set CLAUDE_CODE_OAUTH_TOKEN before running spin.',
+      warnings,
+      hasNpmrc: false,
+    };
+  }
+
   // Check ~/.npmrc
   const npmrcPath = join(homedir(), '.npmrc');
   const hasNpmrc = existsSync(npmrcPath);
@@ -173,6 +196,9 @@ export function buildDockerRunCommand(
   containerName: string,
   hasNpmrc: boolean,
 ): string[] {
+  // Convert SSH URLs to HTTPS for GitHub PAT authentication
+  const repoUrl = convertSshToHttps(config.repo);
+
   const dockerArgs = [
     'run',
     '-d',
@@ -181,7 +207,9 @@ export function buildDockerRunCommand(
     '-e',
     `GITHUB_TOKEN=${process.env.GITHUB_TOKEN}`,
     '-e',
-    `REPO_URL=${config.repo}`,
+    `CLAUDE_CODE_OAUTH_TOKEN=${process.env.CLAUDE_CODE_OAUTH_TOKEN}`,
+    '-e',
+    `REPO_URL=${repoUrl}`,
   ];
 
   // Add Ralph loop environment variables if prompt is provided
@@ -198,7 +226,7 @@ export function buildDockerRunCommand(
   // Add .npmrc mount if it exists
   if (hasNpmrc) {
     const npmrcPath = join(homedir(), '.npmrc');
-    dockerArgs.push('-v', `${npmrcPath}:/root/.npmrc`);
+    dockerArgs.push('-v', `${npmrcPath}:/home/spinner/.npmrc`);
   }
 
   // Add image

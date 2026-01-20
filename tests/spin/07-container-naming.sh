@@ -1,7 +1,10 @@
 #!/bin/bash
-# Test: container is running after spin command completes
+# Test: container is named correctly based on repo name
 
-echo "Test: Container is running"
+echo "Test: Container naming"
+
+# Source environment variables
+source ../../.envrc
 
 # Cleanup function
 cleanup() {
@@ -29,14 +32,11 @@ if [ -z "$CONTAINER_NAME" ]; then
   exit 1
 fi
 
-# Check if container is running
-if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-  status=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME")
-  if [ "$status" = "running" ]; then
-    echo "✓ Test passed: Container is running"
-    exit 0
-  fi
+# Check if container name starts with expected prefix (Hello-World)
+if echo "$CONTAINER_NAME" | grep -q "^Hello-World-"; then
+  echo "✓ Test passed: Container named correctly: $CONTAINER_NAME"
+  exit 0
 fi
 
-echo "✗ Test failed: Container is not running"
+echo "✗ Test failed: Container name does not match expected pattern: $CONTAINER_NAME"
 exit 1

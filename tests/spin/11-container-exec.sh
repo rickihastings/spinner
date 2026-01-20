@@ -1,7 +1,10 @@
 #!/bin/bash
-# Test: container is named correctly based on repo name
+# Test: container can be exec'd into with bash
 
-echo "Test: Container naming"
+echo "Test: Container can be exec'd into with bash"
+
+# Source environment variables
+source ../../.envrc
 
 # Cleanup function
 cleanup() {
@@ -13,12 +16,6 @@ cleanup() {
 }
 
 trap cleanup EXIT
-
-# Check if GITHUB_TOKEN is set
-if [ -z "$GITHUB_TOKEN" ]; then
-  echo "⚠ Skipping test: GITHUB_TOKEN not set"
-  exit 0
-fi
 
 # Use a public test repository
 # Note: assumes spinner:test-env exists from setup tests
@@ -35,11 +32,11 @@ if [ -z "$CONTAINER_NAME" ]; then
   exit 1
 fi
 
-# Check if container name starts with expected prefix (Hello-World)
-if echo "$CONTAINER_NAME" | grep -q "^Hello-World-"; then
-  echo "✓ Test passed: Container named correctly: $CONTAINER_NAME"
+# Try to exec into container
+if docker exec "$CONTAINER_NAME" bash -c "pwd" >/dev/null 2>&1; then
+  echo "✓ Test passed: Can exec into container with bash"
   exit 0
 fi
 
-echo "✗ Test failed: Container name does not match expected pattern: $CONTAINER_NAME"
+echo "✗ Test failed: Cannot exec into container"
 exit 1

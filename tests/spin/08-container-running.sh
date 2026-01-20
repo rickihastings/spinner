@@ -1,7 +1,10 @@
 #!/bin/bash
-# Test: private repository clone with GITHUB_TOKEN
+# Test: container is running after spin command completes
 
-echo "Test: Private repository clone"
+echo "Test: Container is running"
+
+# Source environment variables
+source ../../.envrc
 
 # Cleanup function
 cleanup() {
@@ -14,15 +17,9 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Check if GITHUB_TOKEN is set
-if [ -z "$GITHUB_TOKEN" ]; then
-  echo "⚠ Skipping test: GITHUB_TOKEN not set"
-  exit 0
-fi
-
-# Use this private repository
+# Use a public test repository
 # Note: assumes spinner:test-env exists from setup tests
-TEST_REPO="https://github.com/rickihastings/spinner.git"
+TEST_REPO="https://github.com/octocat/Hello-World.git"
 
 # Run spin command
 output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
@@ -32,18 +29,17 @@ CONTAINER_NAME=$(echo "$output" | sed -n 's/.*Container created successfully: \(
 
 if [ -z "$CONTAINER_NAME" ]; then
   echo "✗ Test failed: Could not extract container name"
-  echo "Output: $output"
   exit 1
 fi
 
-# Wait a moment for clone to complete
-sleep 3
-
-# Check if /workspace exists and has content
-if docker exec "$CONTAINER_NAME" test -d /workspace/.git; then
-  echo "✓ Test passed: Private repository cloned successfully"
-  exit 0
+# Check if container is running
+if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+  status=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME")
+  if [ "$status" = "running" ]; then
+    echo "✓ Test passed: Container is running"
+    exit 0
+  fi
 fi
 
-echo "✗ Test failed: Private repository not cloned"
+echo "✗ Test failed: Container is not running"
 exit 1

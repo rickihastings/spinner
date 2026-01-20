@@ -3,6 +3,9 @@
 
 echo "Test: --max-iterations defaults to 100"
 
+# Source environment variables
+source ../../.envrc
+
 # Cleanup function
 cleanup() {
   if [ -n "$CONTAINER_NAME" ]; then

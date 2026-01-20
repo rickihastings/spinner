@@ -3,6 +3,9 @@
 
 echo "Test: Warning displayed when .npmrc missing"
 
+# Source environment variables
+source ../../.envrc
+
 # Cleanup function
 cleanup() {
   if [ -n "$CONTAINER_NAME" ]; then

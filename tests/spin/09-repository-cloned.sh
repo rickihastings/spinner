@@ -1,7 +1,10 @@
 #!/bin/bash
-# Test: container can be exec'd into with bash
+# Test: repository is cloned into /workspace inside container
 
-echo "Test: Container can be exec'd into with bash"
+echo "Test: Repository cloned into /workspace"
+
+# Source environment variables
+source ../../.envrc
 
 # Cleanup function
 cleanup() {
@@ -29,11 +32,14 @@ if [ -z "$CONTAINER_NAME" ]; then
   exit 1
 fi
 
-# Try to exec into container
-if docker exec "$CONTAINER_NAME" bash -c "pwd" >/dev/null 2>&1; then
-  echo "✓ Test passed: Can exec into container with bash"
+# Wait a moment for clone to complete
+sleep 2
+
+# Check if /workspace exists and has content
+if docker exec "$CONTAINER_NAME" test -d /workspace/.git; then
+  echo "✓ Test passed: Repository cloned into /workspace"
   exit 0
 fi
 
-echo "✗ Test failed: Cannot exec into container"
+echo "✗ Test failed: Repository not found in /workspace"
 exit 1

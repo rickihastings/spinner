@@ -3,6 +3,9 @@
 
 echo "Test: --prompt without --branch runs on default branch"
 
+# Source environment variables
+source ../../.envrc
+
 # Cleanup function
 cleanup() {
   if [ -n "$CONTAINER_NAME" ]; then

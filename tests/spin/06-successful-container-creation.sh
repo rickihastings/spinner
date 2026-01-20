@@ -3,6 +3,9 @@
 
 echo "Test: Successful container creation"
 
+# Source environment variables
+source ../../.envrc
+
 # Cleanup function
 cleanup() {
   echo "Cleaning up..."
@@ -16,12 +19,6 @@ cleanup() {
 }
 
 trap cleanup EXIT INT TERM
-
-# Check if GITHUB_TOKEN is set
-if [ -z "$GITHUB_TOKEN" ]; then
-  echo "⚠ Skipping test: GITHUB_TOKEN not set"
-  exit 0
-fi
 
 # Create a temporary public test repository URL (using a real public repo)
 # Note: assumes spinner:test-env exists from setup tests
