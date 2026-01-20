@@ -30,7 +30,7 @@ ENV PATH=/home/spinner/.local/bin:${PATH}
 
 # Copy skill templates
 RUN mkdir -p /home/spinner/.claude/skills
-COPY --chown=spinner:spinner templates/skills/task-implementation-lifecycle/SKILL.md /home/spinner/.claude/skills/task-implementation-lifecycle
+COPY --chown=spinner:spinner templates/skills/task-implementation-lifecycle/SKILL.md /home/spinner/.claude/skills/task-implementation-lifecycle/SKILL.md
 
 # Copy and set up startup script
 USER root
@@ -42,10 +42,10 @@ COPY templates/scripts/ralph-loop.sh /usr/local/bin/ralph-loop.sh
 RUN chmod +x /usr/local/bin/ralph-loop.sh
 
 # Set up workspace directory with correct ownership
-RUN mkdir -p /workspace && chown spinner:spinner /workspace
+RUN mkdir -p /home/spinner/workspace && chown spinner:spinner /home/spinner/workspace
 
 # Switch back to spinner user
 USER spinner
-WORKDIR /workspace
+WORKDIR /home/spinner/workspace
 
 CMD ["/usr/local/bin/startup.sh"]

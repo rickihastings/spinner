@@ -56,7 +56,7 @@ contain git and claude-code (installed only if missing from the base). The image
 
 ### Requirement: Startup Script Inclusion
 
-The Docker image SHALL include a startup script at /usr/local/bin/startup.sh that handles repository cloning and container initialization. The script SHALL accept a REPO_URL environment variable, clone the repository to /workspace, verify the clone with `git status`, output a hello message, and keep the container running with `tail -f /dev/null`.
+The Docker image SHALL include a startup script at /usr/local/bin/startup.sh that handles repository cloning and container initialization. The script SHALL accept a REPO_URL environment variable, clone the repository to /home/spinner/workspace, verify the clone with `git status`, output a hello message, and keep the container running with `tail -f /dev/null`.
 
 #### Scenario: Startup script exists in image
 
@@ -66,7 +66,7 @@ The Docker image SHALL include a startup script at /usr/local/bin/startup.sh tha
 #### Scenario: Startup script clones repository
 
 - **WHEN** the container starts with REPO_URL environment variable set
-- **THEN** the startup script clones the repository to /workspace
+- **THEN** the startup script clones the repository to /home/spinner/workspace
 - **AND** runs `git status` to verify the clone
 - **AND** outputs a hello message
 

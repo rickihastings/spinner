@@ -9,6 +9,8 @@ Verify a task list exists before beginning. If not found, alert the user and hal
 
 ## The 10-Step Lifecycle
 
+**IMPORTANT** - FOLLOW THESE RULES TO THE LETTER, DO NOT IMPLEMENT ALL TASKS AT ONCE.
+
 ### 1. Orient
 
 Read available specifications and understand the implementation goal. Spec-agnostic (supports OpenSpec, speckit, or any
@@ -20,7 +22,7 @@ Find and read the task list (tasks.md, TODO.md, etc). Review all tasks and ident
 
 ### 3. Select Task
 
-Select the next incomplete task and mark it as in-progress. If the spec indicates multiple tasks can be done in
+Select the next incomplete task and mark it as in-progress. ONLY IF the spec indicates multiple tasks can be done in
 parallel, you may select and process them together.
 
 ### 4. Investigate

@@ -24,7 +24,7 @@ fi
 echo "Cloning repository: $REPO_URL"
 git clone "$REPO_URL" .
 
-echo "Repository cloned to /workspace"
+echo "Repository cloned to /home/spinner/workspace"
 
 echo "Verifying clone..."
 git status

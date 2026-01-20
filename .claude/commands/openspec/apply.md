@@ -12,7 +12,7 @@ tags: [openspec, apply]
 
 **Steps**
 1. Read `changes/<id>/proposal.md`, `design.md` (if present), and `tasks.md` to confirm scope and acceptance criteria.
-2. Use 'task-implementation-lifecycle' skill to implement the tasks.
+2. As per task implementation lifecycle skill, identify first task to implement.
 3. Reference `openspec list` or `openspec show <item>` when additional context is required.
 
 **Reference**

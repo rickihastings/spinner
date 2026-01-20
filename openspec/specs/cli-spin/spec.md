@@ -144,7 +144,7 @@ the CLI SHALL proceed without mounting and display a warning message.
 
 ### Requirement: Repository Cloning
 
-The container SHALL automatically clone the repository specified by --repo into /workspace during startup. The CLI SHALL
+The container SHALL automatically clone the repository specified by --repo into /home/spinner/workspace during startup. The CLI SHALL
 pass the repository URL to the container via the REPO_URL environment variable. The container's startup script (baked into
 the image at /usr/local/bin/startup.sh) SHALL handle the cloning, verification, and initialization. If the clone fails, the
 container SHALL exit with a non-zero status.
@@ -152,7 +152,7 @@ container SHALL exit with a non-zero status.
 #### Scenario: Successful repository clone
 
 - **WHEN** the container starts with a valid --repo URL passed as REPO_URL environment variable
-- **THEN** the repository is cloned into /workspace by the startup script
+- **THEN** the repository is cloned into /home/spinner/workspace by the startup script
 - **AND** the startup script runs `git status` to verify the clone
 - **AND** the startup script outputs "hello world" to confirm successful initialization
 - **AND** the container remains running after clone completes
@@ -199,7 +199,7 @@ and a timestamp or random suffix.
 
 - **WHEN** the container is running
 - **THEN** user can exec into it with `docker exec -it <container-name> bash`
-- **AND** the working directory is /workspace
+- **AND** the working directory is /home/spinner/workspace
 
 ### Requirement: Container Lifecycle Management
 

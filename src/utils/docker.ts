@@ -242,7 +242,7 @@ export function buildDockerRunCommand(
  */
 export function executeDockerRun(dockerArgs: string[], containerName: string): ContainerResult {
   try {
-    mkdirSync(join(homedir(), '.spinner', containerName, 'logs'));
+    mkdirSync(join(homedir(), '.spinner', containerName, 'logs'), { recursive: true });
 
     execSync(`docker ${dockerArgs.join(' ')}`, {
       stdio: 'pipe',

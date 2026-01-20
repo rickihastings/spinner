@@ -36,8 +36,8 @@ fi
 # Wait a moment for clone to complete
 sleep 3
 
-# Check if /workspace exists and has content
-if docker exec "$CONTAINER_NAME" test -d /workspace/.git; then
+# Check if /home/spinner/workspace exists and has content
+if docker exec "$CONTAINER_NAME" test -d /home/spinner/workspace/.git; then
   echo "✓ Test passed: Private repository cloned successfully"
   exit 0
 fi

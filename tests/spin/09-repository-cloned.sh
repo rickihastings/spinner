@@ -1,7 +1,7 @@
 #!/bin/bash
-# Test: repository is cloned into /workspace inside container
+# Test: repository is cloned into /home/spinner/workspace inside container
 
-echo "Test: Repository cloned into /workspace"
+echo "Test: Repository cloned into /home/spinner/workspace"
 
 # Source environment variables
 source ../../.envrc
@@ -35,11 +35,11 @@ fi
 # Wait a moment for clone to complete
 sleep 2
 
-# Check if /workspace exists and has content
-if docker exec "$CONTAINER_NAME" test -d /workspace/.git; then
-  echo "✓ Test passed: Repository cloned into /workspace"
+# Check if /home/spinner/workspace exists and has content
+if docker exec "$CONTAINER_NAME" test -d /home/spinner/workspace/.git; then
+  echo "✓ Test passed: Repository cloned into /home/spinner/workspace"
   exit 0
 fi
 
-echo "✗ Test failed: Repository not found in /workspace"
+echo "✗ Test failed: Repository not found in /home/spinner/workspace"
 exit 1

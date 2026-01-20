@@ -66,7 +66,7 @@ The container will:
 
 - Use GitHub Personal Access Token for git authentication
 - Mount your ~/.npmrc for npm registry access
-- Clone the repository into /workspace
+- Clone the repository into /home/spinner/workspace
 - Run in the background for multiple exec sessions
 
 Access the container:
