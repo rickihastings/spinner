@@ -26,6 +26,7 @@ spinner setup --name my-sandbox [--base-image <image> | --dockerfile <path>]
 ```
 
 The setup command ensures git and claude-code are installed in the final image. You can:
+
 - Use the default ubuntu:22.04 base (no flags needed)
 - Specify a custom base image with `--base-image`
 - Provide your own Dockerfile with `--dockerfile`
@@ -50,24 +51,45 @@ spinner setup --name custom-env --dockerfile ./Dockerfile.custom
 Spin up a development container with a cloned repository:
 
 ```bash
-spinner spin --image <docker-image> --repo <git-ssh-url>
+export GITHUB_TOKEN=<your-github-token>
+spinner spin --image <docker-image> --repo <git-url>
 ```
 
 Example:
+
 ```bash
-spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+spinner spin --image spinner:my-env --repo https://github.com/octocat/Hello-World.git
 ```
 
 The container will:
-- Mount your SSH agent for git authentication
+
+- Use GitHub Personal Access Token for git authentication
 - Mount your ~/.npmrc for npm registry access
 - Clone the repository into /workspace
 - Run in the background for multiple exec sessions
 
 Access the container:
+
 ```bash
 docker exec -it <container-name> bash
 ```
+
+#### GitHub Token Setup
+
+To use the spin command, you need a GitHub Personal Access Token:
+
+1. Generate a token at https://github.com/settings/tokens
+2. Required scopes:
+    - `repo` - Full control of private repositories (required for private repos)
+    - For public repos only, no scopes are technically required, but `public_repo` is recommended
+3. Set the token as an environment variable:
+   ```bash
+   export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+   ```
+
+**Security Note**: The token is passed to the container via environment variable (not CLI flag) to prevent exposure in
+bash history.
 
 ## Testing
 
@@ -85,4 +107,4 @@ See [tests/README.md](tests/README.md) for more details.
 - Git
 - Claude CLI
 - Node.js
-- SSH agent running (for spin command)
+- GitHub Personal Access Token (for spin command)

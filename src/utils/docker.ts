@@ -20,7 +20,6 @@ export interface ValidationResult {
   valid: boolean;
   error?: string;
   warnings: string[];
-  sshAuthSock?: string;
   hasNpmrc: boolean;
 }
 
@@ -96,7 +95,7 @@ export function buildImage(config: BuildConfig): void {
 
 /**
  * Validates prerequisites for spinning up a container.
- * Checks: Docker image exists, valid git repo URL, SSH agent is running, npmrc availability.
+ * Checks: Docker image exists, valid git repo URL, GITHUB_TOKEN is set, npmrc availability.
  */
 export function validatePrerequisites(config: SpinConfig): ValidationResult {
   const warnings: string[] = [];
@@ -127,12 +126,13 @@ export function validatePrerequisites(config: SpinConfig): ValidationResult {
     };
   }
 
-  // Check SSH_AUTH_SOCK
-  const sshAuthSock = process.env.SSH_AUTH_SOCK;
-  if (!sshAuthSock || !existsSync(sshAuthSock)) {
+  // Check GITHUB_TOKEN
+  const githubToken = process.env.GITHUB_TOKEN;
+  if (!githubToken) {
     return {
       valid: false,
-      error: 'SSH agent not running. Start ssh-agent and add your key.',
+      error:
+        'GITHUB_TOKEN environment variable not set. Please set GITHUB_TOKEN before running spin.',
       warnings,
       hasNpmrc: false,
     };
@@ -148,7 +148,6 @@ export function validatePrerequisites(config: SpinConfig): ValidationResult {
   return {
     valid: true,
     warnings,
-    sshAuthSock,
     hasNpmrc,
   };
 }
@@ -172,7 +171,6 @@ export function generateContainerName(repo: string): string {
 export function buildDockerRunCommand(
   config: SpinConfig,
   containerName: string,
-  sshAuthSock: string,
   hasNpmrc: boolean,
 ): string[] {
   const dockerArgs = [
@@ -180,10 +178,8 @@ export function buildDockerRunCommand(
     '-d',
     '--name',
     containerName,
-    '-v',
-    `${sshAuthSock}:/ssh-agent`,
     '-e',
-    'SSH_AUTH_SOCK=/ssh-agent',
+    `GITHUB_TOKEN=${process.env.GITHUB_TOKEN}`,
     '-e',
     `REPO_URL=${config.repo}`,
   ];

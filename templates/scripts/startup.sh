@@ -1,6 +1,20 @@
 #!/bin/bash
 set -e
 
+# Check if GITHUB_TOKEN is set
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo "Error: GITHUB_TOKEN environment variable is not set"
+  echo "Please set GITHUB_TOKEN before running spin"
+  exit 1
+fi
+
+# Configure GitHub authentication
+echo "Configuring GitHub authentication..."
+gh auth setup-git
+
+# Configure git credential cache with 1-year timeout
+git config --global credential.helper 'cache --timeout=31536000'
+
 # Check if REPO_URL is set
 if [ -z "$REPO_URL" ]; then
   echo "Error: REPO_URL environment variable is not set"

@@ -52,12 +52,7 @@ export const Spin: React.FC<SpinProps> = ({ image, repo, prompt, branch, maxIter
         setWarnings(validationResult.warnings);
 
         // Build docker run command
-        const dockerArgs = buildDockerRunCommand(
-          config,
-          generatedName,
-          validationResult.sshAuthSock!,
-          validationResult.hasNpmrc,
-        );
+        const dockerArgs = buildDockerRunCommand(config, generatedName, validationResult.hasNpmrc);
 
         // Execute docker run
         const runResult = executeDockerRun(dockerArgs, generatedName);

@@ -17,12 +17,17 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+# Check if GITHUB_TOKEN is set
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo "⚠ Skipping test: GITHUB_TOKEN not set"
+  exit 0
+fi
+
 # Create a temporary public test repository URL (using a real public repo)
 # Note: assumes spinner:test-env exists from setup tests
 TEST_REPO="https://github.com/octocat/Hello-World.git"
 
-# Run spin command (note: this will fail if SSH agent isn't properly configured)
-# For testing purposes, we'll use HTTPS instead
+# Run spin command
 output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
 
 # Extract container name from output (macOS compatible)

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Test: container is named correctly based on repo name
+# Test: private repository clone with GITHUB_TOKEN
 
-echo "Test: Container naming"
+echo "Test: Private repository clone"
 
 # Cleanup function
 cleanup() {
@@ -20,9 +20,9 @@ if [ -z "$GITHUB_TOKEN" ]; then
   exit 0
 fi
 
-# Use a public test repository
+# Use this private repository
 # Note: assumes spinner:test-env exists from setup tests
-TEST_REPO="https://github.com/octocat/Hello-World.git"
+TEST_REPO="https://github.com/rickihastings/spinner.git"
 
 # Run spin command
 output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
@@ -32,14 +32,18 @@ CONTAINER_NAME=$(echo "$output" | sed -n 's/.*Container created successfully: \(
 
 if [ -z "$CONTAINER_NAME" ]; then
   echo "✗ Test failed: Could not extract container name"
+  echo "Output: $output"
   exit 1
 fi
 
-# Check if container name starts with expected prefix (Hello-World)
-if echo "$CONTAINER_NAME" | grep -q "^Hello-World-"; then
-  echo "✓ Test passed: Container named correctly: $CONTAINER_NAME"
+# Wait a moment for clone to complete
+sleep 3
+
+# Check if /workspace exists and has content
+if docker exec "$CONTAINER_NAME" test -d /workspace/.git; then
+  echo "✓ Test passed: Private repository cloned successfully"
   exit 0
 fi
 
-echo "✗ Test failed: Container name does not match expected pattern: $CONTAINER_NAME"
+echo "✗ Test failed: Private repository not cloned"
 exit 1
