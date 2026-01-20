@@ -210,6 +210,8 @@ export function buildDockerRunCommand(
     `CLAUDE_CODE_OAUTH_TOKEN=${process.env.CLAUDE_CODE_OAUTH_TOKEN}`,
     '-e',
     `REPO_URL=${repoUrl}`,
+    '-v',
+    `${homedir()}/.spinner/${containerName}/logs:/logs`,
   ];
 
   // Add Ralph loop environment variables if prompt is provided
@@ -240,6 +242,8 @@ export function buildDockerRunCommand(
  */
 export function executeDockerRun(dockerArgs: string[], containerName: string): ContainerResult {
   try {
+    mkdirSync(join(homedir(), '.spinner', containerName, 'logs'));
+
     execSync(`docker ${dockerArgs.join(' ')}`, {
       stdio: 'pipe',
       encoding: 'utf-8',

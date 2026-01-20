@@ -47,14 +47,7 @@ Skip proposal for:
 4. Run `openspec validate <id> --strict --no-interactive` and resolve any issues before sharing the proposal.
 
 ### Stage 2: Implementing Changes
-Track these steps as TODOs and complete them one by one.
-1. **Read proposal.md** - Understand what's being built
-2. **Read design.md** - Review the Technical Implementation Plan for guidance on approach, affected components, and patterns to follow
-3. **Read tasks.md** - Get implementation checklist
-4. **Implement tasks sequentially** - Complete in order, using design.md as guidance
-5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
-6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
-7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
+Use `task-implementation-lifecycle` skill to implement features.
 
 ### Stage 3: Archiving Changes
 After deployment, create separate PR to:
