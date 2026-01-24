@@ -12,7 +12,7 @@ tags: [openspec, apply]
 
 **Steps**
 1. Read `changes/<id>/proposal.md`, `design.md` (if present), and `tasks.md` to confirm scope and acceptance criteria.
-2. As per task implementation lifecycle skill, identify first task to implement.
+2. Follow Stage 2 workflow in `openspec/AGENTS.md`: implement one vertical slice at a time (select → investigate → implement → verify → update → commit).
 3. Reference `openspec list` or `openspec show <item>` when additional context is required.
 
 **Reference**

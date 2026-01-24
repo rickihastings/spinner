@@ -28,10 +28,6 @@ RUN command -v claude > /dev/null 2>&1 || \
     (curl -fsSL https://claude.ai/install.sh | bash)
 ENV PATH=/home/spinner/.local/bin:${PATH}
 
-# Copy skill templates
-RUN mkdir -p /home/spinner/.claude/skills
-COPY --chown=spinner:spinner templates/skills/task-implementation-lifecycle/SKILL.md /home/spinner/.claude/skills/task-implementation-lifecycle/SKILL.md
-
 # Copy and set up startup script
 USER root
 COPY templates/scripts/startup.sh /usr/local/bin/startup.sh

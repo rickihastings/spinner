@@ -47,7 +47,26 @@ Skip proposal for:
 4. Run `openspec validate <id> --strict --no-interactive` and resolve any issues before sharing the proposal.
 
 ### Stage 2: Implementing Changes
-Use `task-implementation-lifecycle` skill to implement features.
+
+**CRITICAL: One Vertical Slice Only**
+
+Each agent invocation implements ONE complete feature (X.0). Do NOT scatter changes across the codebase or defer tests. The vertical slice must be fully implemented, tested, and committed—then the agent's job is done.
+
+**Per-Task Cycle:**
+1. **Select** - Pick first incomplete task from the vertical slice
+2. **Investigate** - Search codebase for existing patterns before coding
+3. **Implement** - Make minimal, focused changes following existing patterns
+4. **Verify** - Run builds and tests; fix any failures before proceeding
+5. **Update** - Mark task complete in `tasks.md` (`- [x]`)
+6. **Commit** - Create meaningful commit, push changes
+7. **Repeat** - Continue until all sub-tasks (X.1, X.2, X.3...) in the slice are done
+
+**Rules:**
+- Complete the entire vertical slice (all sub-tasks) in one agent session
+- Each commit should leave the codebase in a valid, tested state
+- Never defer tests—they are part of the vertical slice, not a separate phase
+- If implementation diverges from spec, update the spec immediately
+- On completion, signal `~~ FEATURE_COMPLETED ~~` and halt
 
 ### Stage 3: Archiving Changes
 After deployment, create separate PR to:
@@ -189,13 +208,57 @@ The system SHALL provide...
 If multiple capabilities are affected, create multiple delta files under `changes/[change-id]/specs/<capability>/spec.md`—one per capability.
 
 4. **Create tasks.md:**
+
+Tasks MUST be organized as **vertical feature slices**, not horizontal layers. Each top-level task (X.0) represents a complete, testable, committable feature.
+
+**Structure:**
+- `X.0` = Complete feature (e.g., "Implement `--prune` command")
+- `X.1-X.n` = Sub-tasks that together deliver the feature
+- Each `X.0` MUST include: implementation + tests + docs + verification
+- After completing `X.0`, the codebase should be in a valid, tested, documented state
+
+**What belongs in a vertical slice:**
+1. Implementation code
+2. Tests for that feature
+3. Documentation updates (help text, comments, README sections)
+4. Verification that everything works
+
+**Example:**
 ```markdown
-## 1. Implementation
-- [ ] 1.1 Create database schema
-- [ ] 1.2 Implement API endpoint
-- [ ] 1.3 Add frontend component
-- [ ] 1.4 Write tests
+## 1.0 Implement `--prune` command
+- [ ] 1.1 Add `--prune` flag to CLI argument parser
+- [ ] 1.2 Implement container pruning logic in utils
+- [ ] 1.3 Update help text to document `--prune` behavior
+- [ ] 1.4 Add tests for `--prune` functionality
+- [ ] 1.5 Verify tests pass and feature works end-to-end
+
+## 2.0 Implement container listing
+- [ ] 2.1 Add `--list` flag to CLI
+- [ ] 2.2 Implement listing logic with filtering
+- [ ] 2.3 Update help text to document `--list` behavior
+- [ ] 2.4 Add tests for listing behavior
+- [ ] 2.5 Verify tests pass
 ```
+
+**Anti-pattern (DO NOT do this):**
+```markdown
+## 1. CLI Changes        ← Horizontal slice, tests deferred
+- [ ] 1.1 Add --prune flag
+- [ ] 1.2 Add --list flag
+## 2. Backend Logic
+- [ ] 2.1 Implement pruning
+- [ ] 2.2 Implement listing
+## 3. Tests              ← Tests come last, no TDD
+- [ ] 3.1 Test pruning
+- [ ] 3.2 Test listing
+```
+
+**Why vertical slices:**
+- Each feature is independently committable
+- Aligns with Stage 2 workflow (verify → commit → next)
+- Enables TDD workflow
+- Reduces context switching between unrelated code areas
+- Clear progress: "Feature 1 done" vs "CLI half-done, backend half-done"
 
 5. **Create design.md:**
 Every change MUST include a `design.md` with a Technical Implementation Plan. This provides implementing agents with guidance on how to approach the work.
@@ -330,7 +393,7 @@ openspec list
 CHANGE=add-two-factor-auth
 mkdir -p openspec/changes/$CHANGE/{specs/auth}
 printf "## Why\n...\n\n## What Changes\n- ...\n\n## Impact\n- ...\n" > openspec/changes/$CHANGE/proposal.md
-printf "## 1. Implementation\n- [ ] 1.1 ...\n" > openspec/changes/$CHANGE/tasks.md
+printf "## 1.0 Implement OTP verification\n- [ ] 1.1 Add OTP input to login flow\n- [ ] 1.2 Implement OTP validation logic\n- [ ] 1.3 Add tests for OTP scenarios\n- [ ] 1.4 Verify tests pass\n" > openspec/changes/$CHANGE/tasks.md
 
 # 3) Add deltas (example)
 cat > openspec/changes/$CHANGE/specs/auth/spec.md << 'EOF'

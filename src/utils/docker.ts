@@ -75,19 +75,10 @@ export function buildImage(config: BuildConfig): void {
   const dockerfile = generateDockerfile({ baseImage });
   writeFileSync(dockerfilePath, dockerfile);
 
-  // Copy skill templates and startup script to build context
+  // Copy startup scripts to build context
   const templatesDir = join(buildContext, 'templates');
-  const skillsDir = join(templatesDir, 'skills', 'task-implementation-lifecycle');
   const scriptsDir = join(templatesDir, 'scripts');
-  mkdirSync(skillsDir, { recursive: true });
   mkdirSync(scriptsDir, { recursive: true });
-
-  const skillTemplateSrc = join(
-    __dirname,
-    '../../templates/skills/task-implementation-lifecycle/SKILL.md',
-  );
-  const skillTemplateDest = join(skillsDir, 'SKILL.md');
-  copyFileSync(skillTemplateSrc, skillTemplateDest);
 
   const startupScriptSrc = join(__dirname, '../../templates/scripts/startup.sh');
   const startupScriptDest = join(scriptsDir, 'startup.sh');
