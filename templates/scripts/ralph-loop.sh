@@ -22,7 +22,7 @@ ITERATION=0
 COMPLETION_SIGNAL="~~ FEATURE_COMPLETED ~~"
 RATE_LIMIT_WAIT_SECONDS=3660
 
-LOG_DIR="/logs"
+LOG_DIR="${LOG_DIR:-/logs}"
 LOG_FILE="$LOG_DIR/raw.log"
 
 mkdir -p "$LOG_DIR"
@@ -51,22 +51,21 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
     # 3. The grep check will touch the flag file immediately upon seeing the error
     echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --verbose 2>&1 \
     | tee -a "$LOG_FILE" \
-    | stdbuf -oL awk '{
-        print $0;
-        if ($0 ~ /rate_limit/ || $0 ~ /hit your limit/) {
-            system("touch /tmp/rate_limit_detected");
-        }
-        if ($0 ~ /authentication_error/ || $0 ~ /API Error: 401/ || $0 ~ /Invalid bearer token/) {
-            system("touch /tmp/auth_error_detected");
-        }
-    }' | while read -r line; do
+    | while IFS= read -r line; do
+        # Check for errors
+        if echo "$line" | grep -q 'rate_limit\|hit your limit'; then
+            touch /tmp/rate_limit_detected
+        fi
+        if echo "$line" | grep -q 'authentication_error\|API Error: 401\|Invalid bearer token'; then
+            touch /tmp/auth_error_detected
+        fi
 
-        # Extract clean text for the console
-        CLEAN_TEXT=$(echo "$line" | jq -r '.message.content[].text // .result // empty' 2>/dev/null | grep -v "null" || true)
+        # Extract and display text content from assistant message events
+        MESSAGE=$(echo "$line" | jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text' 2>/dev/null)
 
-        if [ -n "$CLEAN_TEXT" ] && [[ "$CLEAN_TEXT" != *"hit your limit"* ]]; then
-            echo -n "$CLEAN_TEXT"
-            if [[ "$CLEAN_TEXT" == *"$COMPLETION_SIGNAL"* ]]; then
+        if [ -n "$MESSAGE" ] && [ "$MESSAGE" != "null" ]; then
+            echo "$MESSAGE"
+            if [[ "$MESSAGE" == *"$COMPLETION_SIGNAL"* ]]; then
                 echo "200" > /tmp/feature_complete
             fi
         fi
