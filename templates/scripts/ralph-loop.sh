@@ -42,7 +42,9 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
     echo -e "\n🔁 Iteration $ITERATION/$MAX_ITERATIONS"
 
     LIMIT_FLAG="/tmp/rate_limit_detected"
+    AUTH_ERROR_FLAG="/tmp/auth_error_detected"
     rm -f "$LIMIT_FLAG"
+    rm -f "$AUTH_ERROR_FLAG"
 
     # 1. Run claude
     # 2. Use 'tee' to send output to BOTH the log and a grep check
@@ -53,6 +55,9 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
         print $0;
         if ($0 ~ /rate_limit/ || $0 ~ /hit your limit/) {
             system("touch /tmp/rate_limit_detected");
+        }
+        if ($0 ~ /authentication_error/ || $0 ~ /API Error: 401/ || $0 ~ /Invalid bearer token/) {
+            system("touch /tmp/auth_error_detected");
         }
     }' | while read -r line; do
 
@@ -67,14 +72,21 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
         fi
     done
 
-    # Check for feature completion first
+    # Check for authentication error first
+    if [ -f "$AUTH_ERROR_FLAG" ]; then
+        rm -f "$AUTH_ERROR_FLAG"
+        echo -e "\n\n❌ Authentication error detected - please run /login"
+        exit 1
+    fi
+
+    # Check for feature completion
     if [ -f /tmp/feature_complete ]; then
         rm /tmp/feature_complete
         echo -e "\n\n🎯 ALL TASKS COMPLETE."
         exit 0
     fi
 
-    # Check if the flag file exists
+    # Check if the rate limit flag file exists
     if [ -f "$LIMIT_FLAG" ]; then
         rm -f "$LIMIT_FLAG"
         wait_for_rate_limit

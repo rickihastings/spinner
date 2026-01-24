@@ -21,12 +21,26 @@ if [ -z "$REPO_URL" ]; then
   exit 1
 fi
 
-echo "Cloning repository: $REPO_URL"
-git clone "$REPO_URL" .
+# Check if repository is already cloned (e.g., on container restart)
+if [ -d ".git" ]; then
+  echo "Repository already exists, verifying..."
 
-echo "Repository cloned to /home/spinner/workspace"
+  # Verify it's the correct repository
+  CURRENT_REMOTE=$(git config --get remote.origin.url || echo "")
+  if [ "$CURRENT_REMOTE" != "$REPO_URL" ]; then
+    echo "Error: Existing repository URL ($CURRENT_REMOTE) doesn't match expected URL ($REPO_URL)"
+    exit 1
+  fi
 
-echo "Verifying clone..."
+  echo "Repository verified. Fetching latest changes..."
+  git fetch origin
+else
+  echo "Cloning repository: $REPO_URL"
+  git clone "$REPO_URL" .
+  echo "Repository cloned to /home/spinner/workspace"
+fi
+
+echo "Verifying repository..."
 git status
 
 # If PROMPT is set, run Ralph loop
