@@ -49,8 +49,9 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
     # 1. Run claude
     # 2. Use 'tee' to send output to BOTH the log and a grep check
     # 3. The grep check will touch the flag file immediately upon seeing the error
+    # Note: stdbuf -oL ensures line buffering for responsive output
     echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --verbose 2>&1 \
-    | tee -a "$LOG_FILE" \
+    | stdbuf -oL tee -a "$LOG_FILE" \
     | while IFS= read -r line; do
         # Check for errors
         if echo "$line" | grep -q 'rate_limit\|hit your limit'; then
@@ -61,7 +62,8 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
         fi
 
         # Extract and display text content from assistant message events
-        MESSAGE=$(echo "$line" | jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text' 2>/dev/null)
+        # stream-json format: {"type":"message","role":"assistant","content":[{"type":"text","text":"..."}]}
+        MESSAGE=$(echo "$line" | jq -r 'select(.type == "message") | .content[]? | select(.type == "text") | .text // empty' 2>/dev/null)
 
         if [ -n "$MESSAGE" ] && [ "$MESSAGE" != "null" ]; then
             echo "$MESSAGE"
