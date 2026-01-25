@@ -46,13 +46,12 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
     rm -f "$LIMIT_FLAG"
     rm -f "$AUTH_ERROR_FLAG"
 
-    # 1. Run claude
-    # 2. Use 'tee' to send output to BOTH the log and a grep check
-    # 3. The grep check will touch the flag file immediately upon seeing the error
-    # Note: stdbuf -oL ensures line buffering for responsive output
-    echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --verbose 2>&1 \
-    | stdbuf -oL tee -a "$LOG_FILE" \
-    | while IFS= read -r line; do
+    # Run claude and process output line by line
+    # Using process substitution to avoid subshell issues with while loops in pipelines
+    while IFS= read -r line; do
+        # Log to file
+        echo "$line" >> "$LOG_FILE"
+
         # Check for errors
         if echo "$line" | grep -q 'rate_limit\|hit your limit'; then
             touch /tmp/rate_limit_detected
@@ -61,17 +60,30 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
             touch /tmp/auth_error_detected
         fi
 
-        # Extract and display text content from assistant message events
-        # stream-json format: {"type":"message","role":"assistant","content":[{"type":"text","text":"..."}]}
-        MESSAGE=$(echo "$line" | jq -r 'select(.type == "message") | .content[]? | select(.type == "text") | .text // empty' 2>/dev/null)
+        # Extract and display text content from both complete messages and streaming deltas
+        # Complete message format: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
+        # Streaming delta format: {"type":"content_block_delta","delta":{"type":"text_delta","text":"..."},"index":0}
 
-        if [ -n "$MESSAGE" ] && [ "$MESSAGE" != "null" ]; then
-            echo "$MESSAGE"
-            if [[ "$MESSAGE" == *"$COMPLETION_SIGNAL"* ]]; then
-                echo "200" > /tmp/feature_complete
+        # Try streaming delta first (for real-time output)
+        if echo "$line" | jq -e 'select(.type == "content_block_delta")' >/dev/null 2>&1; then
+            DELTA=$(echo "$line" | jq -r '.delta.text // empty' 2>/dev/null)
+            if [ -n "$DELTA" ] && [ "$DELTA" != "null" ]; then
+                echo -n "$DELTA"  # No newline for streaming deltas
+                if [[ "$DELTA" == *"$COMPLETION_SIGNAL"* ]]; then
+                    echo "200" > /tmp/feature_complete
+                fi
+            fi
+        # Fall back to complete message
+        elif echo "$line" | jq -e 'select(.type == "assistant")' >/dev/null 2>&1; then
+            MESSAGE=$(echo "$line" | jq -r '.message.content[]? | select(.type == "text") | .text // empty' 2>/dev/null)
+            if [ -n "$MESSAGE" ] && [ "$MESSAGE" != "null" ]; then
+                echo "$MESSAGE"  # Regular echo to add newlines between complete messages
+                if [[ "$MESSAGE" == *"$COMPLETION_SIGNAL"* ]]; then
+                    echo "200" > /tmp/feature_complete
+                fi
             fi
         fi
-    done
+    done < <(echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --include-partial-messages --verbose 2>&1)
 
     # Check for authentication error first
     if [ -f "$AUTH_ERROR_FLAG" ]; then
