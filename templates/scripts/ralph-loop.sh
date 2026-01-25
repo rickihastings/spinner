@@ -52,38 +52,26 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
         # Log to file
         echo "$line" >> "$LOG_FILE"
 
-        # Check for errors
-        if echo "$line" | grep -q 'rate_limit\|hit your limit'; then
+        # Check for errors using jq to parse JSON structure
+        if echo "$line" | jq -e 'select(.error.type == "rate_limit_error" or .error.type == "overloaded_error")' >/dev/null 2>&1; then
             touch /tmp/rate_limit_detected
         fi
-        if echo "$line" | grep -q 'authentication_error\|API Error: 401\|Invalid bearer token'; then
+        if echo "$line" | jq -e 'select(.error.type == "authentication_error")' >/dev/null 2>&1; then
             touch /tmp/auth_error_detected
         fi
 
-        # Extract and display text content from both complete messages and streaming deltas
+        # Extract and display text content from complete messages
         # Complete message format: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
-        # Streaming delta format: {"type":"content_block_delta","delta":{"type":"text_delta","text":"..."},"index":0}
-
-        # Try streaming delta first (for real-time output)
-        if echo "$line" | jq -e 'select(.type == "content_block_delta")' >/dev/null 2>&1; then
-            DELTA=$(echo "$line" | jq -r '.delta.text // empty' 2>/dev/null)
-            if [ -n "$DELTA" ] && [ "$DELTA" != "null" ]; then
-                echo -n "$DELTA"  # No newline for streaming deltas
-                if [[ "$DELTA" == *"$COMPLETION_SIGNAL"* ]]; then
-                    echo "200" > /tmp/feature_complete
-                fi
-            fi
-        # Fall back to complete message
-        elif echo "$line" | jq -e 'select(.type == "assistant")' >/dev/null 2>&1; then
+        if echo "$line" | jq -e 'select(.type == "assistant")' >/dev/null 2>&1; then
             MESSAGE=$(echo "$line" | jq -r '.message.content[]? | select(.type == "text") | .text // empty' 2>/dev/null)
             if [ -n "$MESSAGE" ] && [ "$MESSAGE" != "null" ]; then
-                echo "$MESSAGE"  # Regular echo to add newlines between complete messages
+                echo "$MESSAGE"
                 if [[ "$MESSAGE" == *"$COMPLETION_SIGNAL"* ]]; then
                     echo "200" > /tmp/feature_complete
                 fi
             fi
         fi
-    done < <(echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --include-partial-messages --verbose 2>&1)
+    done < <(echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --verbose 2>&1)
 
     # Check for authentication error first
     if [ -f "$AUTH_ERROR_FLAG" ]; then

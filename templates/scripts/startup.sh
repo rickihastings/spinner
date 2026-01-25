@@ -55,8 +55,12 @@ if [ -n "$PROMPT" ]; then
   if [ -n "$BRANCH" ]; then
     echo "Branch specified: $BRANCH"
 
+    # Check if branch exists locally
+    if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
+      echo "Branch exists locally, checking out..."
+      git checkout "$BRANCH"
     # Check if branch exists remotely
-    if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+    elif git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
       echo "Branch exists remotely, checking out..."
       git checkout "$BRANCH"
     else
