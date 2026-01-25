@@ -46,30 +46,32 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
     rm -f "$LIMIT_FLAG"
     rm -f "$AUTH_ERROR_FLAG"
 
-    # 1. Run claude
-    # 2. Use 'tee' to send output to BOTH the log and a grep check
-    # 3. The grep check will touch the flag file immediately upon seeing the error
-    echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --verbose 2>&1 \
-    | tee -a "$LOG_FILE" \
-    | while IFS= read -r line; do
-        # Check for errors
-        if echo "$line" | grep -q 'rate_limit\|hit your limit'; then
+    # Run claude and process output line by line
+    # Using process substitution to avoid subshell issues with while loops in pipelines
+    while IFS= read -r line; do
+        # Log to file
+        echo "$line" >> "$LOG_FILE"
+
+        # Check for errors using jq to parse JSON structure
+        if echo "$line" | jq -e 'select(.error.type == "rate_limit_error" or .error.type == "overloaded_error")' >/dev/null 2>&1; then
             touch /tmp/rate_limit_detected
         fi
-        if echo "$line" | grep -q 'authentication_error\|API Error: 401\|Invalid bearer token'; then
+        if echo "$line" | jq -e 'select(.error.type == "authentication_error")' >/dev/null 2>&1; then
             touch /tmp/auth_error_detected
         fi
 
-        # Extract and display text content from assistant message events
-        MESSAGE=$(echo "$line" | jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text' 2>/dev/null)
-
-        if [ -n "$MESSAGE" ] && [ "$MESSAGE" != "null" ]; then
-            echo "$MESSAGE"
-            if [[ "$MESSAGE" == *"$COMPLETION_SIGNAL"* ]]; then
-                echo "200" > /tmp/feature_complete
+        # Extract and display text content from complete messages
+        # Complete message format: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
+        if echo "$line" | jq -e 'select(.type == "assistant")' >/dev/null 2>&1; then
+            MESSAGE=$(echo "$line" | jq -r '.message.content[]? | select(.type == "text") | .text // empty' 2>/dev/null)
+            if [ -n "$MESSAGE" ] && [ "$MESSAGE" != "null" ]; then
+                echo "$MESSAGE"
+                if [[ "$MESSAGE" == *"$COMPLETION_SIGNAL"* ]]; then
+                    echo "200" > /tmp/feature_complete
+                fi
             fi
         fi
-    done
+    done < <(echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --verbose 2>&1)
 
     # Check for authentication error first
     if [ -f "$AUTH_ERROR_FLAG" ]; then
