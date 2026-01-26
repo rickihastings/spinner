@@ -1,7 +1,7 @@
 #!/bin/bash
-# Test: container is named deterministically based on image + repo
+# Test: container names are properly sanitized (special chars replaced with hyphens)
 
-echo "Test: Deterministic container naming (image + repo)"
+echo "Test: Container name sanitization"
 
 # Source environment variables
 source ../../.envrc
@@ -17,13 +17,14 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Use a public test repository
-# Note: assumes spinner:test-env exists from setup tests
-TEST_REPO="https://github.com/octocat/Hello-World.git"
-EXPECTED_NAME="spinner-test-env-hello-world"
+# Use SSH format repo URL with special chars that need sanitization
+TEST_REPO="git@github.com:octocat/Hello-World.git"
+TEST_BRANCH="feature/auth-v2"
+# Expected: spinner-test-env-hello-world-feature-auth-v2
+EXPECTED_NAME="spinner-test-env-hello-world-feature-auth-v2"
 
 # Run spin command
-output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
+output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" --prompt "test" --branch "$TEST_BRANCH" 2>&1 || true)
 
 # Extract container name
 CONTAINER_NAME=$(echo "$output" | sed -n 's/.*Container created successfully: \([^ ]*\).*/\1/p')
@@ -33,9 +34,9 @@ if [ -z "$CONTAINER_NAME" ]; then
   exit 1
 fi
 
-# Check if container name matches expected deterministic name
+# Check if container name is properly sanitized
 if [ "$CONTAINER_NAME" = "$EXPECTED_NAME" ]; then
-  echo "✓ Test passed: Container named deterministically: $CONTAINER_NAME"
+  echo "✓ Test passed: Container name properly sanitized: $CONTAINER_NAME"
   exit 0
 fi
 

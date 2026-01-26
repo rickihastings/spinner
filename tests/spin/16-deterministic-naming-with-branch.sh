@@ -1,7 +1,7 @@
 #!/bin/bash
-# Test: container is named deterministically based on image + repo
+# Test: container is named deterministically based on image + repo + branch
 
-echo "Test: Deterministic container naming (image + repo)"
+echo "Test: Deterministic container naming (image + repo + branch)"
 
 # Source environment variables
 source ../../.envrc
@@ -17,13 +17,13 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Use a public test repository
-# Note: assumes spinner:test-env exists from setup tests
+# Use a public test repository with a branch
 TEST_REPO="https://github.com/octocat/Hello-World.git"
-EXPECTED_NAME="spinner-test-env-hello-world"
+TEST_BRANCH="master"
+EXPECTED_NAME="spinner-test-env-hello-world-master"
 
-# Run spin command
-output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
+# Run spin command with branch
+output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" --prompt "test" --branch "$TEST_BRANCH" 2>&1 || true)
 
 # Extract container name
 CONTAINER_NAME=$(echo "$output" | sed -n 's/.*Container created successfully: \([^ ]*\).*/\1/p')
@@ -33,9 +33,9 @@ if [ -z "$CONTAINER_NAME" ]; then
   exit 1
 fi
 
-# Check if container name matches expected deterministic name
+# Check if container name matches expected deterministic name with branch
 if [ "$CONTAINER_NAME" = "$EXPECTED_NAME" ]; then
-  echo "✓ Test passed: Container named deterministically: $CONTAINER_NAME"
+  echo "✓ Test passed: Container named deterministically with branch: $CONTAINER_NAME"
   exit 0
 fi
 

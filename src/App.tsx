@@ -14,6 +14,7 @@ export interface AppProps {
     prompt?: string;
     branch?: string;
     maxIterations?: string;
+    recreate?: boolean;
     help?: boolean;
     version?: boolean;
   };
@@ -41,6 +42,7 @@ SPIN OPTIONS:
   --prompt <prompt>          Prompt string for autonomous implementation (optional)
   --branch <branch>          Branch to work on (optional, uses default branch if not specified)
   --max-iterations <num>     Maximum Ralph loop iterations (optional, default: 100)
+  --recreate                 Force removal and recreation of existing container (optional)
 
 GENERAL OPTIONS:
   --help                     Show this help message
@@ -60,6 +62,9 @@ NOTES:
   - Setup: The CLI ensures git and claude-code are installed in the final image
   - Setup: If using --dockerfile, the custom Dockerfile is built first and used as base
   - Spin: SSH agent must be running on host system
+  - Spin: Container names are deterministic based on image + repo + branch
+  - Spin: Running spin with same image/repo/branch reuses the existing container
+  - Spin: Use --recreate to force removal and recreation of existing container
   - Spin: Containers are persistent and must be manually stopped/removed
 `;
 
@@ -125,6 +130,7 @@ export const App: React.FC<AppProps> = ({ command, flags }) => {
         prompt={flags.prompt}
         branch={flags.branch}
         maxIterations={flags.maxIterations}
+        recreate={flags.recreate}
       />
     );
   }

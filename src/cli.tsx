@@ -39,6 +39,7 @@ render(
         prompt?: string;
         branch?: string;
         maxIterations?: string;
+        recreate?: boolean;
         help?: boolean;
         version?: boolean;
       }

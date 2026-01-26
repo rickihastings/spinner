@@ -29,6 +29,13 @@ export interface ContainerResult {
   error?: string;
 }
 
+export type ContainerStatus = 'running' | 'stopped' | 'none';
+
+export interface ReuseResult {
+  status: ContainerStatus;
+  action: 'created' | 'reused' | 'restarted';
+}
+
 export interface BuildConfig {
   name: string;
   baseImage?: string;
@@ -167,16 +174,40 @@ export function validatePrerequisites(config: SpinConfig): ValidationResult {
 }
 
 /**
- * Generates a unique container name from the repository URL.
+ * Sanitizes a component for use in a Docker container name.
+ * Converts to lowercase, replaces invalid characters with hyphens,
+ * collapses consecutive hyphens, and trims leading/trailing hyphens.
  */
-export function generateContainerName(repo: string): string {
-  const repoName =
-    repo
-      .split('/')
-      .pop()
-      ?.replace(/\.git$/, '') || 'sandbox';
-  const timestamp = Date.now();
-  return `${repoName}-${timestamp}`;
+function sanitizeComponent(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Extracts the repository name from a Git URL.
+ * Handles both SSH (git@github.com:user/repo.git) and HTTPS (https://github.com/user/repo.git) formats.
+ */
+function extractRepoName(repoUrl: string): string {
+  const match = repoUrl.match(/([^/:]+)(\.git)?$/);
+  return match ? match[1].replace(/\.git$/, '') : 'sandbox';
+}
+
+/**
+ * Generates a deterministic container name based on image, repo, and branch.
+ * Format: {image}-{repo} or {image}-{repo}-{branch}
+ */
+export function generateContainerName(config: SpinConfig): string {
+  const imagePart = sanitizeComponent(config.image.replace(':', '-'));
+  const repoPart = sanitizeComponent(extractRepoName(config.repo));
+  const branchPart = config.branch ? sanitizeComponent(config.branch) : null;
+
+  if (branchPart) {
+    return `${imagePart}-${repoPart}-${branchPart}`;
+  }
+  return `${imagePart}-${repoPart}`;
 }
 
 /**
@@ -302,6 +333,78 @@ export function verifyContainerStatus(containerName: string): ContainerResult {
       success: false,
       containerName,
       error: 'Failed to verify container status',
+    };
+  }
+}
+
+/**
+ * Checks if a container exists and returns its status.
+ * Returns 'running' if container exists and is running,
+ * 'stopped' if container exists but is not running,
+ * 'none' if container does not exist.
+ */
+export function checkContainerExists(containerName: string): ContainerStatus {
+  try {
+    const status = execSync(`docker inspect -f '{{.State.Status}}' ${containerName}`, {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    }).trim();
+
+    return status === 'running' ? 'running' : 'stopped';
+  } catch {
+    // Container doesn't exist
+    return 'none';
+  }
+}
+
+/**
+ * Restarts a stopped container.
+ */
+export function restartContainer(containerName: string): ContainerResult {
+  try {
+    execSync(`docker start ${containerName}`, {
+      stdio: 'pipe',
+      encoding: 'utf-8',
+    });
+
+    return {
+      success: true,
+      containerName,
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to restart container';
+    const stderr =
+      error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : '';
+    return {
+      success: false,
+      containerName,
+      error: stderr || message,
+    };
+  }
+}
+
+/**
+ * Removes a container, forcing removal if it's running.
+ */
+export function removeContainer(containerName: string): ContainerResult {
+  try {
+    execSync(`docker rm -f ${containerName}`, {
+      stdio: 'pipe',
+      encoding: 'utf-8',
+    });
+
+    return {
+      success: true,
+      containerName,
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to remove container';
+    const stderr =
+      error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : '';
+    return {
+      success: false,
+      containerName,
+      error: stderr || message,
     };
   }
 }

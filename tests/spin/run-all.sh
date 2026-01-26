@@ -62,7 +62,7 @@ for test in $(ls [0-9]*.sh | sort); do
   if ! run_with_timeout "$test" $TEST_TIMEOUT; then
     echo -e "${RED}✗ $test failed${NC}"
     # Clean up any containers created by the failed test
-    docker ps -a --filter "name=Hello-World-" --format "{{.Names}}" | xargs -r docker rm -f >/dev/null 2>&1 || true
+    docker ps -a --filter "name=hello-world" --format "{{.Names}}" | xargs -r docker rm -f >/dev/null 2>&1 || true
     docker ps -a --filter "name=spinner-" --format "{{.Names}}" | xargs -r docker rm -f >/dev/null 2>&1 || true
     echo ""
     echo "======================================"
@@ -75,7 +75,7 @@ for test in $(ls [0-9]*.sh | sort); do
     echo -e "${RED}Exiting test suite due to failure.${NC}"
     # Cleanup before exiting
     echo "Cleaning up any leftover test containers..."
-    docker ps -a --filter "name=Hello-World-" --format "{{.Names}}" | while read container; do
+    docker ps -a --filter "name=hello-world" --format "{{.Names}}" | while read container; do
       if [ -n "$container" ]; then
         docker rm -f "$container" >/dev/null 2>&1 || true
       fi
@@ -101,7 +101,7 @@ done
 # Cleanup any leftover containers
 echo "Cleaning up any leftover test containers..."
 # Stop and remove Hello-World containers
-docker ps -a --filter "name=Hello-World-" --format "{{.Names}}" | while read container; do
+docker ps -a --filter "name=hello-world" --format "{{.Names}}" | while read container; do
   if [ -n "$container" ]; then
     echo "Stopping and removing: $container"
     docker stop "$container" >/dev/null 2>&1 || true

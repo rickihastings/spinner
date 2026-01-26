@@ -6,6 +6,9 @@ import {
   buildDockerRunCommand,
   executeDockerRun,
   verifyContainerStatus,
+  checkContainerExists,
+  restartContainer,
+  removeContainer,
   type SpinConfig,
 } from '../utils/docker.js';
 
@@ -15,15 +18,26 @@ export interface SpinProps {
   prompt?: string;
   branch?: string;
   maxIterations?: string;
+  recreate?: boolean;
 }
 
-export const Spin: React.FC<SpinProps> = ({ image, repo, prompt, branch, maxIterations }) => {
+export const Spin: React.FC<SpinProps> = ({
+  image,
+  repo,
+  prompt,
+  branch,
+  maxIterations,
+  recreate,
+}) => {
   const [status, setStatus] = useState<'validating' | 'creating' | 'success' | 'error'>(
     'validating',
   );
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [containerName, setContainerName] = useState<string>('');
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [containerAction, setContainerAction] = useState<'created' | 'reused' | 'restarted'>(
+    'created',
+  );
 
   useEffect(() => {
     async function run() {
@@ -45,28 +59,64 @@ export const Spin: React.FC<SpinProps> = ({ image, repo, prompt, branch, maxIter
         }
 
         // Generate container name
-        const generatedName = generateContainerName(repo);
+        const generatedName = generateContainerName(config);
         setContainerName(generatedName);
 
         setStatus('creating');
         setWarnings(validationResult.warnings);
 
-        // Build docker run command
-        const dockerArgs = buildDockerRunCommand(config, generatedName, validationResult.hasNpmrc);
+        // Check if container already exists
+        const containerStatus = checkContainerExists(generatedName);
 
-        // Execute docker run
-        const runResult = executeDockerRun(dockerArgs, generatedName);
-        if (!runResult.success) {
-          throw new Error(runResult.error);
+        // Handle --recreate flag: remove existing container and create fresh
+        if (recreate && containerStatus !== 'none') {
+          const removeResult = removeContainer(generatedName);
+          if (!removeResult.success) {
+            throw new Error(removeResult.error);
+          }
         }
 
-        // Verify container is running
-        const statusResult = verifyContainerStatus(generatedName);
-        if (!statusResult.success) {
-          throw new Error(statusResult.error);
-        }
+        if (recreate || containerStatus === 'none') {
+          // Create new container
+          const dockerArgs = buildDockerRunCommand(
+            config,
+            generatedName,
+            validationResult.hasNpmrc,
+          );
 
-        setStatus('success');
+          const runResult = executeDockerRun(dockerArgs, generatedName);
+          if (!runResult.success) {
+            throw new Error(runResult.error);
+          }
+
+          // Verify container is running
+          const statusResult = verifyContainerStatus(generatedName);
+          if (!statusResult.success) {
+            throw new Error(statusResult.error);
+          }
+
+          setContainerAction('created');
+          setStatus('success');
+        } else if (containerStatus === 'running') {
+          // Reuse running container
+          setContainerAction('reused');
+          setStatus('success');
+        } else if (containerStatus === 'stopped') {
+          // Restart stopped container
+          const restartResult = restartContainer(generatedName);
+          if (!restartResult.success) {
+            throw new Error(restartResult.error);
+          }
+
+          // Verify container is running after restart
+          const statusResult = verifyContainerStatus(generatedName);
+          if (!statusResult.success) {
+            throw new Error(statusResult.error);
+          }
+
+          setContainerAction('restarted');
+          setStatus('success');
+        }
       } catch (error) {
         setStatus('error');
         if (error instanceof Error) {
@@ -78,7 +128,7 @@ export const Spin: React.FC<SpinProps> = ({ image, repo, prompt, branch, maxIter
     }
 
     run();
-  }, [image, repo, prompt, branch, maxIterations]);
+  }, [image, repo, prompt, branch, maxIterations, recreate]);
 
   if (status === 'validating') {
     return (
@@ -104,6 +154,18 @@ export const Spin: React.FC<SpinProps> = ({ image, repo, prompt, branch, maxIter
   }
 
   if (status === 'success') {
+    const actionMessage =
+      containerAction === 'created'
+        ? `✓ Container created successfully: ${containerName}`
+        : containerAction === 'restarted'
+          ? `✓ Container restarted: ${containerName}`
+          : `✓ Reusing running container: ${containerName}`;
+
+    const managementNote =
+      containerAction !== 'created'
+        ? 'Note: Reusing existing container. Use --recreate flag to force recreation.'
+        : null;
+
     return (
       <Box flexDirection="column">
         <Text color="green">✓ Prerequisites validated</Text>
@@ -112,7 +174,13 @@ export const Spin: React.FC<SpinProps> = ({ image, repo, prompt, branch, maxIter
             ⚠ Warning: {warning}
           </Text>
         ))}
-        <Text color="green">✓ Container created successfully: {containerName}</Text>
+        <Text color="green">{actionMessage}</Text>
+        {managementNote && (
+          <>
+            <Text></Text>
+            <Text color="cyan">{managementNote}</Text>
+          </>
+        )}
         <Text></Text>
         <Text>To access: docker exec -it {containerName} bash</Text>
         <Text>To stop: docker stop {containerName}</Text>

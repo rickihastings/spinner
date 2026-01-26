@@ -15,7 +15,7 @@ cleanup() {
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
   fi
   # Also clean up any containers matching the pattern in case extraction failed
-  docker ps -a --filter "name=Hello-World-" --format "{{.Names}}" | xargs -r docker rm -f >/dev/null 2>&1 || true
+  docker ps -a --filter "name=spinner-test-env-hello-world" --format "{{.Names}}" | xargs -r docker rm -f >/dev/null 2>&1 || true
 }
 
 trap cleanup EXIT INT TERM
