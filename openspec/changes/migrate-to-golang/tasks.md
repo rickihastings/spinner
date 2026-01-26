@@ -39,8 +39,8 @@
 
 ## 5.0 Update build tooling and run full test suite
 - [x] 5.1 Update package.json scripts: build → "go build -o dist/spinner", dev → "go build -o dist/spinner --watch" (or similar)
-- [ ] 5.2 Update package.json test script to reference Go binary: "test": "go build -o dist/spinner && bash tests/run.sh"
-- [ ] 5.3 Update .gitignore to include Go artifacts (dist/spinner, vendor/, go.sum changes)
+- [x] 5.2 Update package.json test script to reference Go binary: "test": "go build -o dist/spinner && bash tests/run.sh"
+- [x] 5.3 Update .gitignore to include Go artifacts (dist/spinner, vendor/, go.sum changes)
 - [ ] 5.4 Run full integration test suite: `yarn test`
 - [ ] 5.5 Debug and fix any remaining test failures
 - [ ] 5.6 Verify 100% test pass rate
