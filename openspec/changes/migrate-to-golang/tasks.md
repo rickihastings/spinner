@@ -41,18 +41,18 @@
 - [x] 5.1 Update package.json scripts: build → "go build -o dist/spinner", dev → "go build -o dist/spinner --watch" (or similar)
 - [x] 5.2 Update package.json test script to reference Go binary: "test": "go build -o dist/spinner && bash tests/run.sh"
 - [x] 5.3 Update .gitignore to include Go artifacts (dist/spinner, vendor/, go.sum changes)
-- [x] 5.4 Run full integration test suite: `yarn test`
+- [x] 5.4 Run full integration test suite: `npm test`
 - [x] 5.5 Debug and fix any remaining test failures
 - [x] 5.6 Verify 100% test pass rate
 
 ## 6.0 Update documentation and project metadata
 - [x] 6.1 Update openspec/project.md: change tech stack from TypeScript/Node.js to Go, update architecture patterns
-- [x] 6.2 Update CLAUDE.md: change essential commands from `yarn build` to `go build -o dist/spinner`
+- [x] 6.2 Update CLAUDE.md: change essential commands from `npm run build` to `go build -o dist/spinner`
 - [x] 6.3 Update docs/usage.md: change development workflow commands to Go equivalents
 - [x] 6.4 Update docs/standards.md: remove TypeScript-specific sections, add Go coding standards
 - [x] 6.5 Create or update README.md with Go build instructions
-- [ ] 6.6 Delete TypeScript source: remove src/, tsconfig.json, .eslintrc.*, .prettierrc files
-- [ ] 6.7 Run final validation: `yarn test` passes, binary works end-to-end, documentation accurate
+- [x] 6.6 Delete TypeScript source: remove src/, tsconfig.json, .eslintrc.*, .prettierrc files
+- [ ] 6.7 Run final validation: `npm test` passes, binary works end-to-end, documentation accurate
 
 ## 7.0 Add Viper configuration support (future-proofing)
 - [ ] 7.1 Initialize Viper in cmd/root.go to read from environment variables

@@ -3,9 +3,9 @@
 ## Package Manager
 
 - **Go modules for dependencies**: This project uses Go modules for managing Go dependencies
-- **yarn for OpenSpec only**: yarn is used only for OpenSpec tooling (`@fission-ai/openspec` package)
+- **npm for OpenSpec only**: npm is used only for OpenSpec tooling (`@fission-ai/openspec` package)
 - Use `go mod download` for Go dependencies
-- Use `yarn install` only when working with OpenSpec features
+- Use `npm install` only when working with OpenSpec features
 
 ## Development & Debugging
 

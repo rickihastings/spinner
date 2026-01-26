@@ -154,7 +154,7 @@ if err := cmd.Run(); err != nil {
 ### Key Decisions
 
 **Decision**: Keep package.json with minimal scripts
-**Rationale**: OpenSpec tooling requires npm/yarn ecosystem; package.json stays for `@fission-ai/openspec` dependency
+**Rationale**: OpenSpec tooling requires npm ecosystem; package.json stays for `@fission-ai/openspec` dependency
 
 **Decision**: Use Cobra + Viper instead of standard library flag package
 **Rationale**: User explicitly requested Cobra and Viper; Cobra provides better subcommand structure and help text generation

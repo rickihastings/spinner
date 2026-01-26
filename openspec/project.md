@@ -8,7 +8,7 @@ A CLI tool for running code and commands in isolated Docker containers. Provides
 - Cobra (CLI command structure)
 - Viper (configuration management)
 - Docker (container runtime)
-- yarn (package manager for OpenSpec tooling only)
+- npm (package manager for OpenSpec tooling only)
 
 ## Project Conventions
 

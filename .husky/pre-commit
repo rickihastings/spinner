@@ -5,21 +5,21 @@ echo "Running pre-commit checks..."
 
 # Check formatting
 echo "Checking code formatting..."
-yarn format:check || {
-  echo "❌ Format check failed. Run 'yarn format' to fix formatting issues."
+npm run format:check || {
+  echo "❌ Format check failed. Run 'npm run format' to fix formatting issues."
   exit 1
 }
 
 # Run linter
 echo "Running linter..."
-yarn lint || {
+npm run lint || {
   echo "❌ Linting failed. Please fix the linting errors."
   exit 1
 }
 
 # Run tests (which also runs build)
 echo "Running tests..."
-yarn test || {
+npm test || {
   echo "❌ Tests failed. Please fix the failing tests."
   exit 1
 }
