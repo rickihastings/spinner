@@ -46,11 +46,11 @@
 - [x] 5.6 Verify 100% test pass rate
 
 ## 6.0 Update documentation and project metadata
-- [ ] 6.1 Update openspec/project.md: change tech stack from TypeScript/Node.js to Go, update architecture patterns
-- [ ] 6.2 Update CLAUDE.md: change essential commands from `yarn build` to `go build -o dist/spinner`
-- [ ] 6.3 Update docs/setup.md: change development workflow commands to Go equivalents
-- [ ] 6.4 Update docs/standards.md: remove TypeScript-specific sections, add Go coding standards
-- [ ] 6.5 Create or update README.md with Go build instructions
+- [x] 6.1 Update openspec/project.md: change tech stack from TypeScript/Node.js to Go, update architecture patterns
+- [x] 6.2 Update CLAUDE.md: change essential commands from `yarn build` to `go build -o dist/spinner`
+- [x] 6.3 Update docs/usage.md: change development workflow commands to Go equivalents
+- [x] 6.4 Update docs/standards.md: remove TypeScript-specific sections, add Go coding standards
+- [x] 6.5 Create or update README.md with Go build instructions
 - [ ] 6.6 Delete TypeScript source: remove src/, tsconfig.json, .eslintrc.*, .prettierrc files
 - [ ] 6.7 Run final validation: `yarn test` passes, binary works end-to-end, documentation accurate
 
