@@ -41,9 +41,9 @@
 - [x] 5.1 Update package.json scripts: build → "go build -o dist/spinner", dev → "go build -o dist/spinner --watch" (or similar)
 - [x] 5.2 Update package.json test script to reference Go binary: "test": "go build -o dist/spinner && bash tests/run.sh"
 - [x] 5.3 Update .gitignore to include Go artifacts (dist/spinner, vendor/, go.sum changes)
-- [ ] 5.4 Run full integration test suite: `yarn test`
-- [ ] 5.5 Debug and fix any remaining test failures
-- [ ] 5.6 Verify 100% test pass rate
+- [x] 5.4 Run full integration test suite: `yarn test`
+- [x] 5.5 Debug and fix any remaining test failures
+- [x] 5.6 Verify 100% test pass rate
 
 ## 6.0 Update documentation and project metadata
 - [ ] 6.1 Update openspec/project.md: change tech stack from TypeScript/Node.js to Go, update architecture patterns
