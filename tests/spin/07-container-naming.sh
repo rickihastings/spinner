@@ -23,7 +23,7 @@ TEST_REPO="https://github.com/octocat/Hello-World.git"
 EXPECTED_NAME="spinner-test-env-hello-world"
 
 # Run spin command
-output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
+output=$(../../dist/spinner spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
 
 # Extract container name
 CONTAINER_NAME=$(echo "$output" | sed -n 's/.*Container created successfully: \([^ ]*\).*/\1/p')

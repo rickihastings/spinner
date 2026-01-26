@@ -23,7 +23,7 @@ TEST_BRANCH="master"
 EXPECTED_NAME="spinner-test-env-hello-world-master"
 
 # Run spin command with branch
-output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" --prompt "test" --branch "$TEST_BRANCH" 2>&1 || true)
+output=$(../../dist/spinner spin --image spinner:test-env --repo "$TEST_REPO" --prompt "test" --branch "$TEST_BRANCH" 2>&1 || true)
 
 # Extract container name
 CONTAINER_NAME=$(echo "$output" | sed -n 's/.*Container created successfully: \([^ ]*\).*/\1/p')

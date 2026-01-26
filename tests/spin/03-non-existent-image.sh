@@ -4,7 +4,7 @@
 echo "Test: Non-existent Docker image"
 
 # Run spin command with non-existent image
-output=$(node ../../dist/cli.js spin --image non-existent-image:latest --repo git@github.com:octocat/Hello-World.git 2>&1)
+output=$(../../dist/spinner spin --image non-existent-image:latest --repo git@github.com:octocat/Hello-World.git 2>&1)
 exit_code=$?
 
 if echo "$output" | grep -q "Docker image 'non-existent-image:latest' not found" && [ $exit_code -eq 1 ]; then

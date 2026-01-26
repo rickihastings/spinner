@@ -3,7 +3,7 @@
 
 echo "Test: Build with --base-image flag"
 
-output=$(node ../../dist/cli.js setup --name test-base-image --base-image ubuntu:22.04 2>&1)
+output=$(../../dist/spinner setup --name test-base-image --base-image ubuntu:22.04 2>&1)
 
 if echo "$output" | grep -q "Docker image built successfully"; then
   echo "✓ Test passed: Docker image built successfully with --base-image"

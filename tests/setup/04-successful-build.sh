@@ -5,7 +5,7 @@
 echo "Test: Successful Docker image build"
 
 # Build the test image with default ubuntu:22.04 base
-output=$(node ../../dist/cli.js setup --name test-env 2>&1)
+output=$(../../dist/spinner setup --name test-env 2>&1)
 
 if echo "$output" | grep -q "Docker image built successfully"; then
   echo "✓ Test passed: Docker image built successfully"

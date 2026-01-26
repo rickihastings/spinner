@@ -57,14 +57,20 @@ func BuildImage(config BuildConfig) error {
 	}
 
 	// Copy startup.sh
-	startupScriptSrc := filepath.Join("templates", "scripts", "startup.sh")
+	startupScriptSrc, err := resolveTemplatePath(filepath.Join("templates", "scripts", "startup.sh"))
+	if err != nil {
+		return fmt.Errorf("failed to find startup.sh: %w", err)
+	}
 	startupScriptDest := filepath.Join(scriptsDir, "startup.sh")
 	if err := copyFile(startupScriptSrc, startupScriptDest); err != nil {
 		return fmt.Errorf("failed to copy startup.sh: %w", err)
 	}
 
 	// Copy ralph-loop.sh
-	ralphLoopScriptSrc := filepath.Join("templates", "scripts", "ralph-loop.sh")
+	ralphLoopScriptSrc, err := resolveTemplatePath(filepath.Join("templates", "scripts", "ralph-loop.sh"))
+	if err != nil {
+		return fmt.Errorf("failed to find ralph-loop.sh: %w", err)
+	}
 	ralphLoopScriptDest := filepath.Join(scriptsDir, "ralph-loop.sh")
 	if err := copyFile(ralphLoopScriptSrc, ralphLoopScriptDest); err != nil {
 		return fmt.Errorf("failed to copy ralph-loop.sh: %w", err)

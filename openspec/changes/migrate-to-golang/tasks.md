@@ -15,15 +15,15 @@
 - [x] 2.5 Test Dockerfile generation produces identical output to TypeScript version
 
 ## 3.0 Implement setup command with Cobra
-- [ ] 3.1 Create cmd/root.go with Cobra root command, --help flag, --version flag
-- [ ] 3.2 Create cmd/setup.go implementing setup command with --name, --base-image, --dockerfile flags
-- [ ] 3.3 Wire up setup command to use internal/prerequisites and internal/docker packages
-- [ ] 3.4 Implement validation: required --name flag, mutually exclusive --base-image and --dockerfile flags
-- [ ] 3.5 Match error message format and help text from src/App.tsx and src/commands/Setup.tsx
-- [ ] 3.6 Create main.go entry point that executes root command
-- [ ] 3.7 Build binary with `go build -o dist/spinner` and test setup command manually
-- [ ] 3.8 Run setup integration tests (tests/setup/run-all.sh) and fix any failures
-- [ ] 3.9 Verify all setup tests pass
+- [x] 3.1 Create cmd/root.go with Cobra root command, --help flag, --version flag
+- [x] 3.2 Create cmd/setup.go implementing setup command with --name, --base-image, --dockerfile flags
+- [x] 3.3 Wire up setup command to use internal/prerequisites and internal/docker packages
+- [x] 3.4 Implement validation: required --name flag, mutually exclusive --base-image and --dockerfile flags
+- [x] 3.5 Match error message format and help text from src/App.tsx and src/commands/Setup.tsx
+- [x] 3.6 Create main.go entry point that executes root command
+- [x] 3.7 Build binary with `go build -o dist/spinner` and test setup command manually
+- [x] 3.8 Run setup integration tests (tests/setup/run-all.sh) and fix any failures
+- [x] 3.9 Verify all setup tests pass
 
 ## 4.0 Implement spin command with Cobra
 - [ ] 4.1 Create cmd/spin.go implementing spin command with --image, --repo, --prompt, --branch, --max-iterations, --recreate flags

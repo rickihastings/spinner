@@ -4,7 +4,7 @@
 echo "Test: Missing --image flag"
 
 # Run spin command without --image flag
-output=$(node ../../dist/cli.js spin --repo git@github.com:octocat/Hello-World.git 2>&1)
+output=$(../../dist/spinner spin --repo git@github.com:octocat/Hello-World.git 2>&1)
 exit_code=$?
 
 if echo "$output" | grep -q "Error: --image flag is required" && [ $exit_code -eq 1 ]; then

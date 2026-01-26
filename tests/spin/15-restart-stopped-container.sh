@@ -23,7 +23,7 @@ EXPECTED_NAME="spinner-test-env-hello-world"
 
 # First run: create container
 echo "Creating initial container..."
-output1=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
+output1=$(../../dist/spinner spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
 
 # Extract container name
 CONTAINER_NAME=$(echo "$output1" | sed -n 's/.*Container created successfully: \([^ ]*\).*/\1/p')
@@ -49,7 +49,7 @@ echo "Container stopped"
 
 # Second run: should restart stopped container
 echo "Running spin again with same parameters..."
-output2=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
+output2=$(../../dist/spinner spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
 
 # Check if output indicates restart
 if echo "$output2" | grep -q "Container restarted: $CONTAINER_NAME"; then

@@ -1,14 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"github.com/rickihastings/spinner/internal/prerequisites"
+	"github.com/rickihastings/spinner/cmd"
 )
 
 func main() {
-	if err := prerequisites.CheckPrerequisites(); err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		return
-	}
-	fmt.Println("All prerequisites checked successfully")
+	cmd.Execute()
 }

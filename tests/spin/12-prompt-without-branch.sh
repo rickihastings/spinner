@@ -21,7 +21,7 @@ trap cleanup EXIT
 TEST_REPO="https://github.com/octocat/Hello-World.git"
 
 # Run spin command with --prompt but without --branch
-output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" --prompt "echo test" 2>&1)
+output=$(../../dist/spinner spin --image spinner:test-env --repo "$TEST_REPO" --prompt "echo test" 2>&1)
 exit_code=$?
 
 # Extract container name from output

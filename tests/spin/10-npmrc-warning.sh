@@ -31,7 +31,7 @@ fi
 TEST_REPO="https://github.com/octocat/Hello-World.git"
 
 # Run spin command
-output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
+output=$(../../dist/spinner spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
 
 # Check for warning message
 if echo "$output" | grep -q "~/.npmrc not found, npm will use default registry"; then

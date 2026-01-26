@@ -3,7 +3,7 @@
 
 echo "Test: Missing --name flag"
 
-output=$(node ../../dist/cli.js setup 2>&1 || true)
+output=$(../../dist/spinner setup 2>&1 || true)
 
 if echo "$output" | grep -q "Missing required flag"; then
   echo "✓ Test passed: Error message displayed for missing --name flag"

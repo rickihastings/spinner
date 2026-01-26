@@ -3,7 +3,7 @@
 
 echo "Test: Mutually exclusive flags"
 
-output=$(node ../../dist/cli.js setup --name test --base-image ubuntu:22.04 --dockerfile ./Dockerfile 2>&1 || true)
+output=$(../../dist/spinner setup --name test --base-image ubuntu:22.04 --dockerfile ./Dockerfile 2>&1 || true)
 
 if echo "$output" | grep -q "mutually exclusive"; then
   echo "✓ Test passed: Error message displayed for mutually exclusive flags"

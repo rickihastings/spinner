@@ -25,7 +25,7 @@ trap cleanup EXIT INT TERM
 TEST_REPO="https://github.com/octocat/Hello-World.git"
 
 # Run spin command
-output=$(node ../../dist/cli.js spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
+output=$(../../dist/spinner spin --image spinner:test-env --repo "$TEST_REPO" 2>&1 || true)
 
 # Extract container name from output (macOS compatible)
 CONTAINER_NAME=$(echo "$output" | grep 'Container created successfully:' | sed 's/.*Container created successfully: \([^ ]*\).*/\1/' || echo "")

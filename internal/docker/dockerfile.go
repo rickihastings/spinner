@@ -11,7 +11,11 @@ type DockerfileConfig struct {
 }
 
 func GenerateDockerfile(config DockerfileConfig) (string, error) {
-	templatePath := filepath.Join("templates", "docker", "extending.template")
+	templatePath, err := resolveTemplatePath(filepath.Join("templates", "docker", "extending.template"))
+	if err != nil {
+		return "", err
+	}
+
 	templateBytes, err := os.ReadFile(templatePath)
 	if err != nil {
 		return "", err

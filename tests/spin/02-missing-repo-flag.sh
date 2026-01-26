@@ -4,7 +4,7 @@
 echo "Test: Missing --repo flag"
 
 # Run spin command without --repo flag
-output=$(node ../../dist/cli.js spin --image spinner:test 2>&1)
+output=$(../../dist/spinner spin --image spinner:test 2>&1)
 exit_code=$?
 
 if echo "$output" | grep -q "Error: --repo flag is required" && [ $exit_code -eq 1 ]; then
