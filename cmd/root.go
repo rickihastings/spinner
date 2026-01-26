@@ -50,6 +50,12 @@ func init() {
 	// Set environment variable prefix
 	viper.SetEnvPrefix("SPINNER")
 	viper.AutomaticEnv()
+
+	// Optional: Load .env file if it exists
+	viper.SetConfigName(".env")
+	viper.SetConfigType("env")
+	viper.AddConfigPath(".")
+	viper.ReadInConfig() // Ignore error if .env doesn't exist
 }
 
 func Execute() {

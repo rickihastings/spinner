@@ -4,189 +4,179 @@
 TBD - created by archiving change add-setup-command. Update Purpose after archive.
 ## Requirements
 ### Requirement: Prerequisite Verification
-
-The CLI SHALL verify that required tools are installed before proceeding with setup operations. The verification MUST
-check for docker, git, and claude CLI tools. If any prerequisite is missing, the CLI SHALL exit immediately with an
-error message identifying the missing tool.
+The CLI SHALL verify that required tools are installed on the host system before building Docker images. The verification SHALL be implemented in Go using os/exec for command execution.
 
 #### Scenario: All prerequisites installed
-
-- **WHEN** docker, git, and claude are all available in PATH
-- **THEN** the CLI proceeds with the setup command
+- **WHEN** user runs `spinner setup --name <name>`
+- **THEN** the CLI SHALL verify docker, git, and claude-code are available via Go's exec.LookPath or equivalent
 
 #### Scenario: Docker not installed
-
-- **WHEN** docker is not available in PATH
-- **THEN** the CLI exits with error code 1 and displays "Error: docker is not installed"
+- **WHEN** user runs `spinner setup` and docker is not installed
+- **THEN** the CLI SHALL print an error message indicating docker is required and exit with non-zero status
 
 #### Scenario: Git not installed
-
-- **WHEN** git is not available in PATH
-- **THEN** the CLI exits with error code 1 and displays "Error: git is not installed"
+- **WHEN** user runs `spinner setup` and git is not installed
+- **THEN** the CLI SHALL print an error message indicating git is required and exit with non-zero status
 
 #### Scenario: Claude not installed
-
-- **WHEN** claude is not available in PATH
-- **THEN** the CLI exits with error code 1 and displays "Error: claude is not installed"
+- **WHEN** user runs `spinner setup` and claude-code is not installed
+- **THEN** the CLI SHALL print an error message indicating claude-code is required and exit with non-zero status
 
 ### Requirement: Docker Image Build
-
-The CLI SHALL build a Docker image by extending the user-provided base image or Dockerfile. The final image SHALL
-contain git and claude-code (installed only if missing from the base). The image SHALL be tagged as spinner:<name>.
+The Docker image build process SHALL be implemented using Go's os/exec package to execute docker build commands with identical behavior to the TypeScript implementation.
 
 #### Scenario: Successful image build
-
-- **WHEN** setup command completes successfully
-- **THEN** a Docker image named spinner:<name> exists locally
+- **WHEN** user provides valid build configuration
+- **THEN** the CLI SHALL execute docker build using exec.Command and stream stdout/stderr to the user
 
 #### Scenario: Git inclusion
-
-- **WHEN** the Docker image is built
-- **THEN** the container can execute `git --version` successfully
+- **WHEN** building the image
+- **THEN** the CLI SHALL ensure git is installed in the final image via Dockerfile RUN commands
 
 #### Scenario: Claude-code inclusion
-
-- **WHEN** the Docker image is built
-- **THEN** the container can execute `claude --version` successfully
+- **WHEN** building the image
+- **THEN** the CLI SHALL ensure claude-code is installed in the final image via Dockerfile RUN commands
 
 #### Scenario: Base image tools preserved
-
-- **WHEN** the base image contains Node.js, Python, or other tools
-- **THEN** these tools remain available in the final spinner:<name> image
+- **WHEN** using a base image with existing tools
+- **THEN** the CLI SHALL preserve existing tools during the build process
 
 ### Requirement: Startup Script Inclusion
-
-The Docker image SHALL include a startup script at /usr/local/bin/startup.sh that handles repository cloning and container initialization. The script SHALL accept a REPO_URL environment variable, clone the repository to /home/spinner/workspace, verify the clone with `git status`, output a hello message, and keep the container running with `tail -f /dev/null`.
+The CLI SHALL generate and include a startup script in the Docker image, implemented in Go with identical template output to the TypeScript version.
 
 #### Scenario: Startup script exists in image
-
-- **WHEN** the Docker image is built
-- **THEN** the file /usr/local/bin/startup.sh exists and is executable
+- **WHEN** the image is built
+- **THEN** the startup script SHALL be present at /startup.sh in the image
 
 #### Scenario: Startup script clones repository
-
-- **WHEN** the container starts with REPO_URL environment variable set
-- **THEN** the startup script clones the repository to /home/spinner/workspace
-- **AND** runs `git status` to verify the clone
-- **AND** outputs a hello message
+- **WHEN** the container starts with a repo URL
+- **THEN** the startup script SHALL clone the repository into /workspace using git clone
 
 #### Scenario: Startup script keeps container running
-
-- **WHEN** the repository clone completes successfully
-- **THEN** the startup script executes `tail -f /dev/null`
-- **AND** the container remains in running state
+- **WHEN** the startup script completes
+- **THEN** the container SHALL remain running via tail -f /dev/null or equivalent
 
 ### Requirement: No Secrets in Image
-
-The Docker image SHALL NOT contain any authentication tokens, API keys, or secrets. Secrets MUST be mounted at container
-runtime.
+The Docker image SHALL NOT contain any secrets, tokens, or sensitive data. This requirement remains unchanged but is implemented in Go.
 
 #### Scenario: Clean image
-
-- **WHEN** the Docker image is built
-- **THEN** no environment variables containing tokens are baked into the image
-- **AND** no credential files are present in the image filesystem
+- **WHEN** inspecting the built image
+- **THEN** no environment variables, files, or layers SHALL contain GitHub tokens, SSH keys, or other secrets
 
 ### Requirement: Base Image Input Options
-
-The setup command SHALL accept either --base-image or --dockerfile flag (mutually exclusive) along with the required
---name flag. The CLI SHALL NOT prompt for interactive input.
+The CLI SHALL accept either --base-image or --dockerfile flags, validated by Cobra's flag parsing system.
 
 #### Scenario: Base image name provided
-
-- **WHEN** user runs `setup --name my-sandbox --base-image ubuntu:22.04`
-- **THEN** the CLI uses ubuntu:22.04 as the base image and proceeds with Docker image build
+- **WHEN** user runs `spinner setup --name my-env --base-image ubuntu:22.04`
+- **THEN** the CLI SHALL build using the specified base image
 
 #### Scenario: Dockerfile path provided
-
-- **WHEN** user runs `setup --name my-sandbox --dockerfile ./my-env.Dockerfile`
-- **THEN** the CLI builds the user's Dockerfile first, then extends it
+- **WHEN** user runs `spinner setup --name my-env --dockerfile ./Dockerfile.custom`
+- **THEN** the CLI SHALL build using the custom Dockerfile
 
 #### Scenario: Both flags provided
-
-- **WHEN** user runs `setup --name test --base-image ubuntu:22.04 --dockerfile ./Dockerfile`
-- **THEN** the CLI exits with error code 1 and displays "Error: Cannot specify both --base-image and --dockerfile"
+- **WHEN** user provides both --base-image and --dockerfile flags
+- **THEN** the CLI SHALL print an error message indicating they are mutually exclusive and exit with non-zero status
 
 #### Scenario: Neither flag provided
-
-- **WHEN** user runs `setup --name test` without --base-image or --dockerfile
-- **THEN** the CLI exits with error code 1 and displays usage information
+- **WHEN** user provides neither --base-image nor --dockerfile flags
+- **THEN** the CLI SHALL default to ubuntu:22.04 as the base image
 
 #### Scenario: Missing name flag
-
-- **WHEN** user runs `setup --base-image ubuntu:22.04` without --name
-- **THEN** the CLI exits with error code 1 and displays usage information
+- **WHEN** user runs `spinner setup` without --name flag
+- **THEN** the CLI SHALL print an error message indicating --name is required and exit with non-zero status (enforced by Cobra's MarkFlagRequired)
 
 ### Requirement: Custom Dockerfile Build
-
-When the user provides a Dockerfile path via --dockerfile, the CLI SHALL build that Dockerfile first to create a base
-image, then extend it with required dependencies.
+The CLI SHALL support building from custom Dockerfiles using Go's exec.Command for docker build operations.
 
 #### Scenario: Valid Dockerfile path
-
-- **WHEN** user runs `setup --name test --dockerfile ./custom.Dockerfile`
-- **AND** ./custom.Dockerfile exists and is valid
-- **THEN** the CLI builds the user's Dockerfile with tag spinner-base:<name>
-- **AND** uses spinner-base:<name> as the base for the final image
+- **WHEN** user provides a valid Dockerfile path
+- **THEN** the CLI SHALL build the custom Dockerfile first using docker build -f <path>, then use the result as the base image for additional setup
 
 #### Scenario: Invalid Dockerfile path
-
-- **WHEN** user runs `setup --name test --dockerfile ./missing.Dockerfile`
-- **AND** the file does not exist
-- **THEN** the CLI exits with error code 1 and displays "Error: Dockerfile not found at ./missing.Dockerfile"
+- **WHEN** user provides a non-existent Dockerfile path
+- **THEN** the CLI SHALL print an error message and exit with non-zero status (validated using os.Stat in Go)
 
 #### Scenario: Dockerfile build failure
-
-- **WHEN** the user's Dockerfile fails to build
-- **THEN** the CLI exits with error code 1 and displays the Docker build error
+- **WHEN** the custom Dockerfile build fails
+- **THEN** the CLI SHALL display the docker build error output and exit with non-zero status
 
 ### Requirement: Conditional Dependency Installation
-
-The Docker image build process SHALL check if git and claude-code are already installed in the base image. Dependencies
-SHALL only be installed if they are missing.
+The CLI SHALL conditionally install dependencies in the Docker image based on their presence, using Go-generated Dockerfile templates.
 
 #### Scenario: Git already present
-
-- **WHEN** the base image already contains git
-- **THEN** the build process skips git installation
-- **AND** the final image can execute `git --version` successfully
+- **WHEN** the base image already has git installed
+- **THEN** the CLI SHALL skip git installation (checked via `which git` in Dockerfile)
 
 #### Scenario: Git missing
-
-- **WHEN** the base image does not contain git
-- **THEN** the build process installs git using apt-get
-- **AND** the final image can execute `git --version` successfully
+- **WHEN** the base image does not have git installed
+- **THEN** the CLI SHALL install git via apt-get in the Dockerfile
 
 #### Scenario: Claude-code already present
-
-- **WHEN** the base image already contains claude-code
-- **THEN** the build process skips claude-code installation
-- **AND** the final image can execute `claude --version` successfully
+- **WHEN** the base image already has claude-code installed
+- **THEN** the CLI SHALL skip claude-code installation
 
 #### Scenario: Claude-code missing
-
-- **WHEN** the base image does not contain claude-code
-- **THEN** the build process installs claude-code using the native installer
-- **AND** the final image can execute `claude --version` successfully
+- **WHEN** the base image does not have claude-code installed
+- **THEN** the CLI SHALL install claude-code via npm or official installation method
 
 ### Requirement: Ubuntu/Debian Base Image Restriction
-
-The CLI SHALL only support Ubuntu or Debian-based base images that use the apt-get package manager. If a non-compatible
-base image is detected, the CLI SHALL exit with a clear error message.
+The CLI SHALL only support Ubuntu/Debian-based images that use apt-get. This validation remains unchanged but is implemented in Go.
 
 #### Scenario: Ubuntu-based image
-
-- **WHEN** user provides --base-image ubuntu:22.04
-- **THEN** the CLI proceeds with the image build
+- **WHEN** user provides an Ubuntu-based image (e.g., ubuntu:22.04)
+- **THEN** the CLI SHALL proceed with the build
 
 #### Scenario: Debian-based image
-
-- **WHEN** user provides --base-image debian:bullseye
-- **THEN** the CLI proceeds with the image build
+- **WHEN** user provides a Debian-based image (e.g., debian:bullseye)
+- **THEN** the CLI SHALL proceed with the build
 
 #### Scenario: Non-Debian base image
+- **WHEN** user provides a non-Debian-based image (e.g., alpine:latest)
+- **THEN** the CLI SHALL print a warning or error indicating only Ubuntu/Debian images are supported
 
-- **WHEN** user provides --base-image alpine:latest
-- **AND** apt-get is not available in the base image
-- **THEN** the Docker build fails with an error indicating unsupported base OS
+### Requirement: Go Binary Build
+The CLI SHALL be built as a standalone Go binary using `go build` command.
+
+#### Scenario: Build command
+- **WHEN** developer runs `go build -o dist/spinner`
+- **THEN** a standalone binary SHALL be created at dist/spinner
+
+#### Scenario: Binary execution
+- **WHEN** user runs `./dist/spinner setup --name test`
+- **THEN** the binary SHALL execute without requiring Node.js runtime
+
+#### Scenario: Cross-platform builds
+- **WHEN** developer uses `GOOS` and `GOARCH` environment variables
+- **THEN** the CLI SHALL support cross-compilation for different platforms (Linux, macOS, Windows)
+
+### Requirement: Cobra Command Structure
+The CLI SHALL use Cobra for command routing and flag parsing.
+
+#### Scenario: Root command
+- **WHEN** user runs `spinner --help`
+- **THEN** Cobra SHALL display help text matching the format from src/App.tsx
+
+#### Scenario: Subcommand registration
+- **WHEN** the CLI initializes
+- **THEN** setup and spin commands SHALL be registered with Cobra's AddCommand
+
+#### Scenario: Flag validation
+- **WHEN** user provides invalid flags
+- **THEN** Cobra SHALL display appropriate error messages and usage information
+
+### Requirement: Viper Configuration Support
+The CLI SHALL use Viper for environment variable configuration (future-proofing).
+
+#### Scenario: Environment variable binding
+- **WHEN** Viper is initialized in cmd/root.go
+- **THEN** the CLI SHALL be capable of reading configuration from environment variables
+
+#### Scenario: Precedence handling
+- **WHEN** both CLI flags and environment variables are provided
+- **THEN** CLI flags SHALL take precedence over environment variables (Cobra + Viper default behavior)
+
+#### Scenario: Configuration file support (optional)
+- **WHEN** a configuration file is present
+- **THEN** Viper SHALL optionally read configuration from the file
 

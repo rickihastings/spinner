@@ -56,7 +56,7 @@
 
 ## 7.0 Add Viper configuration support (future-proofing)
 - [x] 7.1 Initialize Viper in cmd/root.go to read from environment variables
-- [ ] 7.2 Document environment variable configuration patterns in docs/
-- [ ] 7.3 Add example .env or configuration file support (optional, based on need)
-- [ ] 7.4 Test environment variable overrides work correctly
-- [ ] 7.5 Update documentation with Viper configuration examples
+- [x] 7.2 Document environment variable configuration patterns in docs/
+- [x] 7.3 Add example .env or configuration file support (optional, based on need)
+- [x] 7.4 Test environment variable overrides work correctly
+- [x] 7.5 Update documentation with Viper configuration examples

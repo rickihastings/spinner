@@ -4,413 +4,334 @@
 TBD - created by archiving change add-spin-command. Update Purpose after archive.
 ## Requirements
 ### Requirement: Spin Command Flags
-
-The spin command SHALL accept the following required CLI flags: --image (base Docker image name) and --repo (git SSH
-clone URL). The CLI SHALL validate that both flags are provided before proceeding.
+The CLI SHALL accept required and optional flags for the spin command, validated by Cobra's flag parsing system.
 
 #### Scenario: All required flags provided
-
-- **WHEN** user runs `spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git`
-- **THEN** the CLI proceeds with container creation
+- **WHEN** user runs `spinner spin --image <image> --repo <repo>`
+- **THEN** the CLI SHALL proceed with container creation using Cobra's flag parsing
 
 #### Scenario: Missing image flag
-
-- **WHEN** user runs `spin --repo git@github.com:octocat/Hello-World.git` without --image
-- **THEN** the CLI exits with error code 1 and displays "Error: --image flag is required"
+- **WHEN** user runs `spinner spin` without --image flag
+- **THEN** the CLI SHALL print an error message and exit with non-zero status (enforced by Cobra's MarkFlagRequired)
 
 #### Scenario: Missing repo flag
-
-- **WHEN** user runs `spin --image spinner:my-env` without --repo
-- **THEN** the CLI exits with error code 1 and displays "Error: --repo flag is required"
+- **WHEN** user runs `spinner spin` without --repo flag
+- **THEN** the CLI SHALL print an error message and exit with non-zero status (enforced by Cobra's MarkFlagRequired)
 
 #### Scenario: Invalid image name
-
-- **WHEN** user provides an --image that does not exist locally
-- **THEN** the CLI exits with error code 1 and displays "Error: Docker image '<image-name>' not found"
+- **WHEN** user provides a non-existent image name
+- **THEN** docker operations SHALL fail with appropriate error messages from docker CLI
 
 ### Requirement: Prompt Flag for Ralph Loop
-
-The spin command SHALL accept a required `--prompt` flag containing the prompt string to feed to Claude in each iteration of the Ralph loop.
+The CLI SHALL support the --prompt flag for autonomous implementation, implemented in Go with identical behavior.
 
 #### Scenario: Prompt provided with branch
-
-- **WHEN** user runs `spin --image spinner:my-env --repo git@github.com:user/repo.git --prompt "study and implement plan for feature-x" --branch feature-x`
-- **THEN** the CLI passes `PROMPT="study and implement plan for feature-x"` as an environment variable to the container
-- **AND** the CLI passes `BRANCH=feature-x` as an environment variable to the container
-- **AND** the container runs in Ralph loop mode on the specified branch after cloning
+- **WHEN** user runs `spinner spin --image <image> --repo <repo> --prompt "implement X" --branch feature`
+- **THEN** the CLI SHALL start the container and execute ralph-loop with the provided prompt on the specified branch
 
 #### Scenario: Prompt provided without branch
-
-- **WHEN** user runs `spin --image spinner:my-env --repo git@github.com:user/repo.git --prompt "study and implement plan for feature-x"` without `--branch`
-- **THEN** the CLI passes `PROMPT="study and implement plan for feature-x"` as an environment variable to the container
-- **AND** the container runs in Ralph loop mode on the default branch after cloning
+- **WHEN** user runs `spinner spin --image <image> --repo <repo> --prompt "implement X"` without --branch flag
+- **THEN** the CLI SHALL start the container and execute ralph-loop with the provided prompt on the default branch
 
 #### Scenario: Prompt not provided
-
-- **WHEN** user runs `spin --image spinner:my-env --repo git@github.com:user/repo.git` without `--prompt`
-- **THEN** the container clones the repository and stays idle
-- **AND** no Ralph loop is executed
+- **WHEN** user runs `spinner spin --image <image> --repo <repo>` without --prompt flag
+- **THEN** the CLI SHALL start the container without executing ralph-loop
 
 ### Requirement: Branch Flag
-
-The spin command SHALL accept an optional `--branch` flag specifying which branch to checkout and work on after cloning the repository. If not provided and `--prompt` is present, the Ralph loop runs on the default branch.
+The CLI SHALL support the --branch flag for specifying which git branch to use, implemented in Go.
 
 #### Scenario: Branch provided
-
-- **WHEN** user runs `spin --repo git@... --prompt "..." --branch feature-x`
-- **THEN** the CLI passes `BRANCH=feature-x` as an environment variable to the container
-- **AND** after cloning, the container checks out the specified branch
+- **WHEN** user runs `spinner spin --image <image> --repo <repo> --branch feature-x`
+- **THEN** the container startup script SHALL check out the specified branch after cloning
 
 #### Scenario: Branch does not exist
-
-- **WHEN** the container attempts to checkout a branch that does not exist
-- **THEN** the container creates the branch from the default branch
-- **AND** continues with Ralph loop execution
+- **WHEN** user provides a non-existent branch name
+- **THEN** the git checkout operation SHALL fail inside the container with an error message
 
 #### Scenario: Branch not provided but prompt provided
-
-- **WHEN** user runs `spin --repo git@... --prompt "..."` without `--branch`
-- **THEN** the CLI does not pass a `BRANCH` environment variable to the container
-- **AND** after cloning, the container stays on the default branch
-- **AND** the Ralph loop executes on the default branch
+- **WHEN** user runs `spinner spin --image <image> --repo <repo> --prompt "task"`
+- **THEN** the CLI SHALL use the repository's default branch
 
 ### Requirement: Max Iterations Flag
-
-The spin command SHALL accept an optional `--max-iterations` flag specifying the maximum number of Ralph loop iterations before the container exits. Default is 100.
+The CLI SHALL support the --max-iterations flag for controlling ralph-loop execution, implemented in Go.
 
 #### Scenario: Max iterations provided
-
-- **WHEN** user runs `spin --repo git@... --prompt "..." --branch feature-x --max-iterations 50`
-- **THEN** the CLI passes `MAX_ITERATIONS=50` as an environment variable to the container
+- **WHEN** user runs `spinner spin --image <image> --repo <repo> --prompt "task" --max-iterations 50`
+- **THEN** the CLI SHALL pass RALPH_MAX_ITERATIONS=50 environment variable to the container
 
 #### Scenario: Max iterations not provided
-
-- **WHEN** user runs `spin --repo git@... --prompt "..." --branch feature-x` without `--max-iterations`
-- **THEN** the CLI passes `MAX_ITERATIONS=100` as an environment variable to the container
+- **WHEN** user runs `spinner spin` without --max-iterations flag
+- **THEN** the CLI SHALL default to 100 iterations (RALPH_MAX_ITERATIONS=100)
 
 #### Scenario: Max iterations reached
-
-- **WHEN** the Ralph loop completes 100 iterations (or the configured max)
-- **AND** the `~~ FEATURE_COMPLETED ~~` signal has not been detected
-- **THEN** the container outputs "Max iterations (100) reached. Exiting."
-- **AND** the container exits with status 0
+- **WHEN** ralph-loop reaches the max iteration limit
+- **THEN** ralph-loop SHALL stop and the container SHALL remain running for manual inspection
 
 ### Requirement: Ralph Loop Execution
-
-The container SHALL execute a Ralph loop that continuously invokes Claude with the provided prompt until the feature is complete or max iterations is reached.
+The CLI SHALL execute ralph-loop inside the container when a prompt is provided, implemented using Go's exec.Command.
 
 #### Scenario: Ralph loop iteration
-
-- **WHEN** the container starts with `PROMPT` environment variable set
-- **THEN** the loop pipes the prompt string to `claude --dangerously-skip-permissions`
-- **AND** captures and displays the output
-- **AND** increments the iteration counter
-- **AND** repeats until completion signal is detected or max iterations reached
+- **WHEN** ralph-loop is running
+- **THEN** the CLI SHALL stream ralph-loop output to the host terminal in real-time via docker logs -f or equivalent
 
 ### Requirement: Feature Completion Detection
-
-The Ralph loop SHALL monitor Claude's output for the `~~ FEATURE_COMPLETED ~~` signal to detect when all tasks are complete.
+The CLI SHALL detect when ralph-loop signals feature completion, implemented in Go by monitoring container output.
 
 #### Scenario: Completion signal detected
-
-- **WHEN** Claude's output contains the string `~~ FEATURE_COMPLETED ~~`
-- **THEN** the loop exits
-- **AND** the container outputs "Feature completed after N iterations. Exiting."
-- **AND** the container exits with status 0
+- **WHEN** ralph-loop outputs `~~ FEATURE_COMPLETED ~~`
+- **THEN** the CLI SHALL stop following logs and display completion message
 
 #### Scenario: No completion signal
-
-- **WHEN** Claude's output does not contain `~~ FEATURE_COMPLETED ~~`
-- **AND** iteration count is less than max iterations
-- **THEN** the loop starts another iteration
-- **AND** feeds the prompt to Claude again
+- **WHEN** ralph-loop completes without outputting the completion signal
+- **THEN** the CLI SHALL continue following logs until max iterations or manual interrupt
 
 ### Requirement: NPM Configuration Mount
-
-The CLI SHALL mount the user's .npmrc file from ~/.npmrc to /root/.npmrc in the container. If ~/.npmrc does not exist,
-the CLI SHALL proceed without mounting and display a warning message.
+The CLI SHALL mount the user's .npmrc file if present, implemented using Go's os.Stat for file existence checks.
 
 #### Scenario: npmrc file exists
-
-- **WHEN** ~/.npmrc exists on the host system
-- **THEN** the file is mounted at /root/.npmrc in the container
-- **AND** npm commands in the container use the host's registry configuration
+- **WHEN** ~/.npmrc exists on the host
+- **THEN** the CLI SHALL mount it into the container at /root/.npmrc using docker run -v flag
 
 #### Scenario: npmrc file missing
-
-- **WHEN** ~/.npmrc does not exist on the host system
-- **THEN** the CLI displays "Warning: ~/.npmrc not found, npm will use default registry"
-- **AND** the container creation proceeds without the mount
+- **WHEN** ~/.npmrc does not exist on the host
+- **THEN** the CLI SHALL not attempt to mount .npmrc (checked via os.Stat in Go)
 
 ### Requirement: Repository Cloning
-
-The container SHALL automatically clone the repository specified by --repo into /home/spinner/workspace during startup. The CLI SHALL
-pass the repository URL to the container via the REPO_URL environment variable. The container's startup script (baked into
-the image at /usr/local/bin/startup.sh) SHALL handle the cloning, verification, and initialization. If the clone fails, the
-container SHALL exit with a non-zero status.
+The CLI SHALL support repository cloning via the container startup script, with SSH agent forwarding configured by Go.
 
 #### Scenario: Successful repository clone
-
-- **WHEN** the container starts with a valid --repo URL passed as REPO_URL environment variable
-- **THEN** the repository is cloned into /home/spinner/workspace by the startup script
-- **AND** the startup script runs `git status` to verify the clone
-- **AND** the startup script outputs "hello world" to confirm successful initialization
-- **AND** the container remains running after clone completes
+- **WHEN** the container starts with a valid repo URL
+- **THEN** the startup script SHALL clone the repository into /workspace and the CLI SHALL verify success
 
 #### Scenario: Clone failure due to authentication
-
-- **WHEN** SSH agent cannot authenticate to the repository
-- **THEN** git clone fails in the startup script
-- **AND** the container exits with a non-zero status
-- **AND** the CLI displays the git error message
+- **WHEN** the SSH agent is not running or keys are not available
+- **THEN** the git clone operation SHALL fail with an authentication error message
 
 #### Scenario: Clone failure due to invalid URL
-
-- **WHEN** the --repo URL is malformed or repository does not exist
-- **THEN** git clone fails in the startup script
-- **AND** the container exits with a non-zero status
-- **AND** the CLI displays the git error message
+- **WHEN** user provides an invalid git repository URL
+- **THEN** the git clone operation SHALL fail with a URL error message
 
 ### Requirement: Persistent Container
-
-The container SHALL run in detached mode as a persistent background process. The container SHALL NOT be automatically removed when it exits (no --rm flag). The CLI SHALL assign a deterministic name to the container based on the image name, repository name, and optionally the branch name.
+The CLI SHALL create persistent containers that run in detached mode, implemented using Go's exec.Command for docker run. The CLI SHALL assign a deterministic name to the container based on the image name, repository name, and optionally the branch name.
 
 #### Scenario: Container runs in background
-
-- **WHEN** the spin command completes successfully
-- **THEN** the container is running in detached mode
-- **AND** the CLI returns to the user's shell prompt immediately
+- **WHEN** the CLI creates a container
+- **THEN** docker run SHALL be executed with -d flag for detached mode
 
 #### Scenario: Deterministic container naming without branch
-
 - **WHEN** user spins up a container with `--image spinner:default --repo git@github.com:user/my-project.git`
 - **THEN** the container is named `spinner-default-my-project`
 - **AND** the container name is displayed to the user
+- **AND** the naming logic SHALL be implemented in Go using string manipulation
 
 #### Scenario: Deterministic container naming with branch
-
 - **WHEN** user spins up a container with `--image spinner:default --repo git@github.com:user/my-project.git --branch feature/auth-v2`
 - **THEN** the container is named `spinner-default-my-project-feature-auth-v2`
 - **AND** the container name is displayed to the user
+- **AND** the Go implementation SHALL append the sanitized branch name to the container name
 
 #### Scenario: Container name sanitization
-
 - **WHEN** the image is `spinner:my-env`, repo is `git@github.com:user/my.project.git`, and branch is `feature/auth-v2`
 - **THEN** the container name is `spinner-my-env-my-project-feature-auth-v2`
 - **AND** special characters (`:`, `/`, `.`) are replaced with hyphens
+- **AND** the sanitization SHALL be implemented in Go using regex or strings package
 
 #### Scenario: Container persists after exit
-
-- **WHEN** the cloned repository setup completes
-- **THEN** the container continues running
-- **AND** the container can be restarted with `docker start <container-name>`
+- **WHEN** the CLI exits
+- **THEN** the container SHALL continue running in the background
 
 #### Scenario: User can exec into container
-
-- **WHEN** the container is running
-- **THEN** user can exec into it with `docker exec -it <container-name> bash`
+- **WHEN** the CLI displays management instructions
+- **THEN** the instructions SHALL include `docker exec -it <container-name> /bin/bash` for manual access
 - **AND** the working directory is /workspace
 
 ### Requirement: Container Lifecycle Management
-
-The user SHALL be responsible for stopping and removing containers created by the spin command. The CLI SHALL display
-instructions on how to manage the container after creation.
+The CLI SHALL display container management instructions after creation, implemented using Go's fmt package.
 
 #### Scenario: Display management instructions
-
-- **WHEN** the spin command successfully creates a container
-- **THEN** the CLI displays the container name
-- **AND** the CLI displays "To access: docker exec -it <container-name> bash"
-- **AND** the CLI displays "To stop: docker stop <container-name>"
-- **AND** the CLI displays "To remove: docker rm <container-name>"
+- **WHEN** the container is created successfully
+- **THEN** the CLI SHALL print instructions for accessing the container (docker exec) and cleaning up (docker stop, docker rm)
 
 #### Scenario: Container cleanup
-
-- **WHEN** user runs `docker stop <container-name>` then `docker rm <container-name>`
-- **THEN** the container and its filesystem are removed
-- **AND** the cloned repository data is lost (unless separately backed up)
+- **WHEN** user runs suggested cleanup commands
+- **THEN** the container SHALL be stopped and removed (manual operation by user)
 
 ### Requirement: Container Startup Command
-
-The container SHALL use the baked-in startup script at /usr/local/bin/startup.sh as its entrypoint. The startup script handles repository cloning, branch checkout, and Ralph loop execution.
+The CLI SHALL execute the appropriate startup command based on flags, implemented using Go's string building or text/template.
 
 #### Scenario: Container startup sequence with branch
-
-- **WHEN** the container starts with `PROMPT` and `BRANCH` environment variables set
-- **THEN** the startup script clones the repository from `REPO_URL`
-- **AND** checks out the branch specified in `BRANCH` (creating it if it doesn't exist)
-- **AND** executes the Ralph loop with the prompt from `PROMPT`
-- **AND** runs until `~~ FEATURE_COMPLETED ~~` is detected or `MAX_ITERATIONS` is reached
+- **WHEN** user provides --prompt and --branch flags
+- **THEN** the container SHALL execute: git clone → git checkout <branch> → ralph-loop with prompt
 
 #### Scenario: Container startup sequence without branch
-
-- **WHEN** the container starts with `PROMPT` environment variable set but `BRANCH` is not set
-- **THEN** the startup script clones the repository from `REPO_URL`
-- **AND** stays on the default branch
-- **AND** executes the Ralph loop with the prompt from `PROMPT`
-- **AND** runs until `~~ FEATURE_COMPLETED ~~` is detected or `MAX_ITERATIONS` is reached
+- **WHEN** user provides --prompt but not --branch flag
+- **THEN** the container SHALL execute: git clone → ralph-loop with prompt (using default branch)
 
 #### Scenario: Container startup without prompt
-
-- **WHEN** the container starts without `PROMPT` environment variable set
-- **THEN** the startup script clones the repository from `REPO_URL`
-- **AND** the container stays idle without executing Ralph loop
+- **WHEN** user does not provide --prompt flag
+- **THEN** the container SHALL execute: git clone → tail -f /dev/null (keep running)
 
 #### Scenario: Clone failure
-
 - **WHEN** git clone fails in the startup script
-- **THEN** the container outputs the git error message
-- **AND** the container exits immediately with non-zero status
+- **THEN** the container SHALL exit and the CLI SHALL report the failure
 
 ### Requirement: GitHub Token Environment Variable
-
-The CLI SHALL require the `GITHUB_TOKEN` environment variable to be set on the host system before running the spin
-command. The token SHALL be passed to the container as an environment variable for git authentication. If `GITHUB_TOKEN`
-is not set, the CLI SHALL exit with error code 1 and display an error message.
+The CLI SHALL forward the GITHUB_TOKEN environment variable to the container, implemented using Go's os.Getenv and docker run -e flags.
 
 #### Scenario: GITHUB_TOKEN is set
-
-- **WHEN** the user has set `GITHUB_TOKEN` in their shell environment
-- **AND** runs the spin command
-- **THEN** the CLI passes the token value to the container as the `GITHUB_TOKEN` environment variable
-- **AND** the container can use the token for git authentication
+- **WHEN** GITHUB_TOKEN environment variable is set on the host
+- **THEN** the CLI SHALL pass it to the container using docker run -e GITHUB_TOKEN=$GITHUB_TOKEN
 
 #### Scenario: GITHUB_TOKEN is not set
-
-- **WHEN** the user has not set `GITHUB_TOKEN` in their shell environment
-- **AND** runs the spin command
-- **THEN** the CLI exits with error code 1
-- **AND** displays "Error: GITHUB_TOKEN environment variable is required. Set it with a GitHub Personal Access Token."
+- **WHEN** GITHUB_TOKEN environment variable is not set on the host
+- **THEN** the CLI SHALL print an error message and exit with non-zero status (validated in Go using os.Getenv)
 
 #### Scenario: Token is not exposed in logs
-
-- **WHEN** the spin command runs successfully
-- **THEN** the token value is NOT displayed in CLI output or container logs
-- **AND** the token is NOT stored in bash history (because it comes from environment variable, not CLI flag)
+- **WHEN** the CLI executes docker commands
+- **THEN** the token value SHALL NOT appear in docker command output or logs
 
 ### Requirement: GitHub CLI Installation
-
-Docker images created with the setup command SHALL include the GitHub CLI (`gh`) tool installed and available in the
-PATH. The Dockerfile template SHALL include installation steps for `gh` CLI.
+The CLI SHALL ensure gh CLI is available in the container image, with Dockerfile generation implemented in Go.
 
 #### Scenario: gh CLI is available in container
-
-- **WHEN** a container is created from a spinner base image
-- **THEN** the `gh` command is available in the container's PATH
-- **AND** running `gh --version` returns a valid version number
+- **WHEN** the container is created from a setup image
+- **THEN** gh CLI SHALL be installed and accessible via PATH
 
 #### Scenario: Dockerfile template includes gh installation
-
-- **WHEN** the setup command generates a Dockerfile from the template
-- **THEN** the Dockerfile includes steps to install the GitHub CLI
-- **AND** the installation completes successfully during image build
+- **WHEN** the CLI generates a Dockerfile via Go code
+- **THEN** the Dockerfile SHALL include gh CLI installation steps
 
 ### Requirement: Git Credential Configuration
-
-The container startup script SHALL configure git to use GitHub CLI as the credential helper before cloning the
-repository. The script SHALL run `gh auth login --with-token` using the `GITHUB_TOKEN` environment variable, then run
-`gh auth setup-git` to configure git credential helper, and finally configure git credential cache with a 1-year
-timeout.
+The CLI SHALL configure git to use the GITHUB_TOKEN for HTTPS authentication, with configuration generated by Go.
 
 #### Scenario: Git credential helper is configured
-
-- **WHEN** the container starts with `GITHUB_TOKEN` set
-- **THEN** the startup script runs `echo "$GITHUB_TOKEN" | gh auth login --with-token`
-- **AND** the startup script runs `gh auth setup-git`
-- **AND** the startup script runs `git config --global credential.helper 'cache --timeout=31536000'`
-- **AND** git operations use the configured credential helper for authentication
+- **WHEN** the container starts
+- **THEN** git config SHALL be set to use the GITHUB_TOKEN as a credential helper
 
 #### Scenario: Token authentication succeeds
-
-- **WHEN** git credential configuration completes successfully
-- **AND** the container attempts to clone a private repository
-- **THEN** git authentication succeeds using the GitHub token
-- **AND** no additional credentials are prompted
+- **WHEN** git operations require authentication
+- **THEN** git SHALL use the GITHUB_TOKEN successfully
 
 #### Scenario: Token authentication fails
-
-- **WHEN** the provided `GITHUB_TOKEN` is invalid or expired
-- **AND** the container attempts to configure `gh auth login`
-- **THEN** the authentication fails
-- **AND** the startup script outputs the error message from `gh`
-- **AND** the container exits with a non-zero status
+- **WHEN** the GITHUB_TOKEN is invalid or expired
+- **THEN** git operations SHALL fail with authentication error messages
 
 ### Requirement: Repository URL Format
-
-The CLI SHALL accept both SSH and HTTPS repository URLs via the `--repo` flag. When using GitHub token authentication,
-the container SHALL convert SSH URLs to HTTPS format before cloning.
+The CLI SHALL support both HTTPS and SSH repository URLs, with URL handling implemented in Go.
 
 #### Scenario: HTTPS URL provided
-
-- **WHEN** user runs `spin --repo https://github.com/user/repo.git`
-- **THEN** the CLI passes the URL as-is to the container
-- **AND** git clone uses the HTTPS URL with token authentication
+- **WHEN** user provides a repository URL starting with https://
+- **THEN** the CLI SHALL use HTTPS cloning with GITHUB_TOKEN authentication
 
 #### Scenario: SSH URL provided
-
-- **WHEN** user runs `spin --repo git@github.com:user/repo.git`
-- **THEN** the startup script converts the URL to `https://github.com/user/repo.git`
-- **AND** git clone uses the HTTPS URL with token authentication
+- **WHEN** user provides a repository URL starting with git@
+- **THEN** the CLI SHALL use SSH cloning with SSH agent forwarding
 
 #### Scenario: URL conversion handles edge cases
-
-- **WHEN** the repository URL is in SSH format like `git@github.com:org/repo.git`
-- **THEN** the startup script correctly converts it to `https://github.com/org/repo.git`
-- **AND** preserves organization/user and repository name correctly
+- **WHEN** user provides URLs with or without .git suffix
+- **THEN** the CLI SHALL handle both formats correctly (using Go's strings package for normalization)
 
 ### Requirement: Container Reuse
-
-The CLI SHALL check if a container with the deterministic name already exists before creating a new one. If a container with the same name exists and is running, the CLI SHALL reuse it. If a container with the same name exists but is stopped, the CLI SHALL restart it. The CLI output SHALL clearly indicate whether a container was created, reused, or restarted.
+The CLI SHALL check if a container with the deterministic name already exists before creating a new one, implemented using Go's exec.Command to invoke docker inspect. If a container with the same name exists and is running, the CLI SHALL reuse it. If a container with the same name exists but is stopped, the CLI SHALL restart it. The CLI output SHALL clearly indicate whether a container was created, reused, or restarted.
 
 #### Scenario: Reuse running container
-
 - **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git`
 - **AND** a container named `spinner-default-my-project` is already running
 - **THEN** the CLI does not create a new container
 - **AND** the CLI displays "Reusing running container: spinner-default-my-project"
 - **AND** the CLI displays the standard management instructions
+- **AND** the check SHALL be implemented in Go using `docker inspect -f '{{.State.Status}}' <container-name>`
 
 #### Scenario: Restart stopped container
-
 - **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git`
 - **AND** a container named `spinner-default-my-project` exists but is stopped
 - **THEN** the CLI restarts the existing container with `docker start`
 - **AND** the CLI displays "Restarted container: spinner-default-my-project"
 - **AND** the CLI displays the standard management instructions
+- **AND** the restart SHALL be implemented in Go using exec.Command
 
 #### Scenario: Create new container when none exists
-
 - **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git`
 - **AND** no container named `spinner-default-my-project` exists
 - **THEN** the CLI creates a new container with that name
 - **AND** the CLI displays "Container created successfully: spinner-default-my-project"
 - **AND** the CLI displays the standard management instructions
+- **AND** the creation SHALL follow the standard docker run logic implemented in Go
 
 ### Requirement: Container Recreation Flag
-
-The CLI SHALL accept an optional `--recreate` boolean flag. When provided, the CLI SHALL remove any existing container with the deterministic name and create a fresh container. This allows users to force a clean slate when reuse is not desired.
+The CLI SHALL accept an optional `--recreate` boolean flag, implemented using Cobra's BoolP flag type. When provided, the CLI SHALL remove any existing container with the deterministic name and create a fresh container. This allows users to force a clean slate when reuse is not desired.
 
 #### Scenario: Recreate removes running container
-
 - **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git --recreate`
 - **AND** a container named `spinner-default-my-project` is currently running
-- **THEN** the CLI stops and removes the existing container
+- **THEN** the CLI stops and removes the existing container using `docker rm -f`
 - **AND** the CLI creates a new container with the same name
 - **AND** the CLI displays "Container recreated: spinner-default-my-project"
+- **AND** the removal SHALL be implemented in Go using exec.Command
 
 #### Scenario: Recreate removes stopped container
-
 - **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git --recreate`
 - **AND** a container named `spinner-default-my-project` exists but is stopped
-- **THEN** the CLI removes the existing container
+- **THEN** the CLI removes the existing container using `docker rm`
 - **AND** the CLI creates a new container with the same name
 - **AND** the CLI displays "Container recreated: spinner-default-my-project"
 
 #### Scenario: Recreate creates when no container exists
-
 - **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git --recreate`
 - **AND** no container named `spinner-default-my-project` exists
 - **THEN** the CLI creates a new container with that name
 - **AND** the CLI displays "Container created successfully: spinner-default-my-project"
 - **AND** the behavior is identical to running without `--recreate`
+
+### Requirement: Go Binary Execution
+The spin command SHALL be executed from a standalone Go binary without requiring Node.js runtime.
+
+#### Scenario: Binary invocation
+- **WHEN** user runs `./dist/spinner spin --image test --repo <url>`
+- **THEN** the Go binary SHALL execute the spin command using Cobra
+
+#### Scenario: Cross-platform compatibility
+- **WHEN** the binary is compiled for different platforms (Linux, macOS, Windows)
+- **THEN** the spin command SHALL work identically across platforms
+
+### Requirement: Cobra Flag Parsing for Spin
+The spin command SHALL use Cobra for flag definition and validation.
+
+#### Scenario: Flag registration
+- **WHEN** the spin command initializes
+- **THEN** all flags (--image, --repo, --prompt, --branch, --max-iterations, --recreate) SHALL be registered with Cobra
+
+#### Scenario: Required flag enforcement
+- **WHEN** user omits required flags
+- **THEN** Cobra SHALL display error messages and usage information automatically
+
+#### Scenario: Optional flag defaults
+- **WHEN** user omits optional flags (--prompt, --branch, --max-iterations, --recreate)
+- **THEN** Cobra SHALL provide default values (empty string for prompt/branch, 100 for max-iterations, false for recreate)
+
+### Requirement: Viper Environment Variable Support
+The spin command SHALL support environment variable overrides via Viper (future-proofing).
+
+#### Scenario: Environment variable binding
+- **WHEN** Viper is initialized for spin command
+- **THEN** flags like SPINNER_IMAGE, SPINNER_REPO SHALL be bindable to environment variables
+
+#### Scenario: Flag precedence
+- **WHEN** both CLI flags and environment variables are set
+- **THEN** CLI flags SHALL take precedence (Cobra + Viper default behavior)
+
+### Requirement: Real-time Output Streaming
+The CLI SHALL stream docker logs in real-time using Go's exec.Command with stdout/stderr pipes.
+
+#### Scenario: Log following
+- **WHEN** ralph-loop is running
+- **THEN** the CLI SHALL use `docker logs -f <container>` to stream output to the terminal
+
+#### Scenario: Output buffering
+- **WHEN** streaming logs
+- **THEN** the CLI SHALL use line-buffered or unbuffered output to ensure real-time display (using bufio.Scanner in Go)
+
+#### Scenario: Signal handling
+- **WHEN** user presses Ctrl+C
+- **THEN** the CLI SHALL stop following logs but leave the container running (using os.Signal and signal.Notify in Go)
 

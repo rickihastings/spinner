@@ -7,6 +7,50 @@
 - Use `go mod download` for Go dependencies
 - Use `npm install` only when working with OpenSpec features
 
+## Environment Variable Configuration
+
+Spinner uses Viper to support environment variable configuration. All command-line flags can be overridden using environment variables with the `SPINNER_` prefix.
+
+### Supported Environment Variables
+
+**Setup Command:**
+- `SPINNER_NAME` - Override `--name` flag
+- `SPINNER_BASE_IMAGE` - Override `--base-image` flag
+- `SPINNER_DOCKERFILE` - Override `--dockerfile` flag
+
+**Spin Command:**
+- `SPINNER_IMAGE` - Override `--image` flag
+- `SPINNER_REPO` - Override `--repo` flag
+- `SPINNER_PROMPT` - Override `--prompt` flag
+- `SPINNER_BRANCH` - Override `--branch` flag
+- `SPINNER_MAX_ITERATIONS` - Override `--max-iterations` flag
+- `SPINNER_RECREATE` - Override `--recreate` flag (set to `true` or `false`)
+
+### Usage Examples
+
+```bash
+# Set default image via environment variable
+export SPINNER_IMAGE=spinner:default
+./dist/spinner spin --repo https://github.com/user/repo --prompt "task"
+
+# Set multiple configuration values
+export SPINNER_IMAGE=spinner:default
+export SPINNER_MAX_ITERATIONS=50
+./dist/spinner spin --repo https://github.com/user/repo --prompt "task"
+
+# Command-line flags take precedence over environment variables
+export SPINNER_IMAGE=spinner:default
+./dist/spinner spin --image spinner:custom --repo https://github.com/user/repo
+# Uses spinner:custom, not spinner:default
+```
+
+### Configuration Precedence
+
+Configuration values are applied in this order (highest to lowest priority):
+1. Command-line flags
+2. Environment variables
+3. Default values
+
 ## Development & Debugging
 
 ### Running Commands
