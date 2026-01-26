@@ -6,6 +6,9 @@ The current CLI is built with Node.js, TypeScript, React (Ink), and a custom arg
 ## What Changes
 - Replace TypeScript/React/Ink CLI with Go implementation using Cobra for commands and Viper for environment variable configuration
 - Maintain all existing functionality: `setup` and `spin` commands with identical flags and behavior
+  - Including deterministic container naming based on image, repo, and branch
+  - Container reuse logic (reuse running, restart stopped containers)
+  - --recreate flag for forcing fresh container creation
 - Keep package.json for OpenSpec dependency and tooling
 - Preserve all existing integration tests without modification
 - Replace yarn build/test scripts with Go equivalents (go build, go test)

@@ -40,7 +40,7 @@ Project constraints:
 - `cmd/root.go` - Root command with --help, --version (replaces src/App.tsx)
 - `cmd/setup.go` - Setup command implementation (replaces src/commands/Setup.tsx)
 - `cmd/spin.go` - Spin command implementation (replaces src/commands/Spin.tsx)
-- `internal/docker/docker.go` - Docker operations (replaces src/utils/docker.ts)
+- `internal/docker/docker.go` - Docker operations including container lifecycle management: create, check existence, restart, remove, and deterministic naming (replaces src/utils/docker.ts)
 - `internal/docker/dockerfile.go` - Dockerfile generation (replaces src/utils/dockerfile.ts)
 - `internal/prerequisites/prerequisites.go` - Prerequisite checks (replaces src/utils/prerequisites.ts)
 - `go.mod` - Go module definition
@@ -76,12 +76,16 @@ Project constraints:
 4. Port `src/utils/prerequisites.ts` → `internal/prerequisites/prerequisites.go`
 5. Port `src/utils/dockerfile.ts` → `internal/docker/dockerfile.go`
 6. Port `src/utils/docker.ts` → `internal/docker/docker.go`
+   - Include container reuse logic: `CheckContainerExists()`, `RestartContainer()`, `RemoveContainer()`
+   - Implement deterministic naming: `GenerateContainerName()` with `sanitizeComponent()` and `extractRepoName()` helpers
 7. Focus on behavior parity, not line-by-line translation
 
 **Phase 3: Implement CLI commands**
 8. Create `cmd/root.go` with Cobra root command, --help, --version flags
 9. Create `cmd/setup.go` with setup command and flags (--name, --base-image, --dockerfile)
-10. Create `cmd/spin.go` with spin command and flags (--image, --repo, --prompt, --branch, --max-iterations)
+10. Create `cmd/spin.go` with spin command and flags (--image, --repo, --prompt, --branch, --max-iterations, --recreate)
+    - Implement container reuse logic: check existing container, reuse/restart/recreate as needed
+    - Display appropriate messages for created/reused/restarted containers
 11. Implement validation and error handling matching TypeScript behavior
 
 **Phase 4: Wire up entry point**

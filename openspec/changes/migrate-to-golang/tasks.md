@@ -10,7 +10,7 @@
 ## 2.0 Implement Docker utilities and Dockerfile generation
 - [ ] 2.1 Port Dockerfile template generation from src/utils/dockerfile.ts to internal/docker/dockerfile.go
 - [ ] 2.2 Port Docker image build logic from src/utils/docker.ts (buildImage function) to internal/docker/docker.go
-- [ ] 2.3 Port Docker container operations from src/utils/docker.ts (validatePrerequisites, generateContainerName, buildDockerRunCommand, executeDockerRun, verifyContainerStatus) to internal/docker/docker.go
+- [ ] 2.3 Port Docker container operations from src/utils/docker.ts (validatePrerequisites, generateContainerName with deterministic naming and sanitization, buildDockerRunCommand, executeDockerRun, verifyContainerStatus, checkContainerExists, restartContainer, removeContainer) to internal/docker/docker.go
 - [ ] 2.4 Verify all Docker utilities compile and use Go's os/exec for shell commands
 - [ ] 2.5 Test Dockerfile generation produces identical output to TypeScript version
 
@@ -26,15 +26,16 @@
 - [ ] 3.9 Verify all setup tests pass
 
 ## 4.0 Implement spin command with Cobra
-- [ ] 4.1 Create cmd/spin.go implementing spin command with --image, --repo, --prompt, --branch, --max-iterations flags
+- [ ] 4.1 Create cmd/spin.go implementing spin command with --image, --repo, --prompt, --branch, --max-iterations, --recreate flags
 - [ ] 4.2 Wire up spin command to use internal/docker package
 - [ ] 4.3 Implement validation: required --image and --repo flags
 - [ ] 4.4 Match error message format and help text from src/App.tsx and src/commands/Spin.tsx
-- [ ] 4.5 Implement ralph-loop logic with prompt and branch handling
-- [ ] 4.6 Implement container lifecycle management and output display
-- [ ] 4.7 Build binary and test spin command manually
-- [ ] 4.8 Run spin integration tests (tests/spin/run-all.sh) and fix any failures
-- [ ] 4.9 Verify all spin tests pass
+- [ ] 4.5 Implement container reuse logic: check for existing containers, reuse running, restart stopped, or recreate based on --recreate flag
+- [ ] 4.6 Implement ralph-loop logic with prompt and branch handling
+- [ ] 4.7 Implement container lifecycle management and output display with appropriate messages for created/reused/restarted containers
+- [ ] 4.8 Build binary and test spin command manually
+- [ ] 4.9 Run spin integration tests (tests/spin/run-all.sh) and fix any failures
+- [ ] 4.10 Verify all spin tests pass including container reuse tests (14-reuse-running-container.sh, 15-restart-stopped-container.sh, 18-recreate-flag.sh)
 
 ## 5.0 Update build tooling and run full test suite
 - [ ] 5.1 Update package.json scripts: build → "go build -o dist/spinner", dev → "go build -o dist/spinner --watch" (or similar)
