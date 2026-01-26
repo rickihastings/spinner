@@ -25,8 +25,8 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 This project's documentation is organized into focused guides:
 
 - **@docs/communication.md** - AI assistant communication guidelines and best practices
-- **@docs/setup.md** - Development workflow, package manager, and command examples
-- **@docs/standards.md** - Coding standards, SOLID principles, TypeScript conventions, and git commit format
+- **@docs/usage.md** - Development workflow, package manager, and command examples
+- **@docs/standards.md** - Coding standards, SOLID principles, Go conventions, and git commit format
 - **@docs/system-design.md** - Architecture, code organization, and design patterns
 - **@docs/testing.md** - Testing approach, coverage requirements, and testability guidelines
 
@@ -36,16 +36,20 @@ This project's documentation is organized into focused guides:
 
 ```bash
 # Build and test workflow
-yarn build
-node dist/cli.js setup --name default
-node dist/cli.js spin --image default --repo . --prompt "your task"
+go build -o dist/spinner
+./dist/spinner setup --name default
+./dist/spinner spin --image default --repo . --prompt "your task"
+
+# Or if binary is in PATH
+spinner setup --name default
+spinner spin --image default --repo . --prompt "your task"
 ```
 
 ### Key Principles
 
-- Always use **yarn**, never npm
+- Always use **go build** to compile the binary
 - Build before testing CLI commands
 - Follow SOLID principles
 - All code must have tests
-- Keep functions small and focused (< 30 lines)
-- Use TypeScript interfaces for clear contracts
+- Keep functions small and focused
+- Use Go interfaces for clear contracts

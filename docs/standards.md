@@ -34,45 +34,78 @@ This project follows SOLID principles for maintainable, testable, and scalable c
 - High-level modules should not depend on low-level modules
 - Example: `Spin.tsx` depends on utility function interfaces, not their implementation details
 
-## TypeScript Standards
+## Go Standards
 
-### Type Safety
+### Type Safety and Conventions
 
 - Use explicit types for function parameters and return values
-- Avoid `any` - use `unknown` for truly unknown types
-- Define interfaces for complex data structures
-- Export types that are used across modules
+- Define structs for complex data structures
+- Export types (capitalize first letter) that are used across packages
+- Use Go's error handling patterns (return error as last value)
+- Follow Go naming conventions (MixedCaps, not snake_case)
 
-### Interface Conventions
+### Struct Conventions
 
-```typescript
-// Configuration interfaces (input)
-export interface SpinConfig {
-    image: string;
-    repo: string;
-    prompt?: string;  // optional fields marked with ?
-    branch?: string;
+```go
+// Configuration structs (input)
+type SpinConfig struct {
+    Image         string
+    Repo          string
+    Prompt        string // optional fields use pointer (*string) or check for empty string
+    Branch        string
+    MaxIterations int
+    Recreate      bool
 }
 
-// Result interfaces (output)
-export interface ValidationResult {
-    valid: boolean;
-    error?: string;
-    warnings: string[];
-    // ... other fields
+// Result structs (output)
+type ValidationResult struct {
+    Valid    bool
+    Error    string
+    Warnings []string
 }
 ```
 
+### Error Handling
+
+- Return errors as the last return value
+- Use `fmt.Errorf` for formatted error messages
+- Wrap errors with context using `fmt.Errorf("context: %w", err)`
+- Check errors immediately after function calls
+
+```go
+func DoSomething() error {
+    result, err := SomeOperation()
+    if err != nil {
+        return fmt.Errorf("failed to do something: %w", err)
+    }
+    // ... use result
+    return nil
+}
+```
+
+### Code Organization
+
+- Place command implementations in `cmd/` package
+- Place business logic in `internal/` packages
+- Keep internal packages focused (e.g., `internal/docker`, `internal/prerequisites`)
+- Use Go modules for dependency management
+
 ## Code Documentation
 
-- **Prefer self-documenting code**: Write clear, descriptive variable and function names that make the code's intent
-  obvious
-- **Avoid single-line comments**: Rarely use single-line comments. If code needs explanation, consider refactoring for
-  clarity first
-- **Use JSDoc for complex logic**: When documentation is necessary, use JSDoc block comments to explain the "why" behind
-  complex logic, not the "what"
-- **Document interfaces and types**: Always document non-obvious types, interfaces, and their fields
+- **Prefer self-documenting code**: Write clear, descriptive variable and function names that make the code's intent obvious
+- **Avoid excessive comments**: Rarely use single-line comments. If code needs explanation, consider refactoring for clarity first
+- **Use godoc comments for exported items**: When documentation is necessary, use godoc-style comments (complete sentences starting with the item name) for exported functions, types, and packages
+- **Document structs and interfaces**: Always document non-obvious types, structs, and their fields
 - **Don't be too verbose**: Keep documentation concise and focused. Avoid obvious or redundant explanations
+
+Example:
+```go
+// GenerateContainerName creates a deterministic container name from the image, repo, and branch.
+// The name is sanitized to meet Docker naming requirements (lowercase alphanumeric and hyphens).
+func GenerateContainerName(image, repo, branch string) string {
+    // implementation
+}
+```
 
 ## Documentation Standards
 

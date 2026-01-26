@@ -9,10 +9,33 @@ CLI tool for running code in isolated Docker containers.
 
 ## Installation
 
+### Prerequisites
+
+- Docker
+- Git
+- Go 1.21+ (for building from source)
+- GitHub Personal Access Token (for spin command)
+
+### Build from Source
+
 ```bash
-npm install
-npm run build
-npm link  # Optional: to use globally as 'spinner'
+# Clone the repository
+git clone https://github.com/rickihastings/spinner.git
+cd spinner
+
+# Build the binary
+go build -o dist/spinner
+
+# Optional: Install globally
+cp dist/spinner /usr/local/bin/spinner
+# Or add dist/ to your PATH
+```
+
+### Quick Install
+
+```bash
+go build -o dist/spinner
+# Then use ./dist/spinner or copy to your PATH
 ```
 
 ## Usage
@@ -91,20 +114,54 @@ To use the spin command, you need a GitHub Personal Access Token:
 **Security Note**: The token is passed to the container via environment variable (not CLI flag) to prevent exposure in
 bash history.
 
-## Testing
+## Development
+
+### Building
+
+```bash
+# Build the binary
+go build -o dist/spinner
+
+# Build with specific flags
+go build -ldflags "-s -w" -o dist/spinner  # Smaller binary
+```
+
+### Testing
 
 Run the complete test suite:
 
 ```bash
+# Build first
+go build -o dist/spinner
+
+# Run all tests
 ./tests/run.sh
 ```
 
 See [tests/README.md](tests/README.md) for more details.
 
+## Project Structure
+
+```
+.
+├── cmd/                    # Command implementations (Cobra commands)
+│   ├── root.go            # Root command with version and help
+│   ├── setup.go           # Setup command implementation
+│   └── spin.go            # Spin command implementation
+├── internal/              # Internal packages (not importable by external projects)
+│   ├── docker/            # Docker operations and Dockerfile generation
+│   └── prerequisites/     # Prerequisite checking logic
+├── dist/                  # Build output directory
+│   └── spinner           # Compiled binary
+├── tests/                 # Integration tests
+├── docs/                  # Documentation
+└── main.go               # Entry point
+
+```
+
 ## Requirements
 
 - Docker
 - Git
-- Claude CLI
-- Node.js
+- Go 1.21+ (for building)
 - GitHub Personal Access Token (for spin command)

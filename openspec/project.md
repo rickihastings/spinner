@@ -4,21 +4,24 @@
 A CLI tool for running code and commands in isolated Docker containers. Provides a sandboxed execution environment for safely running untrusted or experimental code.
 
 ## Tech Stack
-- TypeScript
-- Node.js
+- Go (Golang)
+- Cobra (CLI command structure)
+- Viper (configuration management)
 - Docker (container runtime)
-- yarn (package manager)
+- yarn (package manager for OpenSpec tooling only)
 
 ## Project Conventions
 
 ### Code Style
-- ESLint for linting
-- Prettier for code formatting
-- Follow standard TypeScript conventions
+- gofmt for code formatting
+- Follow standard Go conventions and idioms
+- Keep functions focused and testable
 
 ### Architecture Patterns
-- CLI-first design with clear command structure
-- Modular architecture separating Docker operations from CLI interface
+- CLI-first design with Cobra command structure
+- Modular architecture with internal packages separating Docker operations from CLI interface
+- Business logic in internal/ packages (internal/docker, internal/prerequisites)
+- Command implementations in cmd/ packages
 
 ### Testing Strategy
 - Minimal testing requirements currently
