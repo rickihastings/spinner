@@ -8,11 +8,11 @@
 - [x] 1.5 Verify prerequisites logic compiles and matches TypeScript behavior
 
 ## 2.0 Implement Docker utilities and Dockerfile generation
-- [ ] 2.1 Port Dockerfile template generation from src/utils/dockerfile.ts to internal/docker/dockerfile.go
-- [ ] 2.2 Port Docker image build logic from src/utils/docker.ts (buildImage function) to internal/docker/docker.go
-- [ ] 2.3 Port Docker container operations from src/utils/docker.ts (validatePrerequisites, generateContainerName with deterministic naming and sanitization, buildDockerRunCommand, executeDockerRun, verifyContainerStatus, checkContainerExists, restartContainer, removeContainer) to internal/docker/docker.go
-- [ ] 2.4 Verify all Docker utilities compile and use Go's os/exec for shell commands
-- [ ] 2.5 Test Dockerfile generation produces identical output to TypeScript version
+- [x] 2.1 Port Dockerfile template generation from src/utils/dockerfile.ts to internal/docker/dockerfile.go
+- [x] 2.2 Port Docker image build logic from src/utils/docker.ts (buildImage function) to internal/docker/docker.go
+- [x] 2.3 Port Docker container operations from src/utils/docker.ts (validatePrerequisites, generateContainerName with deterministic naming and sanitization, buildDockerRunCommand, executeDockerRun, verifyContainerStatus, checkContainerExists, restartContainer, removeContainer) to internal/docker/docker.go
+- [x] 2.4 Verify all Docker utilities compile and use Go's os/exec for shell commands
+- [x] 2.5 Test Dockerfile generation produces identical output to TypeScript version
 
 ## 3.0 Implement setup command with Cobra
 - [ ] 3.1 Create cmd/root.go with Cobra root command, --help flag, --version flag
