@@ -7,6 +7,7 @@ import (
 
 	"github.com/rickihastings/spinner/internal/docker"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -38,6 +39,22 @@ EXAMPLES:
   spinner spin --image spinner:my-env --repo https://github.com/octocat/Hello-World.git --prompt "Fix bug Y" --max-iterations 50
   spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --recreate`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Bind flags to viper - this allows environment variables to override flag values
+		viper.BindPFlag("image", cmd.Flags().Lookup("image"))
+		viper.BindPFlag("repo", cmd.Flags().Lookup("repo"))
+		viper.BindPFlag("prompt", cmd.Flags().Lookup("prompt"))
+		viper.BindPFlag("branch", cmd.Flags().Lookup("branch"))
+		viper.BindPFlag("max-iterations", cmd.Flags().Lookup("max-iterations"))
+		viper.BindPFlag("recreate", cmd.Flags().Lookup("recreate"))
+
+		// Get values from viper (respects env vars and flags)
+		spinImage = viper.GetString("image")
+		spinRepo = viper.GetString("repo")
+		spinPrompt = viper.GetString("prompt")
+		spinBranch = viper.GetString("branch")
+		spinMaxIterations = viper.GetString("max-iterations")
+		spinRecreate = viper.GetBool("recreate")
+
 		// Validate required flags
 		if spinImage == "" {
 			return fmt.Errorf("--image flag is required")

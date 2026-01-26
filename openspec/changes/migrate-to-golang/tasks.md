@@ -55,7 +55,7 @@
 - [x] 6.7 Run final validation: `npm test` passes, binary works end-to-end, documentation accurate
 
 ## 7.0 Add Viper configuration support (future-proofing)
-- [ ] 7.1 Initialize Viper in cmd/root.go to read from environment variables
+- [x] 7.1 Initialize Viper in cmd/root.go to read from environment variables
 - [ ] 7.2 Document environment variable configuration patterns in docs/
 - [ ] 7.3 Add example .env or configuration file support (optional, based on need)
 - [ ] 7.4 Test environment variable overrides work correctly

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
@@ -43,6 +44,12 @@ NOTES:
   - Spin: Use --recreate to force removal and recreation of existing container
   - Spin: Containers are persistent and must be manually stopped/removed`,
 	Version: "0.1.0",
+}
+
+func init() {
+	// Set environment variable prefix
+	viper.SetEnvPrefix("SPINNER")
+	viper.AutomaticEnv()
 }
 
 func Execute() {

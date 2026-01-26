@@ -8,6 +8,7 @@ import (
 	"github.com/rickihastings/spinner/internal/docker"
 	"github.com/rickihastings/spinner/internal/prerequisites"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -32,6 +33,16 @@ EXAMPLES:
   spinner setup --name node-env --base-image node:20-bullseye
   spinner setup --name custom-env --dockerfile ./Dockerfile.custom`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Bind flags to viper - this allows environment variables to override flag values
+		viper.BindPFlag("name", cmd.Flags().Lookup("name"))
+		viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
+		viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
+
+		// Get values from viper (respects env vars and flags)
+		setupName = viper.GetString("name")
+		setupBaseImage = viper.GetString("base-image")
+		setupDockerfile = viper.GetString("dockerfile")
+
 		// Validate required flag
 		if setupName == "" {
 			fmt.Fprintln(os.Stderr, "Error: Missing required flag: --name")
