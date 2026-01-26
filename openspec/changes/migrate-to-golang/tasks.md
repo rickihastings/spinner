@@ -1,11 +1,11 @@
 # Implementation Tasks: Migrate CLI from Node.js/TypeScript to Golang
 
 ## 1.0 Initialize Go project structure and prerequisites logic
-- [ ] 1.1 Initialize Go module with `go mod init github.com/rickihastings/spinner`
-- [ ] 1.2 Add dependencies: cobra, viper
-- [ ] 1.3 Create directory structure: cmd/, internal/docker/, internal/prerequisites/
-- [ ] 1.4 Port prerequisites checking logic from src/utils/prerequisites.ts to internal/prerequisites/prerequisites.go
-- [ ] 1.5 Verify prerequisites logic compiles and matches TypeScript behavior
+- [x] 1.1 Initialize Go module with `go mod init github.com/rickihastings/spinner`
+- [x] 1.2 Add dependencies: cobra, viper
+- [x] 1.3 Create directory structure: cmd/, internal/docker/, internal/prerequisites/
+- [x] 1.4 Port prerequisites checking logic from src/utils/prerequisites.ts to internal/prerequisites/prerequisites.go
+- [x] 1.5 Verify prerequisites logic compiles and matches TypeScript behavior
 
 ## 2.0 Implement Docker utilities and Dockerfile generation
 - [ ] 2.1 Port Dockerfile template generation from src/utils/dockerfile.ts to internal/docker/dockerfile.go
