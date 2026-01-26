@@ -38,7 +38,7 @@
 - [x] 4.10 Verify all spin tests pass including container reuse tests (14-reuse-running-container.sh, 15-restart-stopped-container.sh, 18-recreate-flag.sh)
 
 ## 5.0 Update build tooling and run full test suite
-- [ ] 5.1 Update package.json scripts: build → "go build -o dist/spinner", dev → "go build -o dist/spinner --watch" (or similar)
+- [x] 5.1 Update package.json scripts: build → "go build -o dist/spinner", dev → "go build -o dist/spinner --watch" (or similar)
 - [ ] 5.2 Update package.json test script to reference Go binary: "test": "go build -o dist/spinner && bash tests/run.sh"
 - [ ] 5.3 Update .gitignore to include Go artifacts (dist/spinner, vendor/, go.sum changes)
 - [ ] 5.4 Run full integration test suite: `yarn test`

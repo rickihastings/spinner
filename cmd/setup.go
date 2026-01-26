@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -57,7 +58,7 @@ EXAMPLES:
 			if _, err := os.Stat(setupDockerfile); os.IsNotExist(err) {
 				errMsg := fmt.Sprintf("Dockerfile not found at path: %s", setupDockerfile)
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", errMsg)
-				return fmt.Errorf(errMsg)
+				return errors.New(errMsg)
 			}
 		}
 

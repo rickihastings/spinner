@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -59,7 +60,7 @@ EXAMPLES:
 		validationResult := docker.ValidatePrerequisites(config)
 		if !validationResult.Valid {
 			fmt.Fprintf(os.Stderr, "✗ Error: %s\n", validationResult.Error)
-			return fmt.Errorf(validationResult.Error)
+			return errors.New(validationResult.Error)
 		}
 
 		// Generate container name
@@ -78,7 +79,7 @@ EXAMPLES:
 			removeResult := docker.RemoveContainer(containerName)
 			if !removeResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", removeResult.Error)
-				return fmt.Errorf(removeResult.Error)
+				return errors.New(removeResult.Error)
 			}
 			// After removal, container doesn't exist
 			containerStatus = docker.StatusNone
@@ -95,14 +96,14 @@ EXAMPLES:
 			runResult := docker.ExecuteDockerRun(dockerArgs, containerName)
 			if !runResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", runResult.Error)
-				return fmt.Errorf(runResult.Error)
+				return errors.New(runResult.Error)
 			}
 
 			// Verify container is running
 			statusResult := docker.VerifyContainerStatus(containerName)
 			if !statusResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", statusResult.Error)
-				return fmt.Errorf(statusResult.Error)
+				return errors.New(statusResult.Error)
 			}
 
 			action = docker.ActionCreated
@@ -114,14 +115,14 @@ EXAMPLES:
 			restartResult := docker.RestartContainer(containerName)
 			if !restartResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", restartResult.Error)
-				return fmt.Errorf(restartResult.Error)
+				return errors.New(restartResult.Error)
 			}
 
 			// Verify container is running after restart
 			statusResult := docker.VerifyContainerStatus(containerName)
 			if !statusResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", statusResult.Error)
-				return fmt.Errorf(statusResult.Error)
+				return errors.New(statusResult.Error)
 			}
 
 			action = docker.ActionRestarted
