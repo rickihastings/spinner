@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+// SpinConfig contains configuration for spinning up a container.
 type SpinConfig struct {
 	Image         string
 	Repo          string
@@ -18,6 +19,7 @@ type SpinConfig struct {
 	Recreate      bool
 }
 
+// ValidationResult contains the result of prerequisite validation.
 type ValidationResult struct {
 	Valid    bool
 	Error    string
@@ -25,12 +27,14 @@ type ValidationResult struct {
 	HasNpmrc bool
 }
 
+// ContainerResult contains the result of a container operation.
 type ContainerResult struct {
 	Success       bool
 	ContainerName string
 	Error         string
 }
 
+// ContainerStatus represents the status of a Docker container.
 type ContainerStatus string
 
 const (
@@ -39,6 +43,7 @@ const (
 	StatusNone    ContainerStatus = "none"
 )
 
+// ReuseAction represents the action taken when handling an existing container.
 type ReuseAction string
 
 const (
@@ -47,6 +52,10 @@ const (
 	ActionRestarted ReuseAction = "restarted"
 )
 
+// DefaultMaxIterations is the default maximum number of iterations for ralph-loop.
+const DefaultMaxIterations = "100"
+
+// ReuseResult contains the status and action taken for container reuse.
 type ReuseResult struct {
 	Status ContainerStatus
 	Action ReuseAction
@@ -60,11 +69,11 @@ func escapeShellArg(arg string) string {
 
 // convertSshToHttps converts SSH Git URLs to HTTPS format for GitHub PAT authentication.
 // Example: git@github.com:user/repo.git -> https://github.com/user/repo.git
-func convertSshToHttps(repoUrl string) string {
-	if strings.HasPrefix(repoUrl, "git@github.com:") {
-		return strings.Replace(repoUrl, "git@github.com:", "https://github.com/", 1)
+func convertSshToHttps(repoURL string) string {
+	if strings.HasPrefix(repoURL, "git@github.com:") {
+		return strings.Replace(repoURL, "git@github.com:", "https://github.com/", 1)
 	}
-	return repoUrl
+	return repoURL
 }
 
 // ValidatePrerequisites validates prerequisites for spinning up a container.
@@ -161,9 +170,9 @@ func sanitizeComponent(input string) string {
 
 // extractRepoName extracts the repository name from a Git URL.
 // Handles both SSH (git@github.com:user/repo.git) and HTTPS (https://github.com/user/repo.git) formats.
-func extractRepoName(repoUrl string) string {
+func extractRepoName(repoURL string) string {
 	re := regexp.MustCompile(`([^/:]+)(\.git)?$`)
-	matches := re.FindStringSubmatch(repoUrl)
+	matches := re.FindStringSubmatch(repoURL)
 	if len(matches) > 1 {
 		return strings.TrimSuffix(matches[1], ".git")
 	}
@@ -184,11 +193,14 @@ func GenerateContainerName(config SpinConfig) string {
 }
 
 // BuildDockerRunCommand builds the docker run command arguments.
-func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc bool) []string {
+func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc bool) ([]string, error) {
 	// Convert SSH URLs to HTTPS for GitHub PAT authentication
-	repoUrl := convertSshToHttps(config.Repo)
+	repoURL := convertSshToHttps(config.Repo)
 
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
+	}
 
 	dockerArgs := []string{
 		"run",
@@ -200,7 +212,7 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 		"-e",
 		fmt.Sprintf("CLAUDE_CODE_OAUTH_TOKEN=%s", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN")),
 		"-e",
-		fmt.Sprintf("REPO_URL=%s", repoUrl),
+		fmt.Sprintf("REPO_URL=%s", repoURL),
 		"-v",
 		fmt.Sprintf("%s/.spinner/%s/logs:/logs", homeDir, containerName),
 	}
@@ -211,7 +223,7 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 
 		maxIterations := config.MaxIterations
 		if maxIterations == "" {
-			maxIterations = "100"
+			maxIterations = DefaultMaxIterations
 		}
 		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("MAX_ITERATIONS=%s", maxIterations))
 
@@ -230,12 +242,19 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 	// Add image
 	dockerArgs = append(dockerArgs, config.Image)
 
-	return dockerArgs
+	return dockerArgs, nil
 }
 
 // ExecuteDockerRun executes the docker run command.
 func ExecuteDockerRun(dockerArgs []string, containerName string) ContainerResult {
-	homeDir, _ := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ContainerResult{
+			Success:       false,
+			ContainerName: containerName,
+			Error:         fmt.Sprintf("Failed to get home directory: %s", err.Error()),
+		}
+	}
 	logsDir := filepath.Join(homeDir, ".spinner", containerName, "logs")
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return ContainerResult{
@@ -284,7 +303,7 @@ func VerifyContainerStatus(containerName string) ContainerResult {
 	}
 
 	status := strings.TrimSpace(string(output))
-	if status != "running" {
+	if status != string(StatusRunning) {
 		// Get logs to show what went wrong
 		logsCmd := exec.Command("docker", "logs", containerName)
 		logsOutput, _ := logsCmd.CombinedOutput()
@@ -314,7 +333,7 @@ func CheckContainerExists(containerName string) ContainerStatus {
 	}
 
 	status := strings.TrimSpace(string(output))
-	if status == "running" {
+	if status == string(StatusRunning) {
 		return StatusRunning
 	}
 	return StatusStopped

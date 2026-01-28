@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -77,7 +76,7 @@ EXAMPLES:
 		validationResult := docker.ValidatePrerequisites(config)
 		if !validationResult.Valid {
 			fmt.Fprintf(os.Stderr, "✗ Error: %s\n", validationResult.Error)
-			return errors.New(validationResult.Error)
+			return fmt.Errorf("validation failed: %s", validationResult.Error)
 		}
 
 		// Generate container name
@@ -96,7 +95,7 @@ EXAMPLES:
 			removeResult := docker.RemoveContainer(containerName)
 			if !removeResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", removeResult.Error)
-				return errors.New(removeResult.Error)
+				return fmt.Errorf("failed to remove container: %s", removeResult.Error)
 			}
 			// After removal, container doesn't exist
 			containerStatus = docker.StatusNone
@@ -109,18 +108,22 @@ EXAMPLES:
 			fmt.Printf("Creating container: %s\n", containerName)
 			fmt.Println("Cloning repository...")
 
-			dockerArgs := docker.BuildDockerRunCommand(config, containerName, validationResult.HasNpmrc)
+			dockerArgs, err := docker.BuildDockerRunCommand(config, containerName, validationResult.HasNpmrc)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+				return err
+			}
 			runResult := docker.ExecuteDockerRun(dockerArgs, containerName)
 			if !runResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", runResult.Error)
-				return errors.New(runResult.Error)
+				return fmt.Errorf("failed to run container: %s", runResult.Error)
 			}
 
 			// Verify container is running
 			statusResult := docker.VerifyContainerStatus(containerName)
 			if !statusResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", statusResult.Error)
-				return errors.New(statusResult.Error)
+				return fmt.Errorf("container verification failed: %s", statusResult.Error)
 			}
 
 			action = docker.ActionCreated
@@ -132,14 +135,14 @@ EXAMPLES:
 			restartResult := docker.RestartContainer(containerName)
 			if !restartResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", restartResult.Error)
-				return errors.New(restartResult.Error)
+				return fmt.Errorf("failed to restart container: %s", restartResult.Error)
 			}
 
 			// Verify container is running after restart
 			statusResult := docker.VerifyContainerStatus(containerName)
 			if !statusResult.Success {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", statusResult.Error)
-				return errors.New(statusResult.Error)
+				return fmt.Errorf("container verification failed: %s", statusResult.Error)
 			}
 
 			action = docker.ActionRestarted

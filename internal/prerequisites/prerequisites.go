@@ -4,6 +4,7 @@ import (
 	"os/exec"
 )
 
+// Prerequisite defines a required tool that must be installed.
 type Prerequisite struct {
 	Name         string
 	Command      string
@@ -28,6 +29,7 @@ var prerequisites = []Prerequisite{
 	},
 }
 
+// PrerequisiteError is returned when a required prerequisite is missing.
 type PrerequisiteError struct {
 	Prerequisite Prerequisite
 }
@@ -36,6 +38,7 @@ func (e *PrerequisiteError) Error() string {
 	return e.Prerequisite.ErrorMessage
 }
 
+// CheckPrerequisites verifies that all required tools are installed.
 func CheckPrerequisites() error {
 	for _, prereq := range prerequisites {
 		cmd := exec.Command(prereq.Command, "--version")

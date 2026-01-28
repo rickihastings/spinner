@@ -8,10 +8,25 @@ import (
 	"time"
 )
 
+// BuildConfig contains configuration for building a Docker image.
 type BuildConfig struct {
 	Name       string
 	BaseImage  string
 	Dockerfile string
+}
+
+// buildFile defines a file to copy into the Docker build context
+type buildFile struct {
+	// Source path relative to the templates directory
+	src string
+	// Destination path relative to the build context templates directory
+	dst string
+}
+
+// buildFiles lists all files to copy into the Docker build context
+var buildFiles = []buildFile{
+	{src: "scripts/startup.sh", dst: "scripts/startup.sh"},
+	{src: "scripts/ralph-loop.sh", dst: "scripts/ralph-loop.sh"},
 }
 
 // BuildImage builds a Docker image with the given configuration
@@ -20,6 +35,7 @@ func BuildImage(config BuildConfig) error {
 	if err := os.MkdirAll(buildContext, 0755); err != nil {
 		return fmt.Errorf("failed to create build context: %w", err)
 	}
+	defer os.RemoveAll(buildContext)
 
 	// Determine the base image to use
 	baseImage := config.BaseImage
@@ -49,31 +65,22 @@ func BuildImage(config BuildConfig) error {
 		return fmt.Errorf("failed to write Dockerfile: %w", err)
 	}
 
-	// Copy startup scripts to build context
+	// Copy build files to build context
 	templatesDir := filepath.Join(buildContext, "templates")
-	scriptsDir := filepath.Join(templatesDir, "scripts")
-	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create scripts directory: %w", err)
-	}
+	for _, bf := range buildFiles {
+		srcPath, err := resolveTemplatePath(filepath.Join("templates", bf.src))
+		if err != nil {
+			return fmt.Errorf("failed to find %s: %w", bf.src, err)
+		}
 
-	// Copy startup.sh
-	startupScriptSrc, err := resolveTemplatePath(filepath.Join("templates", "scripts", "startup.sh"))
-	if err != nil {
-		return fmt.Errorf("failed to find startup.sh: %w", err)
-	}
-	startupScriptDest := filepath.Join(scriptsDir, "startup.sh")
-	if err := copyFile(startupScriptSrc, startupScriptDest); err != nil {
-		return fmt.Errorf("failed to copy startup.sh: %w", err)
-	}
+		dstPath := filepath.Join(templatesDir, bf.dst)
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+			return fmt.Errorf("failed to create directory for %s: %w", bf.dst, err)
+		}
 
-	// Copy ralph-loop.sh
-	ralphLoopScriptSrc, err := resolveTemplatePath(filepath.Join("templates", "scripts", "ralph-loop.sh"))
-	if err != nil {
-		return fmt.Errorf("failed to find ralph-loop.sh: %w", err)
-	}
-	ralphLoopScriptDest := filepath.Join(scriptsDir, "ralph-loop.sh")
-	if err := copyFile(ralphLoopScriptSrc, ralphLoopScriptDest); err != nil {
-		return fmt.Errorf("failed to copy ralph-loop.sh: %w", err)
+		if err := copyFile(srcPath, dstPath); err != nil {
+			return fmt.Errorf("failed to copy %s: %w", bf.src, err)
+		}
 	}
 
 	// Build the final image

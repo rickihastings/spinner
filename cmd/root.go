@@ -58,6 +58,7 @@ func init() {
 	viper.ReadInConfig() // Ignore error if .env doesn't exist
 }
 
+// Execute runs the root command and exits on error.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

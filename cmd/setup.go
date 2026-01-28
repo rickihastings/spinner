@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -67,9 +66,8 @@ EXAMPLES:
 		// Validate Dockerfile path if provided
 		if setupDockerfile != "" {
 			if _, err := os.Stat(setupDockerfile); os.IsNotExist(err) {
-				errMsg := fmt.Sprintf("Dockerfile not found at path: %s", setupDockerfile)
-				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", errMsg)
-				return errors.New(errMsg)
+				fmt.Fprintf(os.Stderr, "✗ Error: Dockerfile not found at path: %s\n", setupDockerfile)
+				return fmt.Errorf("Dockerfile not found at path: %s", setupDockerfile)
 			}
 		}
 
