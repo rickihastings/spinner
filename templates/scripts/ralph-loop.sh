@@ -73,6 +73,31 @@ for ((ITERATION=1; ITERATION<=MAX_ITERATIONS; ITERATION++)); do
         fi
     done < <(echo "$PROMPT" | claude -p --dangerously-skip-permissions --output-format=stream-json --verbose 2>&1)
 
+    # Push any changes to remote after iteration
+    CURRENT_BRANCH=$(git branch --show-current)
+    if [ -n "$CURRENT_BRANCH" ]; then
+        # Check if there are any commits to push
+        if git rev-parse @{u} >/dev/null 2>&1; then
+            # Remote tracking branch exists, check if we have commits to push
+            COMMITS_TO_PUSH=$(git rev-list @{u}..HEAD --count 2>/dev/null || echo "0")
+            if [ "$COMMITS_TO_PUSH" -gt 0 ]; then
+                echo "Pushing $COMMITS_TO_PUSH commit(s) to remote..."
+                if git push; then
+                    echo "✓ Push successful"
+                else
+                    echo "⚠️  Push failed, but continuing..."
+                fi
+            fi
+        else
+            # No remote tracking branch, try to push and set upstream
+            if git push -u origin "$CURRENT_BRANCH" 2>/dev/null; then
+                echo "✓ Branch pushed to remote and tracking set"
+            else
+                echo "⚠️  Could not push to remote (branch may not have commits yet)"
+            fi
+        fi
+    fi
+
     # Check for authentication error first
     if [ -f "$AUTH_ERROR_FLAG" ]; then
         rm -f "$AUTH_ERROR_FLAG"

@@ -14,7 +14,7 @@ create a TODO list for all tasks in the change. Your job is to:
 
 1. Implement ALL sub-tasks (X.1, X.2, X.3...) within the ONE assigned vertical slice
 2. Commit after logical checkpoints as you complete sub-tasks
-3. Signal completion when the entire vertical slice is done
+3. Signal completion when the entire feature is done and there are no remaining tasks
 
 **Workflow**
 
@@ -33,8 +33,10 @@ create a TODO list for all tasks in the change. Your job is to:
     - **Repeat**: Continue until all sub-tasks in the slice are done
 
 3. **Signal Completion**
-    - When all sub-tasks in the vertical slice are complete, output: `~~ FEATURE_COMPLETED ~~`
-    - Halt - do not continue to the next vertical slice
+    - When all sub-tasks in the vertical slice are complete, you MUST output the exact signal: `~~ FEATURE_COMPLETED ~~`
+    - This signal MUST be output as plain text in your response, not in a code block or comment
+    - Output this signal immediately after completing the final commit for the vertical slice
+    - After outputting the signal, halt - do not continue to the next vertical slice
 
 **Guardrails**
 

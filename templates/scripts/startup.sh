@@ -53,6 +53,10 @@ if [ -n "$PROMPT" ]; then
 
   # If BRANCH is specified, checkout or create it
   if [ -n "$BRANCH" ]; then
+    # Strip surrounding quotes from BRANCH if present (from escapeShellArg)
+    BRANCH="${BRANCH#\'}"
+    BRANCH="${BRANCH%\'}"
+
     echo "Branch specified: $BRANCH"
 
     # Check if branch exists locally
