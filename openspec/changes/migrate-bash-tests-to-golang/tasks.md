@@ -56,12 +56,12 @@
 
 - [x] 3.1 Create `cmd/setup_test.go` with test suite skeleton
 - [x] 3.2 Implement test for missing --name flag validation
-- [ ] 3.3 Implement test for mutually exclusive flags (--base-image and --dockerfile)
-- [ ] 3.4 Implement test for successful argument parsing with --name only
-- [ ] 3.5 Implement test for argument parsing with --name and --base-image
-- [ ] 3.6 Implement test for argument parsing with --name and --dockerfile
-- [ ] 3.7 Implement test for non-existent Dockerfile path validation
-- [ ] 3.8 Create table-driven test for all flag combinations
+- [x] 3.3 Implement test for mutually exclusive flags (--base-image and --dockerfile)
+- [x] 3.4 Implement test for successful argument parsing with --name only
+- [x] 3.5 Implement test for argument parsing with --name and --base-image
+- [x] 3.6 Implement test for argument parsing with --name and --dockerfile
+- [x] 3.7 Implement test for non-existent Dockerfile path validation
+- [x] 3.8 Create table-driven test for all flag combinations
 
 **Validation:** `go test ./cmd/setup_test.go -v` passes with 100% coverage of validation logic
 
