@@ -73,14 +73,14 @@
 
 **Goal:** Test Docker build operations with mocked client
 
-- [ ] 4.1 Create `internal/docker/build_test.go`
-- [ ] 4.2 Implement test for successful image build with default base image
-- [ ] 4.3 Implement test for image build with custom base image
-- [ ] 4.4 Implement test for image build with custom Dockerfile
-- [ ] 4.5 Implement test for build failure error handling
-- [ ] 4.6 Implement test for Dockerfile generation logic
-- [ ] 4.7 Implement test for startup script inclusion in Dockerfile
-- [ ] 4.8 Create table-driven test for various build configurations
+- [x] 4.1 Create `internal/docker/build_test.go`
+- [x] 4.2 Implement test for successful image build with default base image
+- [x] 4.3 Implement test for image build with custom base image
+- [x] 4.4 Implement test for image build with custom Dockerfile
+- [x] 4.5 Implement test for build failure error handling
+- [x] 4.6 Implement test for Dockerfile generation logic
+- [x] 4.7 Implement test for startup script inclusion in Dockerfile
+- [x] 4.8 Create table-driven test for various build configurations
 
 **Validation:** `go test ./internal/docker/build_test.go -v` passes
 
