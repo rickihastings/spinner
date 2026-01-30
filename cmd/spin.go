@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/rickihastings/spinner/internal/docker"
+	"github.com/rickihastings/spinner/internal/prerequisites"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -16,6 +17,9 @@ var (
 	spinBranch        string
 	spinMaxIterations string
 	spinRecreate      bool
+	spinSetup         bool
+	spinBaseImage     string
+	spinDockerfile    string
 )
 
 var spinCmd = &cobra.Command{
@@ -31,12 +35,29 @@ SPIN OPTIONS:
   --max-iterations <num>     Maximum iterations for ralph-loop (optional, default: 100)
   --recreate                 Force recreation of existing container (optional)
 
+SETUP OPTIONS (use with --setup flag):
+  --setup                    Build/rebuild the Docker image before spinning (optional)
+  --base-image <image>       Base Docker image (optional, default: ubuntu:22.04, requires --setup)
+  --dockerfile <path>        Path to custom Dockerfile (optional, requires --setup, mutually exclusive with --base-image)
+
 EXAMPLES:
+  # Basic spin with existing image
   spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X"
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X" --branch feature/x
-  spinner spin --image spinner:my-env --repo https://github.com/octocat/Hello-World.git --prompt "Fix bug Y" --max-iterations 50
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --recreate`,
+
+  # Spin with setup (builds image first)
+  spinner spin --setup --image my-env --repo git@github.com:octocat/Hello-World.git
+
+  # Setup with custom base image
+  spinner spin --setup --image my-env --base-image node:20-bullseye --repo git@github.com:octocat/Hello-World.git
+
+  # Setup with custom Dockerfile
+  spinner spin --setup --image my-env --dockerfile ./Dockerfile.custom --repo git@github.com:octocat/Hello-World.git
+
+  # Other spin options work with setup
+  spinner spin --setup --image my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X"
+  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --recreate
+
+Note: When --setup is used, the image is always rebuilt (no caching). The --image value becomes the setup name.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Bind flags to viper - this allows environment variables to override flag values
 		viper.BindPFlag("image", cmd.Flags().Lookup("image"))
@@ -45,6 +66,9 @@ EXAMPLES:
 		viper.BindPFlag("branch", cmd.Flags().Lookup("branch"))
 		viper.BindPFlag("max-iterations", cmd.Flags().Lookup("max-iterations"))
 		viper.BindPFlag("recreate", cmd.Flags().Lookup("recreate"))
+		viper.BindPFlag("setup", cmd.Flags().Lookup("setup"))
+		viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
+		viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
 
 		// Get values from viper (respects env vars and flags)
 		spinImage = viper.GetString("image")
@@ -53,6 +77,9 @@ EXAMPLES:
 		spinBranch = viper.GetString("branch")
 		spinMaxIterations = viper.GetString("max-iterations")
 		spinRecreate = viper.GetBool("recreate")
+		spinSetup = viper.GetBool("setup")
+		spinBaseImage = viper.GetString("base-image")
+		spinDockerfile = viper.GetString("dockerfile")
 
 		// Validate required flags
 		if spinImage == "" {
@@ -60,6 +87,64 @@ EXAMPLES:
 		}
 		if spinRepo == "" {
 			return fmt.Errorf("--repo flag is required")
+		}
+
+		// Validate setup-related flags
+		if !spinSetup && spinBaseImage != "" {
+			fmt.Fprintln(os.Stderr, "Error: --base-image requires --setup flag")
+			return fmt.Errorf("--base-image requires --setup flag")
+		}
+		if !spinSetup && spinDockerfile != "" {
+			fmt.Fprintln(os.Stderr, "Error: --dockerfile requires --setup flag")
+			return fmt.Errorf("--dockerfile requires --setup flag")
+		}
+		if spinSetup && spinBaseImage != "" && spinDockerfile != "" {
+			fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
+			fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
+			return fmt.Errorf("mutually exclusive flags provided")
+		}
+
+		// If --setup is provided, build the image first
+		if spinSetup {
+			// Check prerequisites
+			fmt.Println("Checking prerequisites...")
+			if err := prerequisites.CheckPrerequisites(); err != nil {
+				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+				return err
+			}
+
+			// Validate Dockerfile path if provided
+			if spinDockerfile != "" {
+				if _, err := os.Stat(spinDockerfile); os.IsNotExist(err) {
+					fmt.Fprintf(os.Stderr, "✗ Error: Dockerfile not found at path: %s\n", spinDockerfile)
+					return fmt.Errorf("Dockerfile not found at path: %s", spinDockerfile)
+				}
+			}
+
+			// Build the image
+			fmt.Printf("✓ Prerequisites checked\n")
+			// Remove "spinner:" prefix from image if present for setup name
+			setupName := spinImage
+			if len(setupName) > 8 && setupName[:8] == "spinner:" {
+				setupName = setupName[8:]
+			}
+			fmt.Printf("Building Docker image: spinner:%s\n", setupName)
+
+			buildConfig := docker.BuildConfig{
+				Name:       setupName,
+				BaseImage:  spinBaseImage,
+				Dockerfile: spinDockerfile,
+			}
+
+			if err := docker.BuildImage(buildConfig); err != nil {
+				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+				return err
+			}
+
+			fmt.Printf("✓ Docker image built successfully: spinner:%s\n", setupName)
+
+			// Update spinImage to use the built image tag
+			spinImage = "spinner:" + setupName
 		}
 
 		// Validate prerequisites
@@ -181,6 +266,9 @@ func init() {
 	spinCmd.Flags().StringVar(&spinBranch, "branch", "", "Git branch to checkout (optional)")
 	spinCmd.Flags().StringVar(&spinMaxIterations, "max-iterations", "", "Maximum iterations for ralph-loop (optional, default: 100)")
 	spinCmd.Flags().BoolVar(&spinRecreate, "recreate", false, "Force recreation of existing container (optional)")
+	spinCmd.Flags().BoolVar(&spinSetup, "setup", false, "Build/rebuild the Docker image before spinning (optional)")
+	spinCmd.Flags().StringVar(&spinBaseImage, "base-image", "", "Base Docker image (optional, default: ubuntu:22.04, requires --setup)")
+	spinCmd.Flags().StringVar(&spinDockerfile, "dockerfile", "", "Path to custom Dockerfile (optional, requires --setup)")
 
 	rootCmd.AddCommand(spinCmd)
 }
