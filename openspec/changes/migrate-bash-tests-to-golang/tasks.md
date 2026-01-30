@@ -4,22 +4,22 @@
 
 **Goal:** Establish testing foundation and utilities before writing tests
 
-- [ ] 1.1 Install testify dependency (`go get github.com/stretchr/testify`)
-- [ ] 1.2 Create test utilities package structure (`tests/testutil/`)
-- [ ] 1.3 Implement Docker test helpers (`tests/testutil/docker.go`)
+- [x] 1.1 Install testify dependency (`go get github.com/stretchr/testify`)
+- [x] 1.2 Create test utilities package structure (`tests/testutil/`)
+- [x] 1.3 Implement Docker test helpers (`tests/testutil/docker.go`)
   - Image existence checking
   - Container status checking
   - Resource cleanup functions
-- [ ] 1.4 Implement CLI execution helpers (`tests/testutil/cli.go`)
+- [x] 1.4 Implement CLI execution helpers (`tests/testutil/cli.go`)
   - Binary build function
   - Command execution with output capture
   - Exit code verification
-- [ ] 1.5 Implement test fixtures and utilities (`tests/testutil/fixtures.go`)
+- [x] 1.5 Implement test fixtures and utilities (`tests/testutil/fixtures.go`)
   - Generate unique test identifiers
   - Test data generation
   - Common assertions
-- [ ] 1.6 Create integration test package structure (`tests/integration/`)
-- [ ] 1.7 Verify test infrastructure with a simple smoke test
+- [x] 1.6 Create integration test package structure (`tests/integration/`)
+- [x] 1.7 Verify test infrastructure with a simple smoke test
 
 **Validation:** `go test ./tests/testutil/... -v` passes
 
