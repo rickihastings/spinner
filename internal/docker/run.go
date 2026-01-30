@@ -1,9 +1,9 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -78,7 +78,14 @@ func convertSshToHttps(repoURL string) string {
 
 // ValidatePrerequisites validates prerequisites for spinning up a container.
 // Checks: Docker image exists, valid git repo URL, GITHUB_TOKEN is set, CLAUDE_CODE_OAUTH_TOKEN is set, npmrc availability.
+// This is a convenience function that uses the default RealDockerClient.
 func ValidatePrerequisites(config SpinConfig) ValidationResult {
+	client := NewRealDockerClient()
+	return ValidatePrerequisitesWithClient(context.Background(), client, config)
+}
+
+// ValidatePrerequisitesWithClient validates prerequisites using a provided DockerClient.
+func ValidatePrerequisitesWithClient(ctx context.Context, client DockerClient, config SpinConfig) ValidationResult {
 	warnings := []string{}
 
 	// Check if repo is a valid git URL
@@ -95,8 +102,8 @@ func ValidatePrerequisites(config SpinConfig) ValidationResult {
 	}
 
 	// Check if Docker image exists
-	cmd := exec.Command("docker", "image", "inspect", config.Image)
-	if err := cmd.Run(); err != nil {
+	exists, err := client.ImageExists(ctx, config.Image)
+	if err != nil || !exists {
 		return ValidationResult{
 			Valid:    false,
 			Error:    fmt.Sprintf("Docker image '%s' not found", config.Image),
@@ -246,131 +253,44 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 }
 
 // ExecuteDockerRun executes the docker run command.
+// This is a convenience function that uses the default RealDockerClient.
 func ExecuteDockerRun(dockerArgs []string, containerName string) ContainerResult {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: containerName,
-			Error:         fmt.Sprintf("Failed to get home directory: %s", err.Error()),
-		}
-	}
-	logsDir := filepath.Join(homeDir, ".spinner", containerName, "logs")
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: containerName,
-			Error:         fmt.Sprintf("Failed to create logs directory: %s", err.Error()),
-		}
-	}
-
-	cmd := exec.Command("docker", dockerArgs...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Container may have started but clone failed
-		// Try to get the git error message from container logs
-		logsCmd := exec.Command("docker", "logs", containerName)
-		if logsOutput, logsErr := logsCmd.CombinedOutput(); logsErr == nil {
-			return ContainerResult{
-				Success:       false,
-				ContainerName: containerName,
-				Error:         fmt.Sprintf("Git clone failed: %s", strings.TrimSpace(string(logsOutput))),
-			}
-		}
-		return ContainerResult{
-			Success:       false,
-			ContainerName: containerName,
-			Error:         strings.TrimSpace(string(output)),
-		}
-	}
-
-	return ContainerResult{
-		Success:       true,
-		ContainerName: containerName,
-	}
+	client := NewRealDockerClient()
+	result, _ := client.RunContainer(context.Background(), dockerArgs, containerName)
+	return result
 }
 
 // VerifyContainerStatus verifies that the container is running.
+// This is a convenience function that uses the default RealDockerClient.
 func VerifyContainerStatus(containerName string) ContainerResult {
-	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", containerName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: containerName,
-			Error:         "Failed to verify container status",
-		}
-	}
-
-	status := strings.TrimSpace(string(output))
-	if status != string(StatusRunning) {
-		// Get logs to show what went wrong
-		logsCmd := exec.Command("docker", "logs", containerName)
-		logsOutput, _ := logsCmd.CombinedOutput()
-		return ContainerResult{
-			Success:       false,
-			ContainerName: containerName,
-			Error:         fmt.Sprintf("Container exited. Logs: %s", strings.TrimSpace(string(logsOutput))),
-		}
-	}
-
-	return ContainerResult{
-		Success:       true,
-		ContainerName: containerName,
-	}
+	client := NewRealDockerClient()
+	result, _ := client.VerifyContainerStatus(context.Background(), containerName)
+	return result
 }
 
 // CheckContainerExists checks if a container exists and returns its status.
 // Returns 'running' if container exists and is running,
 // 'stopped' if container exists but is not running,
 // 'none' if container does not exist.
+// This is a convenience function that uses the default RealDockerClient.
 func CheckContainerExists(containerName string) ContainerStatus {
-	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", containerName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Container doesn't exist
-		return StatusNone
-	}
-
-	status := strings.TrimSpace(string(output))
-	if status == string(StatusRunning) {
-		return StatusRunning
-	}
-	return StatusStopped
+	client := NewRealDockerClient()
+	status, _ := client.ContainerExists(context.Background(), containerName)
+	return status
 }
 
 // RestartContainer restarts a stopped container.
+// This is a convenience function that uses the default RealDockerClient.
 func RestartContainer(containerName string) ContainerResult {
-	cmd := exec.Command("docker", "start", containerName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: containerName,
-			Error:         strings.TrimSpace(string(output)),
-		}
-	}
-
-	return ContainerResult{
-		Success:       true,
-		ContainerName: containerName,
-	}
+	client := NewRealDockerClient()
+	result, _ := client.RestartContainer(context.Background(), containerName)
+	return result
 }
 
 // RemoveContainer removes a container, forcing removal if it's running.
+// This is a convenience function that uses the default RealDockerClient.
 func RemoveContainer(containerName string) ContainerResult {
-	cmd := exec.Command("docker", "rm", "-f", containerName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: containerName,
-			Error:         strings.TrimSpace(string(output)),
-		}
-	}
-
-	return ContainerResult{
-		Success:       true,
-		ContainerName: containerName,
-	}
+	client := NewRealDockerClient()
+	result, _ := client.RemoveContainer(context.Background(), containerName)
+	return result
 }
