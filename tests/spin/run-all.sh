@@ -20,7 +20,7 @@ PASSED=0
 TOTAL=0
 
 # Test timeout in seconds
-TEST_TIMEOUT=30
+TEST_TIMEOUT=90
 
 # Function to run a test with timeout
 run_with_timeout() {

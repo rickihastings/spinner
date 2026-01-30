@@ -6,7 +6,7 @@ Migrate the existing bash integration tests to Go's native testing framework, pr
 
 ## Problem Statement
 
-Currently, the project has ~29 bash scripts for testing setup and spin commands. While functional, these tests:
+Currently, the project has 31 bash scripts for testing setup and spin commands (7 for setup, 24 for spin). While functional, these tests:
 - Are not integrated with Go's tooling ecosystem
 - Cannot leverage Go's testing features (table-driven tests, benchmarks, test coverage)
 - Require bash-specific knowledge and debugging
@@ -36,7 +36,7 @@ Implement a hybrid testing strategy with both unit tests and integration tests:
 
 ## Success Criteria
 
-1. All 29+ bash test scenarios have equivalent Go tests
+1. All 31 bash test scenarios have equivalent Go tests
 2. Tests can be run via `go test ./...`
 3. Integration tests verify real Docker behavior
 4. Unit tests provide fast feedback without Docker dependencies

@@ -118,7 +118,10 @@
 - [ ] 6.5 Implement test for --branch flag parsing
 - [ ] 6.6 Implement test for --max-iterations flag parsing and default value (maps to bash test 14-max-iterations-default.sh)
 - [ ] 6.7 Implement test for --recreate flag parsing (maps to bash test 18-recreate-flag.sh)
-- [ ] 6.8 Create table-driven test for all flag combinations
+- [ ] 6.8 Implement test for --setup flag parsing and validation
+- [ ] 6.9 Implement test for --setup with --base-image validation (maps to bash test 22-setup-flag-required-for-base-image.sh)
+- [ ] 6.10 Implement test for --setup with mutually exclusive flags (maps to bash test 21-setup-mutually-exclusive-flags.sh)
+- [ ] 6.11 Create table-driven test for all flag combinations
 
 **Validation:** `go test ./cmd/spin_test.go -v` passes with 100% coverage of validation logic
 
@@ -194,6 +197,9 @@
 - [ ] 10.7 Implement integration test for name sanitization (maps to bash test 17-name-sanitization.sh)
 - [ ] 10.8 Implement integration test for recreate flag (maps to bash test 18-recreate-flag.sh)
 - [ ] 10.9 Implement integration test for .npmrc warning (maps to bash test 10-npmrc-warning.sh)
+- [ ] 10.10 Implement integration test for --setup with --base-image (maps to bash test 19-setup-with-base-image.sh)
+- [ ] 10.11 Implement integration test for --setup with --dockerfile (maps to bash test 20-setup-with-dockerfile.sh)
+- [ ] 10.12 Implement integration test for --setup rebuilds existing image (maps to bash test 23-setup-rebuilds-existing-image.sh)
 
 **Validation:** `go test ./tests/integration/spin_test.go -v` passes for all scenarios
 
@@ -282,16 +288,23 @@
 ## Test Count Summary
 
 **Bash tests to migrate:**
-- Setup: 8 tests (tests/setup/*.sh)
-- Spin: 21 tests (tests/spin/*.sh)
-- **Total: 29 tests**
+- Setup: 7 tests (tests/setup/*.sh)
+- Spin: 24 tests (tests/spin/*.sh)
+- **Total: 31 tests**
+
+**Notable new tests since proposal:**
+- spin/19-setup-with-base-image.sh - Tests `--setup` flag with `--base-image`
+- spin/20-setup-with-dockerfile.sh - Tests `--setup` flag with `--dockerfile`
+- spin/21-setup-mutually-exclusive-flags.sh - Tests `--setup` flag validation
+- spin/22-setup-flag-required-for-base-image.sh - Tests `--base-image` requires `--setup`
+- spin/23-setup-rebuilds-existing-image.sh - Tests `--setup` rebuilds existing images
 
 **Expected Go tests (minimum):**
 - Setup unit tests: ~8-10 tests
 - Setup integration tests: ~5-6 tests
 - Docker build unit tests: ~6-8 tests
-- Spin unit tests: ~10-12 tests
-- Spin integration tests: ~15-18 tests
+- Spin unit tests: ~12-15 tests (including --setup flag tests)
+- Spin integration tests: ~18-22 tests (including --setup flag tests)
 - Docker run unit tests: ~8-10 tests
 - Prerequisites unit tests: ~4-6 tests
-- **Total: ~56-70 tests** (approximately 2x bash tests due to unit + integration split)
+- **Total: ~61-77 tests** (approximately 2x bash tests due to unit + integration split)

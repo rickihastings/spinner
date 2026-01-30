@@ -40,6 +40,21 @@ The spin command SHALL have comprehensive unit tests that validate all flag comb
 - **WHEN** the command arguments are parsed
 - **THEN** the test SHALL verify max-iterations defaults to 30
 
+#### Scenario: Test setup flag parsing
+- **GIVEN** spin command is invoked with --setup flag
+- **WHEN** the command arguments are parsed
+- **THEN** the test SHALL verify the setup flag is correctly set
+
+#### Scenario: Test setup flag with base-image requires setup
+- **GIVEN** spin command is invoked with --base-image but without --setup flag
+- **WHEN** the command is validated
+- **THEN** the test SHALL verify an error is returned indicating --base-image requires --setup
+
+#### Scenario: Test setup flag with mutually exclusive options
+- **GIVEN** spin command is invoked with --setup, --base-image, and --dockerfile flags
+- **WHEN** the command is validated
+- **THEN** the test SHALL verify an error is returned indicating flags are mutually exclusive
+
 ### Requirement: Unit Test Coverage for Container Operations
 The Docker container operations SHALL have unit tests with mocked Docker client to verify run logic without actual Docker calls.
 
@@ -138,6 +153,21 @@ The spin command SHALL have integration tests that verify end-to-end behavior wi
 - **GIVEN** an integration test has created Docker containers
 - **WHEN** the test completes (success or failure)
 - **THEN** the test SHALL clean up created containers to prevent resource leaks
+
+#### Scenario: Integration test for setup flag with base-image
+- **GIVEN** spin command is executed with --setup, --image, and --base-image flags
+- **WHEN** the command completes
+- **THEN** the test SHALL verify the Docker image is built with the specified base image and container is created
+
+#### Scenario: Integration test for setup flag with dockerfile
+- **GIVEN** spin command is executed with --setup, --image, and --dockerfile flags
+- **WHEN** the command completes
+- **THEN** the test SHALL verify the Docker image is built using the custom Dockerfile and container is created
+
+#### Scenario: Integration test for setup rebuilds existing image
+- **GIVEN** an image with the same name already exists
+- **WHEN** spin command is executed with --setup flag
+- **THEN** the test SHALL verify the existing image is rebuilt and container is created
 
 ### Requirement: Table-Driven Test Coverage
 Complex validation scenarios SHALL use table-driven tests to comprehensively cover all edge cases and variations.
