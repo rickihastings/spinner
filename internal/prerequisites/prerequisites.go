@@ -46,5 +46,6 @@ func CheckPrerequisites() error {
 			return &PrerequisiteError{Prerequisite: prereq}
 		}
 	}
+
 	return nil
 }

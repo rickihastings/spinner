@@ -24,5 +24,6 @@ func GenerateDockerfile(config DockerfileConfig) (string, error) {
 	}
 
 	template := string(templateBytes)
+
 	return strings.ReplaceAll(template, "${BASE_IMAGE}", config.BaseImage), nil
 }

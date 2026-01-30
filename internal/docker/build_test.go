@@ -42,7 +42,8 @@ func TestGenerateDockerfile_TemplateNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(originalWd)
+
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	// Change to a temporary directory without templates
 	tempDir := t.TempDir()
@@ -106,6 +107,7 @@ func TestBuildImage_WithDockerfile(t *testing.T) {
 	// Create a temporary Dockerfile
 	tempDir := t.TempDir()
 	dockerfilePath := filepath.Join(tempDir, "Dockerfile")
+
 	dockerfileContent := `FROM ubuntu:22.04
 RUN apt-get update
 `
@@ -195,12 +197,14 @@ func TestBuildConfig_Variations(t *testing.T) {
 
 			if tt.wantError {
 				assert.Error(t, err)
+
 				if tt.errorCheck != nil {
 					tt.errorCheck(t, err)
 				}
 			} else {
 				assert.NoError(t, err)
 			}
+
 			mockClient.AssertExpectations(t)
 		})
 	}
@@ -245,6 +249,7 @@ func TestCopyFile_InvalidDestination(t *testing.T) {
 	tempDir := t.TempDir()
 
 	srcPath := filepath.Join(tempDir, "source.txt")
+
 	content := []byte("test content")
 	if err := os.WriteFile(srcPath, content, 0644); err != nil {
 		t.Fatal(err)
@@ -262,6 +267,7 @@ func TestCopyFile_InvalidDestination(t *testing.T) {
 func TestResolveTemplatePath_RelativeToCurrentDir(t *testing.T) {
 	// Create a temporary file in the current directory structure
 	tempDir := t.TempDir()
+
 	testPath := filepath.Join(tempDir, "test-template.txt")
 	if err := os.WriteFile(testPath, []byte("test"), 0644); err != nil {
 		t.Fatal(err)
@@ -272,7 +278,8 @@ func TestResolveTemplatePath_RelativeToCurrentDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(originalWd)
+
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	// Change to temp directory
 	if err := os.Chdir(tempDir); err != nil {
@@ -307,7 +314,8 @@ func TestFindProjectRoot_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(originalWd)
+
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	// Change to root directory where go.mod won't exist
 	if err := os.Chdir("/"); err != nil {

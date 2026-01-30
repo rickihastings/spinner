@@ -49,7 +49,8 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	if err := os.MkdirAll(buildContext, 0755); err != nil {
 		return fmt.Errorf("failed to create build context: %w", err)
 	}
-	defer os.RemoveAll(buildContext)
+
+	defer func() { _ = os.RemoveAll(buildContext) }()
 
 	// Determine the base image to use
 	baseImage := config.BaseImage
@@ -62,19 +63,23 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 		userBaseImageTag := fmt.Sprintf("spinner-base:%s", config.Name)
 		cmd := exec.CommandContext(ctx, "docker", "build", "-t", userBaseImageTag, "-f", config.Dockerfile, ".")
 		cmd.Stdout = os.Stdout
+
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to build user Dockerfile: %w", err)
 		}
+
 		baseImage = userBaseImageTag
 	}
 
 	// Generate the final Dockerfile
 	dockerfilePath := filepath.Join(buildContext, "Dockerfile")
+
 	dockerfileContent, err := GenerateDockerfile(DockerfileConfig{BaseImage: baseImage})
 	if err != nil {
 		return fmt.Errorf("failed to generate Dockerfile: %w", err)
 	}
+
 	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644); err != nil {
 		return fmt.Errorf("failed to write Dockerfile: %w", err)
 	}
@@ -102,6 +107,7 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	cmd := exec.CommandContext(ctx, "docker", "build", "-t", imageName, ".")
 	cmd.Dir = buildContext
 	cmd.Stdout = os.Stdout
+
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to build Docker image: %w", err)
@@ -120,6 +126,7 @@ func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, cont
 			Error:         fmt.Sprintf("Failed to get home directory: %s", err.Error()),
 		}, err
 	}
+
 	logsDir := filepath.Join(homeDir, ".spinner", containerName, "logs")
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		return ContainerResult{
@@ -130,6 +137,7 @@ func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, cont
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Container may have started but clone failed
@@ -142,6 +150,7 @@ func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, cont
 				Error:         fmt.Sprintf("Git clone failed: %s", strings.TrimSpace(string(logsOutput))),
 			}, err
 		}
+
 		return ContainerResult{
 			Success:       false,
 			ContainerName: containerName,
@@ -161,12 +170,14 @@ func (c *RealDockerClient) ImageExists(ctx context.Context, image string) (bool,
 	if err := cmd.Run(); err != nil {
 		return false, nil
 	}
+
 	return true, nil
 }
 
 // ContainerExists checks if a container exists and returns its status.
 func (c *RealDockerClient) ContainerExists(ctx context.Context, name string) (ContainerStatus, error) {
 	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Status}}", name)
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Container doesn't exist
@@ -177,12 +188,14 @@ func (c *RealDockerClient) ContainerExists(ctx context.Context, name string) (Co
 	if status == string(StatusRunning) {
 		return StatusRunning, nil
 	}
+
 	return StatusStopped, nil
 }
 
 // RemoveContainer removes a container, forcing removal if it's running.
 func (c *RealDockerClient) RemoveContainer(ctx context.Context, name string) (ContainerResult, error) {
 	cmd := exec.CommandContext(ctx, "docker", "rm", "-f", name)
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return ContainerResult{
@@ -201,6 +214,7 @@ func (c *RealDockerClient) RemoveContainer(ctx context.Context, name string) (Co
 // RestartContainer restarts a stopped container.
 func (c *RealDockerClient) RestartContainer(ctx context.Context, name string) (ContainerResult, error) {
 	cmd := exec.CommandContext(ctx, "docker", "start", name)
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return ContainerResult{
@@ -219,6 +233,7 @@ func (c *RealDockerClient) RestartContainer(ctx context.Context, name string) (C
 // VerifyContainerStatus verifies that a container is running.
 func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name string) (ContainerResult, error) {
 	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Status}}", name)
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return ContainerResult{
@@ -233,6 +248,7 @@ func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name strin
 		// Get logs to show what went wrong
 		logsCmd := exec.CommandContext(ctx, "docker", "logs", name)
 		logsOutput, _ := logsCmd.CombinedOutput()
+
 		return ContainerResult{
 			Success:       false,
 			ContainerName: name,

@@ -55,7 +55,8 @@ func init() {
 	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
 	viper.AddConfigPath(".")
-	viper.ReadInConfig() // Ignore error if .env doesn't exist
+
+	_ = viper.ReadInConfig() // Ignore error if .env doesn't exist
 }
 
 // Execute runs the root command and exits on error.

@@ -38,9 +38,9 @@ EXAMPLES:
   spinner setup --name custom-env --dockerfile ./Dockerfile.custom`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind flags to viper - this allows environment variables to override flag values
-			viper.BindPFlag("name", cmd.Flags().Lookup("name"))
-			viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
-			viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
+			_ = viper.BindPFlag("name", cmd.Flags().Lookup("name"))
+			_ = viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
+			_ = viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
 
 			// Get values from viper (respects env vars and flags)
 			setupName = viper.GetString("name")
@@ -51,6 +51,7 @@ EXAMPLES:
 			if setupName == "" {
 				fmt.Fprintln(os.Stderr, "Error: Missing required flag: --name")
 				fmt.Fprintln(os.Stderr, "Usage: spinner setup --name <name> [--base-image <image> | --dockerfile <path>]")
+
 				return fmt.Errorf("missing required flag: --name")
 			}
 
@@ -58,6 +59,7 @@ EXAMPLES:
 			if setupBaseImage != "" && setupDockerfile != "" {
 				fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
 				fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
+
 				return fmt.Errorf("mutually exclusive flags provided")
 			}
 
@@ -81,6 +83,7 @@ EXAMPLES:
 func performSetupWithClient(ctx context.Context, client docker.DockerClient, config setup.Config) error {
 	// Check prerequisites
 	fmt.Println("Checking prerequisites...")
+
 	if err := prerequisites.CheckPrerequisites(); err != nil {
 		fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 		return err
@@ -90,7 +93,7 @@ func performSetupWithClient(ctx context.Context, client docker.DockerClient, con
 	if config.Dockerfile != "" {
 		if _, err := os.Stat(config.Dockerfile); os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "✗ Error: Dockerfile not found at path: %s\n", config.Dockerfile)
-			return fmt.Errorf("Dockerfile not found at path: %s", config.Dockerfile)
+			return fmt.Errorf("dockerfile not found at path: %s", config.Dockerfile)
 		}
 	}
 
@@ -110,6 +113,7 @@ func performSetupWithClient(ctx context.Context, client docker.DockerClient, con
 	}
 
 	fmt.Printf("✓ Docker image built successfully: spinner:%s\n", config.Name)
+
 	return nil
 }
 
@@ -166,15 +170,15 @@ EXAMPLES:
 Note: When --setup is used, the image is always rebuilt (no caching). The --image value becomes the setup name.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind flags to viper - this allows environment variables to override flag values
-			viper.BindPFlag("image", cmd.Flags().Lookup("image"))
-			viper.BindPFlag("repo", cmd.Flags().Lookup("repo"))
-			viper.BindPFlag("prompt", cmd.Flags().Lookup("prompt"))
-			viper.BindPFlag("branch", cmd.Flags().Lookup("branch"))
-			viper.BindPFlag("max-iterations", cmd.Flags().Lookup("max-iterations"))
-			viper.BindPFlag("recreate", cmd.Flags().Lookup("recreate"))
-			viper.BindPFlag("setup", cmd.Flags().Lookup("setup"))
-			viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
-			viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
+			_ = viper.BindPFlag("image", cmd.Flags().Lookup("image"))
+			_ = viper.BindPFlag("repo", cmd.Flags().Lookup("repo"))
+			_ = viper.BindPFlag("prompt", cmd.Flags().Lookup("prompt"))
+			_ = viper.BindPFlag("branch", cmd.Flags().Lookup("branch"))
+			_ = viper.BindPFlag("max-iterations", cmd.Flags().Lookup("max-iterations"))
+			_ = viper.BindPFlag("recreate", cmd.Flags().Lookup("recreate"))
+			_ = viper.BindPFlag("setup", cmd.Flags().Lookup("setup"))
+			_ = viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
+			_ = viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
 
 			// Get values from viper (respects env vars and flags)
 			spinImage = viper.GetString("image")
@@ -191,6 +195,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 			if spinImage == "" {
 				return fmt.Errorf("--image flag is required")
 			}
+
 			if spinRepo == "" {
 				return fmt.Errorf("--repo flag is required")
 			}
@@ -200,13 +205,16 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				fmt.Fprintln(os.Stderr, "Error: --base-image requires --setup flag")
 				return fmt.Errorf("--base-image requires --setup flag")
 			}
+
 			if !spinSetup && spinDockerfile != "" {
 				fmt.Fprintln(os.Stderr, "Error: --dockerfile requires --setup flag")
 				return fmt.Errorf("--dockerfile requires --setup flag")
 			}
+
 			if spinSetup && spinBaseImage != "" && spinDockerfile != "" {
 				fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
 				fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
+
 				return fmt.Errorf("mutually exclusive flags provided")
 			}
 
@@ -235,6 +243,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 
 			// Validate prerequisites
 			fmt.Println("Validating prerequisites...")
+
 			config := docker.SpinConfig{
 				Image:         spinImage,
 				Repo:          spinRepo,
@@ -254,6 +263,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 			containerName := docker.GenerateContainerName(config)
 
 			fmt.Println("✓ Prerequisites validated")
+
 			for _, warning := range validationResult.Warnings {
 				fmt.Printf("⚠ Warning: %s\n", warning)
 			}
@@ -274,7 +284,8 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 
 			var action docker.ReuseAction
 
-			if containerStatus == docker.StatusNone {
+			switch containerStatus {
+			case docker.StatusNone:
 				// Create new container
 				fmt.Printf("Creating container: %s\n", containerName)
 				fmt.Println("Cloning repository...")
@@ -284,6 +295,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 					return err
 				}
+
 				runResult, _ := client.RunContainer(ctx, dockerArgs, containerName)
 				if !runResult.Success {
 					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", runResult.Error)
@@ -298,10 +310,10 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				}
 
 				action = docker.ActionCreated
-			} else if containerStatus == docker.StatusRunning {
+			case docker.StatusRunning:
 				// Reuse running container
 				action = docker.ActionReused
-			} else if containerStatus == docker.StatusStopped {
+			case docker.StatusStopped:
 				// Restart stopped container
 				restartResult, _ := client.RestartContainer(ctx, containerName)
 				if !restartResult.Success {

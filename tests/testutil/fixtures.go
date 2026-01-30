@@ -10,8 +10,10 @@ import (
 // GenerateTestID creates a unique identifier for test resources
 func GenerateTestID(t *testing.T) string {
 	t.Helper()
+
 	timestamp := time.Now().Unix()
 	random := rand.Intn(10000)
+
 	return fmt.Sprintf("test-%d-%d", timestamp, random)
 }
 
@@ -43,8 +45,10 @@ func CleanupTestResources(t *testing.T, imageName string, containerName string) 
 // SkipIfDockerNotAvailable skips the test if Docker is not available
 func SkipIfDockerNotAvailable(t *testing.T) {
 	t.Helper()
+
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+
 	EnsureDockerRunning(t)
 }

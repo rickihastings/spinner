@@ -48,6 +48,7 @@ func RunCommandWithEnv(t *testing.T, env map[string]string, args ...string) (std
 	cmd := exec.Command(binaryPath, args...)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
+
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 
@@ -81,6 +82,7 @@ func RunCommandExpectSuccess(t *testing.T, args ...string) (stdout string, stder
 	t.Helper()
 	stdout, stderr, exitCode := RunCommand(t, args...)
 	require.Equal(t, 0, exitCode, "command failed: stdout=%s, stderr=%s", stdout, stderr)
+
 	return stdout, stderr
 }
 
@@ -89,5 +91,6 @@ func RunCommandExpectError(t *testing.T, args ...string) (stdout string, stderr 
 	t.Helper()
 	stdout, stderr, exitCode = RunCommand(t, args...)
 	require.NotEqual(t, 0, exitCode, "command should have failed but succeeded: stdout=%s", stdout)
+
 	return stdout, stderr, exitCode
 }

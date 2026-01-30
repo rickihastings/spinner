@@ -106,8 +106,10 @@ func TestSetupCommand_WithDockerfile(t *testing.T) {
 	// Create a temporary Dockerfile
 	tmpfile, err := os.CreateTemp("", "Dockerfile.*")
 	assert.NoError(t, err)
-	defer os.Remove(tmpfile.Name())
-	tmpfile.Close()
+
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+
+	_ = tmpfile.Close()
 
 	mockClient := new(docker.MockDockerClient)
 
@@ -150,7 +152,7 @@ func TestSetupCommand_NonExistentDockerfile(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Dockerfile not found at path")
+	assert.Contains(t, err.Error(), "dockerfile not found at path")
 	// Verify no Docker operations were attempted
 	mockClient.AssertNotCalled(t, "BuildImage")
 }
@@ -160,8 +162,10 @@ func TestSetupCommand_FlagCombinations(t *testing.T) {
 	// Create a temporary Dockerfile for valid Dockerfile tests
 	tmpfile, err := os.CreateTemp("", "Dockerfile.*")
 	assert.NoError(t, err)
-	defer os.Remove(tmpfile.Name())
-	tmpfile.Close()
+
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+
+	_ = tmpfile.Close()
 
 	tests := []struct {
 		name        string
@@ -212,7 +216,7 @@ func TestSetupCommand_FlagCombinations(t *testing.T) {
 			name:        "non-existent dockerfile",
 			args:        []string{"--name", "test", "--dockerfile", "/nonexistent/Dockerfile"},
 			wantError:   true,
-			errorString: "Dockerfile not found",
+			errorString: "dockerfile not found",
 			mockSetup:   func(m *docker.MockDockerClient) {},
 		},
 	}
@@ -232,6 +236,7 @@ func TestSetupCommand_FlagCombinations(t *testing.T) {
 
 			if tt.wantError {
 				assert.Error(t, err)
+
 				if tt.errorString != "" {
 					assert.Contains(t, err.Error(), tt.errorString)
 				}

@@ -22,6 +22,7 @@ type Config struct {
 func PerformSetup(config Config) error {
 	// Check prerequisites
 	fmt.Println("Checking prerequisites...")
+
 	if err := prerequisites.CheckPrerequisites(); err != nil {
 		fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 		return err
@@ -31,7 +32,7 @@ func PerformSetup(config Config) error {
 	if config.Dockerfile != "" {
 		if _, err := os.Stat(config.Dockerfile); os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "✗ Error: Dockerfile not found at path: %s\n", config.Dockerfile)
-			return fmt.Errorf("Dockerfile not found at path: %s", config.Dockerfile)
+			return fmt.Errorf("dockerfile not found at path: %s", config.Dockerfile)
 		}
 	}
 
@@ -51,5 +52,6 @@ func PerformSetup(config Config) error {
 	}
 
 	fmt.Printf("✓ Docker image built successfully: spinner:%s\n", config.Name)
+
 	return nil
 }

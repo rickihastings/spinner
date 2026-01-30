@@ -73,6 +73,7 @@ func convertSshToHttps(repoURL string) string {
 	if strings.HasPrefix(repoURL, "git@github.com:") {
 		return strings.Replace(repoURL, "git@github.com:", "https://github.com/", 1)
 	}
+
 	return repoURL
 }
 
@@ -139,7 +140,9 @@ func ValidatePrerequisitesWithClient(ctx context.Context, client DockerClient, c
 	if err != nil {
 		homeDir = ""
 	}
+
 	npmrcPath := filepath.Join(homeDir, ".npmrc")
+
 	hasNpmrc := false
 	if _, err := os.Stat(npmrcPath); err == nil {
 		hasNpmrc = true
@@ -179,10 +182,12 @@ func sanitizeComponent(input string) string {
 // Handles both SSH (git@github.com:user/repo.git) and HTTPS (https://github.com/user/repo.git) formats.
 func extractRepoName(repoURL string) string {
 	re := regexp.MustCompile(`([^/:]+)(\.git)?$`)
+
 	matches := re.FindStringSubmatch(repoURL)
 	if len(matches) > 1 {
 		return strings.TrimSuffix(matches[1], ".git")
 	}
+
 	return "sandbox"
 }
 
@@ -196,6 +201,7 @@ func GenerateContainerName(config SpinConfig) string {
 		branchPart := sanitizeComponent(config.Branch)
 		return fmt.Sprintf("%s-%s-%s", imagePart, repoPart, branchPart)
 	}
+
 	return fmt.Sprintf("%s-%s", imagePart, repoPart)
 }
 
@@ -232,6 +238,7 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 		if maxIterations == "" {
 			maxIterations = DefaultMaxIterations
 		}
+
 		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("MAX_ITERATIONS=%s", maxIterations))
 
 		// Add branch if specified
@@ -257,6 +264,7 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 func ExecuteDockerRun(dockerArgs []string, containerName string) ContainerResult {
 	client := NewRealDockerClient()
 	result, _ := client.RunContainer(context.Background(), dockerArgs, containerName)
+
 	return result
 }
 
@@ -265,6 +273,7 @@ func ExecuteDockerRun(dockerArgs []string, containerName string) ContainerResult
 func VerifyContainerStatus(containerName string) ContainerResult {
 	client := NewRealDockerClient()
 	result, _ := client.VerifyContainerStatus(context.Background(), containerName)
+
 	return result
 }
 
@@ -276,6 +285,7 @@ func VerifyContainerStatus(containerName string) ContainerResult {
 func CheckContainerExists(containerName string) ContainerStatus {
 	client := NewRealDockerClient()
 	status, _ := client.ContainerExists(context.Background(), containerName)
+
 	return status
 }
 
@@ -284,6 +294,7 @@ func CheckContainerExists(containerName string) ContainerStatus {
 func RestartContainer(containerName string) ContainerResult {
 	client := NewRealDockerClient()
 	result, _ := client.RestartContainer(context.Background(), containerName)
+
 	return result
 }
 
@@ -292,5 +303,6 @@ func RestartContainer(containerName string) ContainerResult {
 func RemoveContainer(containerName string) ContainerResult {
 	client := NewRealDockerClient()
 	result, _ := client.RemoveContainer(context.Background(), containerName)
+
 	return result
 }

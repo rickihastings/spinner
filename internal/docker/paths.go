@@ -25,6 +25,7 @@ func findProjectRoot() (string, error) {
 			// Reached root without finding project root
 			return "", os.ErrNotExist
 		}
+
 		dir = parent
 	}
 }
