@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rickihastings/spinner/internal/docker"
-	"github.com/rickihastings/spinner/internal/prerequisites"
+	"github.com/rickihastings/spinner/internal/setup"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -56,38 +55,12 @@ EXAMPLES:
 			return fmt.Errorf("mutually exclusive flags provided")
 		}
 
-		// Check prerequisites
-		fmt.Println("Checking prerequisites...")
-		if err := prerequisites.CheckPrerequisites(); err != nil {
-			fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
-			return err
-		}
-
-		// Validate Dockerfile path if provided
-		if setupDockerfile != "" {
-			if _, err := os.Stat(setupDockerfile); os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "✗ Error: Dockerfile not found at path: %s\n", setupDockerfile)
-				return fmt.Errorf("Dockerfile not found at path: %s", setupDockerfile)
-			}
-		}
-
-		// Build the image
-		fmt.Printf("✓ Prerequisites checked\n")
-		fmt.Printf("Building Docker image: spinner:%s\n", setupName)
-
-		buildConfig := docker.BuildConfig{
+		// Perform setup using shared logic
+		return setup.PerformSetup(setup.Config{
 			Name:       setupName,
 			BaseImage:  setupBaseImage,
 			Dockerfile: setupDockerfile,
-		}
-
-		if err := docker.BuildImage(buildConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
-			return err
-		}
-
-		fmt.Printf("✓ Docker image built successfully: spinner:%s\n", setupName)
-		return nil
+		})
 	},
 }
 

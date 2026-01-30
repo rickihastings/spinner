@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/rickihastings/spinner/internal/docker"
-	"github.com/rickihastings/spinner/internal/prerequisites"
+	"github.com/rickihastings/spinner/internal/setup"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -106,42 +106,20 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 
 		// If --setup is provided, build the image first
 		if spinSetup {
-			// Check prerequisites
-			fmt.Println("Checking prerequisites...")
-			if err := prerequisites.CheckPrerequisites(); err != nil {
-				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
-				return err
-			}
-
-			// Validate Dockerfile path if provided
-			if spinDockerfile != "" {
-				if _, err := os.Stat(spinDockerfile); os.IsNotExist(err) {
-					fmt.Fprintf(os.Stderr, "✗ Error: Dockerfile not found at path: %s\n", spinDockerfile)
-					return fmt.Errorf("Dockerfile not found at path: %s", spinDockerfile)
-				}
-			}
-
-			// Build the image
-			fmt.Printf("✓ Prerequisites checked\n")
 			// Remove "spinner:" prefix from image if present for setup name
 			setupName := spinImage
 			if len(setupName) > 8 && setupName[:8] == "spinner:" {
 				setupName = setupName[8:]
 			}
-			fmt.Printf("Building Docker image: spinner:%s\n", setupName)
 
-			buildConfig := docker.BuildConfig{
+			// Perform setup using shared logic
+			if err := setup.PerformSetup(setup.Config{
 				Name:       setupName,
 				BaseImage:  spinBaseImage,
 				Dockerfile: spinDockerfile,
-			}
-
-			if err := docker.BuildImage(buildConfig); err != nil {
-				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+			}); err != nil {
 				return err
 			}
-
-			fmt.Printf("✓ Docker image built successfully: spinner:%s\n", setupName)
 
 			// Update spinImage to use the built image tag
 			spinImage = "spinner:" + setupName
