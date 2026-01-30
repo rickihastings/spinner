@@ -54,8 +54,8 @@
 
 **Goal:** Test setup command validation and logic without Docker
 
-- [ ] 3.1 Create `cmd/setup_test.go` with test suite skeleton
-- [ ] 3.2 Implement test for missing --name flag validation
+- [x] 3.1 Create `cmd/setup_test.go` with test suite skeleton
+- [x] 3.2 Implement test for missing --name flag validation
 - [ ] 3.3 Implement test for mutually exclusive flags (--base-image and --dockerfile)
 - [ ] 3.4 Implement test for successful argument parsing with --name only
 - [ ] 3.5 Implement test for argument parsing with --name and --base-image
