@@ -39,10 +39,10 @@
   - `RemoveContainer(ctx, name) error`
 - [x] 2.2 Implement `RealDockerClient` struct that wraps exec.Command calls
 - [x] 2.3 Create mock Docker client in `internal/docker/mock_client_test.go` using testify/mock
-- [ ] 2.4 Update `cmd/setup.go` to accept DockerClient via dependency injection
-- [ ] 2.5 Update `cmd/spin.go` to accept DockerClient via dependency injection
-- [ ] 2.6 Create command constructor functions (`NewSetupCommand`, `NewSpinCommand`)
-- [ ] 2.7 Update `cmd/root.go` to use new constructors with RealDockerClient
+- [x] 2.4 Update `cmd/setup.go` to accept DockerClient via dependency injection
+- [x] 2.5 Update `cmd/spin.go` to accept DockerClient via dependency injection
+- [x] 2.6 Create command constructor functions (`NewSetupCommand`, `NewSpinCommand`)
+- [x] 2.7 Update `cmd/root.go` to use new constructors with RealDockerClient
 
 **Validation:** Project still builds and runs successfully (`go build -o dist/spinner && ./dist/spinner --help`)
 
