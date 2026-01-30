@@ -31,14 +31,14 @@
 
 **Goal:** Enable dependency injection for testability
 
-- [ ] 2.1 Define `DockerClient` interface in `internal/docker/client.go`
+- [x] 2.1 Define `DockerClient` interface in `internal/docker/client.go`
   - `BuildImage(ctx, config) error`
   - `RunContainer(ctx, config) (containerID string, error)`
   - `ImageExists(ctx, image) (bool, error)`
   - `ContainerExists(ctx, name) (bool, error)`
   - `RemoveContainer(ctx, name) error`
-- [ ] 2.2 Implement `RealDockerClient` struct that wraps exec.Command calls
-- [ ] 2.3 Create mock Docker client in `internal/docker/mock_client_test.go` using testify/mock
+- [x] 2.2 Implement `RealDockerClient` struct that wraps exec.Command calls
+- [x] 2.3 Create mock Docker client in `internal/docker/mock_client_test.go` using testify/mock
 - [ ] 2.4 Update `cmd/setup.go` to accept DockerClient via dependency injection
 - [ ] 2.5 Update `cmd/spin.go` to accept DockerClient via dependency injection
 - [ ] 2.6 Create command constructor functions (`NewSetupCommand`, `NewSpinCommand`)
