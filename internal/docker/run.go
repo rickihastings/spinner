@@ -238,30 +238,3 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 
 	return dockerArgs, nil
 }
-
-// VerifyContainerStatus verifies that the container is running.
-// This is a convenience function that uses the default RealDockerClient.
-func VerifyContainerStatus(containerName string) ContainerResult {
-	client := NewRealDockerClient()
-	result, _ := client.VerifyContainerStatus(context.Background(), containerName)
-
-	return result
-}
-
-// RestartContainer restarts a stopped container.
-// This is a convenience function that uses the default RealDockerClient.
-func RestartContainer(containerName string) ContainerResult {
-	client := NewRealDockerClient()
-	result, _ := client.RestartContainer(context.Background(), containerName)
-
-	return result
-}
-
-// RemoveContainer removes a container, forcing removal if it's running.
-// This is a convenience function that uses the default RealDockerClient.
-func RemoveContainer(containerName string) ContainerResult {
-	client := NewRealDockerClient()
-	result, _ := client.RemoveContainer(context.Background(), containerName)
-
-	return result
-}

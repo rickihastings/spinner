@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"context"
 	"os"
 )
 
@@ -24,13 +23,6 @@ type buildFile struct {
 var buildFiles = []buildFile{
 	{src: "scripts/startup.sh", dst: "scripts/startup.sh"},
 	{src: "scripts/ralph-loop.sh", dst: "scripts/ralph-loop.sh"},
-}
-
-// BuildImage builds a Docker image with the given configuration.
-// This is a convenience function that uses the default RealDockerClient.
-func BuildImage(config BuildConfig) error {
-	client := NewRealDockerClient()
-	return client.BuildImage(context.Background(), config)
 }
 
 // copyFile copies a file from src to dst

@@ -1,12 +1,9 @@
 package testutil
 
 import (
-	"context"
-	"fmt"
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -75,39 +72,6 @@ func RemoveDockerContainer(t *testing.T, name string) {
 	if err != nil {
 		t.Logf("Warning: failed to remove container %s: %v", name, err)
 	}
-}
-
-// WaitForContainer waits for a container to reach a specific state
-func WaitForContainer(t *testing.T, name string, timeout time.Duration) error {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for container %s", name)
-		case <-ticker.C:
-			if DockerContainerExists(t, name) {
-				return nil
-			}
-		}
-	}
-}
-
-// GetContainerID retrieves the container ID by name
-func GetContainerID(t *testing.T, name string) string {
-	t.Helper()
-
-	cmd := exec.Command("docker", "inspect", "-f", "{{.Id}}", name)
-	output, err := cmd.Output()
-	require.NoError(t, err, "failed to get container ID for %s", name)
-
-	return strings.TrimSpace(string(output))
 }
 
 // EnsureDockerRunning checks that Docker daemon is accessible

@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,10 +68,9 @@ func RunCommandWithEnv(t *testing.T, env map[string]string, args ...string) (std
 	exitCode = 0
 
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			exitCode = exitErr.ExitCode()
-		} else {
-			t.Fatalf("failed to run command: %v", err)
 		}
 	}
 

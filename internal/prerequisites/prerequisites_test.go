@@ -1,6 +1,7 @@
 package prerequisites
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -42,7 +43,8 @@ func TestCheckPrerequisites_MissingTool(t *testing.T) {
 
 	require.Error(t, err, "CheckPrerequisites should return error for missing tool")
 
-	prereqErr, ok := err.(*PrerequisiteError)
+	var prereqErr *PrerequisiteError
+	ok := errors.As(err, &prereqErr)
 	require.True(t, ok, "Error should be of type *PrerequisiteError")
 	assert.Equal(t, "NonExistentTool", prereqErr.Prerequisite.Name)
 	assert.Equal(t, "Test error: NonExistentTool is not installed.", prereqErr.Error())
@@ -68,7 +70,8 @@ func TestCheckPrerequisites_Docker(t *testing.T) {
 
 	// If Docker is not installed, we expect an error
 	if err != nil {
-		prereqErr, ok := err.(*PrerequisiteError)
+		var prereqErr *PrerequisiteError
+		ok := errors.As(err, &prereqErr)
 		require.True(t, ok, "Error should be of type *PrerequisiteError")
 		assert.Equal(t, "Docker", prereqErr.Prerequisite.Name)
 		t.Skipf("Docker not available on this system: %v", err)

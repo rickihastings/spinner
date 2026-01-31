@@ -39,19 +39,6 @@ func GenerateTestContainerName(t *testing.T) string {
 	return fmt.Sprintf("spinner-test-%d", time.Now().Unix())
 }
 
-// CleanupTestResources removes test Docker resources (images and containers)
-func CleanupTestResources(t *testing.T, imageName string, containerName string) {
-	t.Helper()
-
-	if containerName != "" {
-		RemoveDockerContainer(t, containerName)
-	}
-
-	if imageName != "" {
-		RemoveDockerImage(t, imageName)
-	}
-}
-
 // SkipIfDockerNotAvailable skips the test if Docker is not available
 func SkipIfDockerNotAvailable(t *testing.T) {
 	t.Helper()
@@ -61,27 +48,6 @@ func SkipIfDockerNotAvailable(t *testing.T) {
 	}
 
 	EnsureDockerRunning(t)
-}
-
-// GetHomeDir returns the user's home directory
-func GetHomeDir(t *testing.T) string {
-	t.Helper()
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("failed to get home directory: %v", err)
-	}
-
-	return homeDir
-}
-
-// FileExists checks if a file exists at the given path
-func FileExists(t *testing.T, path string) bool {
-	t.Helper()
-
-	_, err := os.Stat(path)
-
-	return err == nil
 }
 
 // WriteFile writes content to a file at the given path
