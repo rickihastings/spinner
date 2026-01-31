@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rickihastings/spinner/internal/prerequisites"
 )
 
 // SpinConfig contains configuration for spinning up a container.
@@ -113,23 +115,11 @@ func ValidatePrerequisitesWithClient(ctx context.Context, client DockerClient, c
 		}
 	}
 
-	// Check GITHUB_TOKEN
-	githubToken := os.Getenv("GITHUB_TOKEN")
-	if githubToken == "" {
+	// Check environment variables (GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN)
+	if err := prerequisites.CheckEnvironmentVariables(); err != nil {
 		return ValidationResult{
 			Valid:    false,
-			Error:    "GITHUB_TOKEN environment variable not set. Please set GITHUB_TOKEN before running spin.",
-			Warnings: warnings,
-			HasNpmrc: false,
-		}
-	}
-
-	// Check CLAUDE_CODE_OAUTH_TOKEN
-	claudeToken := os.Getenv("CLAUDE_CODE_OAUTH_TOKEN")
-	if claudeToken == "" {
-		return ValidationResult{
-			Valid:    false,
-			Error:    "CLAUDE_CODE_OAUTH_TOKEN environment variable not set. Please set CLAUDE_CODE_OAUTH_TOKEN before running spin.",
+			Error:    err.Error(),
 			Warnings: warnings,
 			HasNpmrc: false,
 		}
