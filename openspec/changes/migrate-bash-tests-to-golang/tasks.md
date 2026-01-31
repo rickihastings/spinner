@@ -211,13 +211,13 @@
 
 **Goal:** Ensure comprehensive coverage and identify missing tests
 
-- [ ] 11.1 Run coverage analysis: `go test -cover -coverprofile=coverage.out ./...`
-- [ ] 11.2 Generate coverage report: `go tool cover -html=coverage.out -o coverage.html`
-- [ ] 11.3 Review coverage report and identify gaps
-- [ ] 11.4 Cross-reference all bash tests with Go tests (create mapping document)
-- [ ] 11.5 Identify any bash test scenarios not covered by Go tests
-- [ ] 11.6 Add additional tests for identified gaps
-- [ ] 11.7 Document test coverage metrics in `tests/README.md`
+- [x] 11.1 Run coverage analysis: `go test -cover -coverprofile=coverage.out ./...`
+- [x] 11.2 Generate coverage report: `go tool cover -html=coverage.out -o coverage.html`
+- [x] 11.3 Review coverage report and identify gaps
+- [x] 11.4 Cross-reference all bash tests with Go tests (create mapping document)
+- [x] 11.5 Identify any bash test scenarios not covered by Go tests
+- [x] 11.6 Add additional tests for identified gaps
+- [x] 11.7 Document test coverage metrics in `tests/README.md`
 
 **Validation:** Coverage report shows ≥80% coverage for cmd/ and internal/ packages
 
@@ -229,17 +229,14 @@
 
 **Goal:** Enable automated test execution and document testing approach
 
-- [ ] 12.1 Update `.github/workflows/` (if exists) to run Go tests
-- [ ] 12.2 Add GitHub Actions step for unit tests (`go test -short ./...`)
-- [ ] 12.3 Add GitHub Actions step for integration tests (`go test ./tests/integration/...`)
-- [ ] 12.4 Configure test timeout and Docker service in CI
-- [ ] 12.5 Update `tests/README.md` with Go testing documentation
+- [ ] 12.1 Configure test timeout and Docker service in CI
+- [ ] 12.2 Update `tests/README.md` with Go testing documentation
   - How to run unit tests
   - How to run integration tests
   - How to run with coverage
   - How to skip integration tests with `-short` flag
-- [ ] 12.6 Update root `README.md` with testing section
-- [ ] 12.7 Document migration from bash to Go tests (why, how, what changed)
+- [ ] 12.3 Update root `README.md` with testing section
+- [ ] 12.4 Document migration from bash to Go tests (why, how, what changed)
 
 **Validation:** CI pipeline runs and passes all Go tests; documentation is clear and complete
 
