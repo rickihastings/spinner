@@ -128,8 +128,6 @@ func ValidatePrerequisitesWithClient(ctx context.Context, client DockerClient, c
 	hasNpmrc := false
 	if _, err := os.Stat(npmrcPath); err == nil {
 		hasNpmrc = true
-	} else {
-		warnings = append(warnings, "~/.npmrc not found, npm will use default registry")
 	}
 
 	return ValidationResult{

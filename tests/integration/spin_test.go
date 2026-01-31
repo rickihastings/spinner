@@ -215,3 +215,486 @@ func TestSpin_NonExistentImage(t *testing.T) {
 	// Verify exit code is 1
 	assert.Equal(t, 1, exitCode, "should exit with code 1")
 }
+
+// TestSpin_PromptWithoutBranch tests that --prompt without --branch runs on default branch
+func TestSpin_PromptWithoutBranch(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	// Setup test image
+	_, imageName := setupSpinTestEnvironment(t)
+
+	// Run spin command with --prompt but without --branch
+	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--prompt", "echo test"}
+	containerName, _, _ := runSpinCommand(t, args...)
+
+	// Register cleanup
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Check environment variables in the container
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	envVars := string(output)
+
+	// Verify PROMPT is set
+	assert.Contains(t, envVars, "PROMPT=", "PROMPT environment variable should be set")
+
+	// Verify BRANCH is not set (or is empty)
+	lines := strings.Split(envVars, "\n")
+	branchSet := false
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "BRANCH=") && strings.TrimPrefix(line, "BRANCH=") != "" {
+			branchSet = true
+			break
+		}
+	}
+
+	assert.False(t, branchSet, "BRANCH environment variable should not be set when not provided")
+}
+
+// TestSpin_BranchWithoutPrompt tests that --branch without --prompt creates idle container
+func TestSpin_BranchWithoutPrompt(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	// Setup test image
+	_, imageName := setupSpinTestEnvironment(t)
+
+	// Run spin command with --branch but without --prompt
+	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--branch", "test"}
+	containerName, _, _ := runSpinCommand(t, args...)
+
+	// Register cleanup
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Check environment variables in the container
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	envVars := string(output)
+
+	// Verify PROMPT is not set (container should be idle)
+	lines := strings.Split(envVars, "\n")
+	promptSet := false
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "PROMPT=") && strings.TrimPrefix(line, "PROMPT=") != "" {
+			promptSet = true
+			break
+		}
+	}
+
+	assert.False(t, promptSet, "PROMPT environment variable should not be set (idle mode)")
+}
+
+// TestSpin_ReuseRunningContainer tests that running container is reused
+func TestSpin_ReuseRunningContainer(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	// Setup test image with a specific tag
+	imageTag := "test-env"
+	imageName := "spinner:" + imageTag
+
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerImage(t, imageName)
+	})
+
+	testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag)
+
+	// First run: create container
+	args := []string{"spin", "--image", imageName, "--repo", testRepo}
+	containerName, _, _ := runSpinCommand(t, args...)
+
+	// Register cleanup
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Verify container is running
+	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running")
+
+	// Second run: should reuse existing running container
+	stdout, stderr := testutil.RunCommandExpectSuccess(t, args...)
+	output := stdout + stderr
+
+	// Verify output indicates reuse
+	assert.Contains(t, output, "Reusing running container: "+containerName, "should reuse running container")
+}
+
+// TestSpin_RestartStoppedContainer tests that stopped container is restarted
+func TestSpin_RestartStoppedContainer(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	// Setup test image with a specific tag
+	imageTag := "test-env"
+	imageName := "spinner:" + imageTag
+
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerImage(t, imageName)
+	})
+
+	testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag)
+
+	// First run: create container
+	args := []string{"spin", "--image", imageName, "--repo", testRepo}
+	containerName, _, _ := runSpinCommand(t, args...)
+
+	// Register cleanup
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Stop the container
+	cmd := exec.Command("docker", "stop", containerName)
+	err := cmd.Run()
+	require.NoError(t, err, "should stop container")
+
+	// Verify container is stopped
+	assert.False(t, testutil.DockerContainerRunning(t, containerName), "container should be stopped")
+
+	// Second run: should restart stopped container
+	stdout, stderr := testutil.RunCommandExpectSuccess(t, args...)
+	output := stdout + stderr
+
+	// Verify output indicates restart
+	assert.Contains(t, output, "Container restarted: "+containerName, "should restart stopped container")
+
+	// Verify container is running again
+	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running after restart")
+}
+
+// TestSpin_PrivateRepoClone tests that private repository can be cloned with GITHUB_TOKEN
+func TestSpin_PrivateRepoClone(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	// Setup test image
+	_, imageName := setupSpinTestEnvironment(t)
+
+	// Use a private repository (assumes GITHUB_TOKEN is set)
+	privateRepo := "https://github.com/rickihastings/spinner.git"
+
+	// Run spin command with private repo
+	args := []string{"spin", "--image", imageName, "--repo", privateRepo}
+	containerName, _, _ := runSpinCommand(t, args...)
+
+	// Register cleanup
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Wait a moment for clone to complete
+	time.Sleep(3 * time.Second)
+
+	// Check if repository was cloned
+	cmd := exec.Command("docker", "exec", containerName, "test", "-d", workspacePath+"/.git")
+	err := cmd.Run()
+	assert.NoError(t, err, "private repository should be cloned into %s", workspacePath)
+}
+
+// TestSpin_DeterministicNamingWithBranch tests container naming with branch
+func TestSpin_DeterministicNamingWithBranch(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	// Setup test image with a specific tag
+	imageTag := "test-env"
+	imageName := "spinner:" + imageTag
+	testBranch := "master"
+
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerImage(t, imageName)
+	})
+
+	testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag)
+
+	// Run spin command with branch
+	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--prompt", "test", "--branch", testBranch}
+	containerName, _, _ := runSpinCommand(t, args...)
+
+	// Register cleanup
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Expected deterministic name format: spinner-<image-tag>-<repo-name>-<branch>
+	// For image "spinner:test-env", repo "Hello-World", and branch "master"
+	expectedName := "spinner-test-env-hello-world-master"
+
+	assert.Equal(t, expectedName, containerName, "container name should include branch in deterministic naming")
+}
+
+// TestSpin_NameSanitization tests that container names are properly sanitized
+func TestSpin_NameSanitization(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	// Setup test image with a specific tag
+	imageTag := "test-env"
+	imageName := "spinner:" + imageTag
+
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerImage(t, imageName)
+	})
+
+	testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag)
+
+	// Use SSH format repo URL with special chars that need sanitization
+	sshRepo := "git@github.com:octocat/Hello-World.git"
+	testBranch := "feature/auth-v2"
+
+	// Run spin command
+	args := []string{"spin", "--image", imageName, "--repo", sshRepo, "--prompt", "test", "--branch", testBranch}
+	containerName, _, _ := runSpinCommand(t, args...)
+
+	// Register cleanup
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Expected: special characters should be replaced with hyphens
+	// spinner-test-env-hello-world-feature-auth-v2
+	expectedName := "spinner-test-env-hello-world-feature-auth-v2"
+
+	assert.Equal(t, expectedName, containerName, "container name should be properly sanitized")
+
+	// Verify name contains only valid Docker container name characters
+	assert.Regexp(t, "^[a-z0-9][a-z0-9_.-]*$", containerName, "container name should only contain valid characters")
+}
+
+// TestSpin_RecreateFlag tests that --recreate flag removes and recreates container
+func TestSpin_RecreateFlag(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	// Setup test image with a specific tag
+	imageTag := "test-env"
+	imageName := "spinner:" + imageTag
+
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerImage(t, imageName)
+	})
+
+	testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag)
+
+	// First run: create container
+	args := []string{"spin", "--image", imageName, "--repo", testRepo}
+	containerName, _, _ := runSpinCommand(t, args...)
+
+	// Register cleanup
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Get container ID before recreate
+	cmd := exec.Command("docker", "inspect", "-f", "{{.Id}}", containerName)
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container ID")
+
+	containerIDBefore := strings.TrimSpace(string(output))
+
+	// Second run: use --recreate flag to force recreation
+	argsWithRecreate := []string{"spin", "--image", imageName, "--repo", testRepo, "--recreate"}
+	stdout, stderr := testutil.RunCommandExpectSuccess(t, argsWithRecreate...)
+	recreateOutput := stdout + stderr
+
+	// Get container ID after recreate
+	cmd = exec.Command("docker", "inspect", "-f", "{{.Id}}", containerName)
+	output, err = cmd.Output()
+	require.NoError(t, err, "should get container ID after recreate")
+
+	containerIDAfter := strings.TrimSpace(string(output))
+
+	// Verify container was recreated (different container ID)
+	assert.NotEqual(t, containerIDBefore, containerIDAfter, "container should have different ID after recreate")
+
+	// Verify output indicates creation (not reuse)
+	assert.Contains(t, recreateOutput, "Container created successfully: "+containerName, "should show container creation message")
+}
+
+// TestSpin_SetupWithBaseImage tests that --setup with --base-image builds and creates container
+func TestSpin_SetupWithBaseImage(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	imageTag := "setup-test"
+	imageName := "spinner:" + imageTag
+
+	// Cleanup
+	t.Cleanup(func() {
+		// Clean up container first (extract from potential error output)
+		containerName := "spinner-" + imageTag + "-hello-world"
+		testutil.RemoveDockerContainer(t, containerName)
+		testutil.RemoveDockerImage(t, imageName)
+	})
+
+	// Run spin command with --setup and --base-image
+	args := []string{"spin", "--setup", "--image", imageTag, "--base-image", "ubuntu:22.04", "--repo", testRepo, "--prompt", "echo test"}
+	stdout, stderr := testutil.RunCommandExpectSuccess(t, args...)
+	output := stdout + stderr
+
+	// Verify image build was successful
+	assert.Contains(t, output, "Docker image built successfully", "should show image build success message")
+
+	// Verify container creation was successful
+	assert.Contains(t, output, "Container created successfully", "should show container creation message")
+
+	// Verify the image was created
+	assert.True(t, testutil.DockerImageExists(t, imageName), "image should exist after setup")
+
+	// Extract container name and verify it's running
+	var containerName string
+
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "Container created successfully:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 4 {
+				containerName = parts[len(parts)-1]
+				break
+			}
+		}
+	}
+
+	require.NotEmpty(t, containerName, "should extract container name")
+	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running")
+}
+
+// TestSpin_SetupWithDockerfile tests that --setup with --dockerfile uses custom Dockerfile
+func TestSpin_SetupWithDockerfile(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	imageTag := "dockerfile-test"
+	imageName := "spinner:" + imageTag
+
+	// Create a temporary custom Dockerfile
+	tmpDir := t.TempDir()
+	dockerfilePath := tmpDir + "/custom.Dockerfile"
+
+	dockerfileContent := `FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+`
+	err := testutil.WriteFile(t, dockerfilePath, dockerfileContent)
+	require.NoError(t, err, "should create custom Dockerfile")
+
+	// Cleanup
+	t.Cleanup(func() {
+		// Clean up container first
+		containerName := "spinner-" + imageTag + "-hello-world"
+		testutil.RemoveDockerContainer(t, containerName)
+		testutil.RemoveDockerImage(t, imageName)
+	})
+
+	// Run spin command with --setup and --dockerfile
+	args := []string{"spin", "--setup", "--image", imageTag, "--dockerfile", dockerfilePath, "--repo", testRepo, "--prompt", "echo test"}
+	stdout, stderr := testutil.RunCommandExpectSuccess(t, args...)
+	output := stdout + stderr
+
+	// Verify image build was successful
+	assert.Contains(t, output, "Docker image built successfully", "should show image build success message")
+
+	// Verify container creation was successful
+	assert.Contains(t, output, "Container created successfully", "should show container creation message")
+
+	// Verify the image was created
+	assert.True(t, testutil.DockerImageExists(t, imageName), "image should exist after setup")
+
+	// Extract container name and verify it's running
+	var containerName string
+
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "Container created successfully:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 4 {
+				containerName = parts[len(parts)-1]
+				break
+			}
+		}
+	}
+
+	require.NotEmpty(t, containerName, "should extract container name")
+	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running")
+}
+
+// TestSpin_SetupRebuildsExistingImage tests that --setup rebuilds image even if it exists
+func TestSpin_SetupRebuildsExistingImage(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+	testutil.BuildCLI(t)
+
+	imageTag := "rebuild-test"
+	imageName := "spinner:" + imageTag
+
+	// Cleanup
+	t.Cleanup(func() {
+		containerName := "spinner-" + imageTag + "-hello-world"
+		testutil.RemoveDockerContainer(t, containerName)
+		testutil.RemoveDockerImage(t, imageName)
+	})
+
+	// First, create the image using setup command
+	testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag, "--base-image", "ubuntu:22.04")
+
+	// Verify the image exists before running spin with --setup
+	assert.True(t, testutil.DockerImageExists(t, imageName), "initial image should exist")
+
+	// Now run spin with --setup on the existing image
+	args := []string{"spin", "--setup", "--image", imageTag, "--base-image", "ubuntu:22.04", "--repo", testRepo, "--prompt", "echo test"}
+	stdout, stderr := testutil.RunCommandExpectSuccess(t, args...)
+	output := stdout + stderr
+
+	// Verify image build was successful (this proves --setup triggered the build process)
+	assert.Contains(t, output, "Docker image built successfully", "should rebuild image even if it exists")
+
+	// Verify container creation was successful
+	assert.Contains(t, output, "Container created successfully", "should show container creation message")
+
+	// Verify the image still exists
+	assert.True(t, testutil.DockerImageExists(t, imageName), "image should exist after rebuild")
+
+	// Extract container name and verify it's running
+	var containerName string
+
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "Container created successfully:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 4 {
+				containerName = parts[len(parts)-1]
+				break
+			}
+		}
+	}
+
+	require.NotEmpty(t, containerName, "should extract container name")
+	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running")
+}

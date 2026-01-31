@@ -188,18 +188,18 @@
 
 **Goal:** Verify advanced spin command scenarios with real Docker
 
-- [ ] 10.1 Implement integration test for prompt without branch (maps to bash test 12-prompt-without-branch.sh)
-- [ ] 10.2 Implement integration test for branch without prompt (maps to bash test 13-branch-without-prompt.sh)
-- [ ] 10.3 Implement integration test for container reuse (maps to bash test 14-reuse-running-container.sh)
-- [ ] 10.4 Implement integration test for restart stopped container (maps to bash test 15-restart-stopped-container.sh)
-- [ ] 10.5 Implement integration test for private repo clone (maps to bash test 15-private-repo-clone.sh)
-- [ ] 10.6 Implement integration test for deterministic naming with branch (maps to bash test 16-deterministic-naming-with-branch.sh)
-- [ ] 10.7 Implement integration test for name sanitization (maps to bash test 17-name-sanitization.sh)
-- [ ] 10.8 Implement integration test for recreate flag (maps to bash test 18-recreate-flag.sh)
-- [ ] 10.9 Implement integration test for .npmrc warning (maps to bash test 10-npmrc-warning.sh)
-- [ ] 10.10 Implement integration test for --setup with --base-image (maps to bash test 19-setup-with-base-image.sh)
-- [ ] 10.11 Implement integration test for --setup with --dockerfile (maps to bash test 20-setup-with-dockerfile.sh)
-- [ ] 10.12 Implement integration test for --setup rebuilds existing image (maps to bash test 23-setup-rebuilds-existing-image.sh)
+- [x] 10.1 Implement integration test for prompt without branch (maps to bash test 12-prompt-without-branch.sh)
+- [x] 10.2 Implement integration test for branch without prompt (maps to bash test 13-branch-without-prompt.sh)
+- [x] 10.3 Implement integration test for container reuse (maps to bash test 14-reuse-running-container.sh)
+- [x] 10.4 Implement integration test for restart stopped container (maps to bash test 15-restart-stopped-container.sh)
+- [x] 10.5 Implement integration test for private repo clone (maps to bash test 15-private-repo-clone.sh)
+- [x] 10.6 Implement integration test for deterministic naming with branch (maps to bash test 16-deterministic-naming-with-branch.sh)
+- [x] 10.7 Implement integration test for name sanitization (maps to bash test 17-name-sanitization.sh)
+- [x] 10.8 Implement integration test for recreate flag (maps to bash test 18-recreate-flag.sh)
+- [x] 10.9 Implement integration test for .npmrc warning (maps to bash test 10-npmrc-warning.sh)
+- [x] 10.10 Implement integration test for --setup with --base-image (maps to bash test 19-setup-with-base-image.sh)
+- [x] 10.11 Implement integration test for --setup with --dockerfile (maps to bash test 20-setup-with-dockerfile.sh)
+- [x] 10.12 Implement integration test for --setup rebuilds existing image (maps to bash test 23-setup-rebuilds-existing-image.sh)
 
 **Validation:** `go test ./tests/integration/spin_test.go -v` passes for all scenarios
 

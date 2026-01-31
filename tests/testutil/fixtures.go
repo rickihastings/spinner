@@ -3,6 +3,7 @@ package testutil
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 )
@@ -60,4 +61,32 @@ func SkipIfDockerNotAvailable(t *testing.T) {
 	}
 
 	EnsureDockerRunning(t)
+}
+
+// GetHomeDir returns the user's home directory
+func GetHomeDir(t *testing.T) string {
+	t.Helper()
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("failed to get home directory: %v", err)
+	}
+
+	return homeDir
+}
+
+// FileExists checks if a file exists at the given path
+func FileExists(t *testing.T, path string) bool {
+	t.Helper()
+
+	_, err := os.Stat(path)
+
+	return err == nil
+}
+
+// WriteFile writes content to a file at the given path
+func WriteFile(t *testing.T, path string, content string) error {
+	t.Helper()
+
+	return os.WriteFile(path, []byte(content), 0644)
 }
