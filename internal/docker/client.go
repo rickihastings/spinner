@@ -22,8 +22,8 @@ type DockerClient interface {
 	// BuildImage builds a Docker image with the given configuration
 	BuildImage(ctx context.Context, config BuildConfig) error
 
-	// RunContainer creates and starts a container with the given arguments
-	RunContainer(ctx context.Context, args []string, containerName string) (ContainerResult, error)
+	// RunContainer creates and starts a container with the given configuration
+	RunContainer(ctx context.Context, config SpinConfig, containerName string, hasNpmrc bool) (ContainerResult, error)
 
 	// ImageExists checks if a Docker image exists
 	ImageExists(ctx context.Context, image string) (bool, error)
@@ -217,8 +217,8 @@ func createTarArchive(srcDir string) (*bytes.Buffer, error) {
 	return buf, err
 }
 
-// RunContainer creates and starts a container with the given arguments.
-func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, containerName string) (ContainerResult, error) {
+// RunContainer creates and starts a container with the given configuration.
+func (c *RealDockerClient) RunContainer(ctx context.Context, config SpinConfig, containerName string, hasNpmrc bool) (ContainerResult, error) {
 	if err := c.ensureClient(); err != nil {
 		return ContainerResult{
 			Success:       false,
@@ -245,16 +245,8 @@ func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, cont
 		}, err
 	}
 
-	// Parse the args slice into container config
-	// Expected format: run -d --name <name> -e KEY=VAL ... -v src:dst ... <image>
-	containerConfig, hostConfig, _, err := parseDockerRunArgs(args)
-	if err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: containerName,
-			Error:         fmt.Sprintf("Failed to parse docker run args: %s", err.Error()),
-		}, err
-	}
+	// Build container configuration directly from SpinConfig
+	containerConfig, hostConfig := buildContainerConfigs(config, containerName, homeDir, hasNpmrc)
 
 	// Create the container
 	createResp, err := c.cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, containerName)
@@ -298,58 +290,54 @@ func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, cont
 	}, nil
 }
 
-// parseDockerRunArgs parses docker run arguments into container and host configs.
-func parseDockerRunArgs(args []string) (*container.Config, *container.HostConfig, string, error) {
-	containerConfig := &container.Config{
-		Env: []string{},
+// buildContainerConfigs creates Docker container and host configs from SpinConfig.
+func buildContainerConfigs(config SpinConfig, containerName, homeDir string, hasNpmrc bool) (*container.Config, *container.HostConfig) {
+	// Convert SSH URLs to HTTPS for GitHub PAT authentication
+	repoURL := convertSshToHttps(config.Repo)
+
+	// Build environment variables
+	env := []string{
+		fmt.Sprintf("GITHUB_TOKEN=%s", os.Getenv("GITHUB_TOKEN")),
+		fmt.Sprintf("CLAUDE_CODE_OAUTH_TOKEN=%s", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN")),
+		fmt.Sprintf("REPO_URL=%s", repoURL),
 	}
 
-	hostConfig := &container.HostConfig{
-		Binds: []string{},
-	}
+	// Add Ralph loop environment variables if prompt is provided
+	if config.Prompt != "" {
+		env = append(env, fmt.Sprintf("PROMPT=%s", escapeShellArg(config.Prompt)))
 
-	var imageName string
+		maxIterations := config.MaxIterations
+		if maxIterations == "" {
+			maxIterations = DefaultMaxIterations
+		}
 
-	i := 0
-	for i < len(args) {
-		arg := args[i]
+		env = append(env, fmt.Sprintf("MAX_ITERATIONS=%s", maxIterations))
 
-		switch arg {
-		case "run", "-d", "--detach":
-			i++
-		case "--name":
-			i += 2 // Skip --name and the name value (already handled by caller)
-		case "-e", "--env":
-			if i+1 < len(args) {
-				containerConfig.Env = append(containerConfig.Env, args[i+1])
-				i += 2
-			} else {
-				i++
-			}
-		case "-v", "--volume":
-			if i+1 < len(args) {
-				hostConfig.Binds = append(hostConfig.Binds, args[i+1])
-				i += 2
-			} else {
-				i++
-			}
-		default:
-			// If it doesn't start with -, it's probably the image name
-			if !strings.HasPrefix(arg, "-") {
-				imageName = arg
-			}
-
-			i++
+		if config.Branch != "" {
+			env = append(env, fmt.Sprintf("BRANCH=%s", escapeShellArg(config.Branch)))
 		}
 	}
 
-	if imageName == "" {
-		return nil, nil, "", fmt.Errorf("no image specified in docker run args")
+	// Build volume binds
+	binds := []string{
+		fmt.Sprintf("%s/.spinner/%s/logs:/logs", homeDir, containerName),
 	}
 
-	containerConfig.Image = imageName
+	if hasNpmrc {
+		npmrcPath := filepath.Join(homeDir, ".npmrc")
+		binds = append(binds, fmt.Sprintf("%s:/home/spinner/.npmrc", npmrcPath))
+	}
 
-	return containerConfig, hostConfig, imageName, nil
+	containerConfig := &container.Config{
+		Image: config.Image,
+		Env:   env,
+	}
+
+	hostConfig := &container.HostConfig{
+		Binds: binds,
+	}
+
+	return containerConfig, hostConfig
 }
 
 // getContainerLogs retrieves logs from a container.

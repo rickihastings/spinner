@@ -31,8 +31,8 @@ func (m *MockDockerClient) ContainerExists(ctx context.Context, name string) (do
 	return args.Get(0).(docker.ContainerStatus), args.Error(1)
 }
 
-func (m *MockDockerClient) RunContainer(ctx context.Context, dockerArgs []string, containerName string) (docker.ContainerResult, error) {
-	args := m.Called(ctx, dockerArgs, containerName)
+func (m *MockDockerClient) RunContainer(ctx context.Context, config docker.SpinConfig, containerName string, hasNpmrc bool) (docker.ContainerResult, error) {
+	args := m.Called(ctx, config, containerName, hasNpmrc)
 	return args.Get(0).(docker.ContainerResult), args.Error(1)
 }
 
@@ -60,7 +60,7 @@ func setupSpinCommandWithMocks() *cobra.Command {
 
 	// Mock container operations
 	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusNone, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
 	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
 
 	return cmd
@@ -152,7 +152,7 @@ func TestSpinCommand_RecreateFlagParsing(t *testing.T) {
 	// Mock container operations - container exists and should be removed
 	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusRunning, nil)
 	mockClient.On("RemoveContainer", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
 	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
 
 	b := new(bytes.Buffer)
@@ -179,7 +179,7 @@ func TestSpinCommand_SetupFlagParsing(t *testing.T) {
 
 	// Mock container operations
 	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusNone, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
 	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
 
 	b := new(bytes.Buffer)

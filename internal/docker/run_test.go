@@ -2,7 +2,6 @@ package docker
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -236,219 +235,10 @@ func TestExtractRepoName(t *testing.T) {
 	}
 }
 
-// TestBuildDockerRunCommand_BasicScenarios tests Docker run command building (7.2)
-func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
-	// Set required environment variables
-	_ = os.Setenv("GITHUB_TOKEN", "test-github-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-claude-token")
+// NOTE: BuildDockerRunCommand tests were removed as the function was replaced
+// by buildContainerConfigs (internal to client.go). The logic is now tested
+// indirectly through RunContainer.
 
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
-	homeDir, _ := os.UserHomeDir()
-
-	tests := []struct {
-		name           string
-		config         SpinConfig
-		containerName  string
-		hasNpmrc       bool
-		expectedArgs   []string
-		unexpectedArgs []string
-		description    string
-	}{
-		{
-			name: "basic run without prompt",
-			config: SpinConfig{
-				Image: "spinner:test",
-				Repo:  "https://github.com/user/repo.git",
-			},
-			containerName: "spinner-test-repo",
-			hasNpmrc:      false,
-			expectedArgs: []string{
-				"run", "-d", "--name", "spinner-test-repo",
-				"-e", "GITHUB_TOKEN=test-github-token",
-				"-e", "CLAUDE_CODE_OAUTH_TOKEN=test-claude-token",
-				"-e", "REPO_URL=https://github.com/user/repo.git",
-				"spinner:test",
-			},
-			unexpectedArgs: []string{"PROMPT=", "MAX_ITERATIONS=", "BRANCH="},
-			description:    "should create basic run command without Ralph environment",
-		},
-		{
-			name: "run with prompt",
-			config: SpinConfig{
-				Image:  "spinner:test",
-				Repo:   "https://github.com/user/repo.git",
-				Prompt: "fix the bug",
-			},
-			containerName: "spinner-test-repo",
-			hasNpmrc:      false,
-			expectedArgs: []string{
-				"-e", "PROMPT='fix the bug'",
-				"-e", "MAX_ITERATIONS=100",
-			},
-			description: "should include prompt and default max iterations",
-		},
-		{
-			name: "run with prompt and custom max iterations",
-			config: SpinConfig{
-				Image:         "spinner:test",
-				Repo:          "https://github.com/user/repo.git",
-				Prompt:        "add feature",
-				MaxIterations: "50",
-			},
-			containerName: "spinner-test-repo",
-			hasNpmrc:      false,
-			expectedArgs: []string{
-				"-e", "PROMPT='add feature'",
-				"-e", "MAX_ITERATIONS=50",
-			},
-			description: "should use custom max iterations when provided",
-		},
-		{
-			name: "run with prompt and branch",
-			config: SpinConfig{
-				Image:  "spinner:test",
-				Repo:   "https://github.com/user/repo.git",
-				Prompt: "test task",
-				Branch: "feature/new",
-			},
-			containerName: "spinner-test-repo-feature-new",
-			hasNpmrc:      false,
-			expectedArgs: []string{
-				"-e", "PROMPT='test task'",
-				"-e", "BRANCH='feature/new'",
-			},
-			description: "should include branch when provided with prompt",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			args, err := BuildDockerRunCommand(tt.config, tt.containerName, tt.hasNpmrc)
-
-			assert.NoError(t, err)
-			assert.NotNil(t, args)
-
-			argsStr := ""
-			for _, arg := range args {
-				argsStr += arg + " "
-			}
-
-			// Check expected args
-			for _, expected := range tt.expectedArgs {
-				assert.Contains(t, argsStr, expected, "should contain: %s", expected)
-			}
-
-			// Check unexpected args
-			for _, unexpected := range tt.unexpectedArgs {
-				assert.NotContains(t, argsStr, unexpected, "should not contain: %s", unexpected)
-			}
-
-			// Verify logs volume mount
-			expectedLogMount := homeDir + "/.spinner/" + tt.containerName + "/logs:/logs"
-			assert.Contains(t, argsStr, expectedLogMount, "should mount logs directory")
-		})
-	}
-}
-
-// TestBuildDockerRunCommand_NpmrcHandling tests npmrc mounting
-func TestBuildDockerRunCommand_NpmrcHandling(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
-	homeDir, _ := os.UserHomeDir()
-
-	tests := []struct {
-		name        string
-		hasNpmrc    bool
-		shouldMount bool
-	}{
-		{"with npmrc", true, true},
-		{"without npmrc", false, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := SpinConfig{
-				Image: "spinner:test",
-				Repo:  "https://github.com/user/repo.git",
-			}
-
-			args, err := BuildDockerRunCommand(config, "test-container", tt.hasNpmrc)
-
-			assert.NoError(t, err)
-
-			argsStr := ""
-			for _, arg := range args {
-				argsStr += arg + " "
-			}
-
-			expectedNpmrcMount := homeDir + "/.npmrc:/home/spinner/.npmrc"
-			if tt.shouldMount {
-				assert.Contains(t, argsStr, expectedNpmrcMount, "should mount .npmrc")
-			} else {
-				assert.NotContains(t, argsStr, expectedNpmrcMount, "should not mount .npmrc")
-			}
-		})
-	}
-}
-
-// TestBuildDockerRunCommand_SshToHttpsConversion tests SSH URL conversion
-func TestBuildDockerRunCommand_SshToHttpsConversion(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
-	tests := []struct {
-		name        string
-		repoURL     string
-		expectedURL string
-	}{
-		{
-			name:        "convert SSH to HTTPS",
-			repoURL:     "git@github.com:user/repo.git",
-			expectedURL: "https://github.com/user/repo.git",
-		},
-		{
-			name:        "keep HTTPS as-is",
-			repoURL:     "https://github.com/user/repo.git",
-			expectedURL: "https://github.com/user/repo.git",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := SpinConfig{
-				Image: "spinner:test",
-				Repo:  tt.repoURL,
-			}
-
-			args, err := BuildDockerRunCommand(config, "test-container", false)
-
-			assert.NoError(t, err)
-
-			argsStr := ""
-			for _, arg := range args {
-				argsStr += arg + " "
-			}
-
-			expectedEnvVar := "REPO_URL=" + tt.expectedURL
-			assert.Contains(t, argsStr, expectedEnvVar, "should use converted URL")
-		})
-	}
-}
 
 // TestConvertSshToHttps tests SSH to HTTPS URL conversion
 func TestConvertSshToHttps(t *testing.T) {
@@ -557,7 +347,7 @@ func TestContainerReuse_MockClient(t *testing.T) {
 			}
 
 			if tt.shouldCallRun {
-				mockClient.On("RunContainer", ctx, mock.Anything, containerName).Return(
+				mockClient.On("RunContainer", ctx, mock.Anything, containerName, mock.Anything).Return(
 					ContainerResult{Success: true, ContainerName: containerName}, nil,
 				)
 			}
@@ -580,7 +370,7 @@ func TestContainerReuse_MockClient(t *testing.T) {
 
 			if status == StatusNone || tt.recreate {
 				if tt.shouldCallRun {
-					_, err := mockClient.RunContainer(ctx, []string{}, containerName)
+					_, err := mockClient.RunContainer(ctx, SpinConfig{Image: "test"}, containerName, false)
 					assert.NoError(t, err)
 				}
 			} else if status == StatusStopped {
@@ -606,7 +396,7 @@ func TestContainerRecreation_MockClient(t *testing.T) {
 	mockClient.On("RemoveContainer", ctx, containerName).Return(
 		ContainerResult{Success: true, ContainerName: containerName}, nil,
 	)
-	mockClient.On("RunContainer", ctx, mock.Anything, containerName).Return(
+	mockClient.On("RunContainer", ctx, mock.Anything, containerName, mock.Anything).Return(
 		ContainerResult{Success: true, ContainerName: containerName}, nil,
 	)
 
@@ -621,7 +411,7 @@ func TestContainerRecreation_MockClient(t *testing.T) {
 	assert.True(t, result.Success)
 
 	// Create new container
-	result, err = mockClient.RunContainer(ctx, []string{}, containerName)
+	result, err = mockClient.RunContainer(ctx, SpinConfig{Image: "test"}, containerName, false)
 	assert.NoError(t, err)
 	assert.True(t, result.Success)
 

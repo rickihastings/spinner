@@ -18,8 +18,8 @@ func (m *MockDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 }
 
 // RunContainer mocks the RunContainer method.
-func (m *MockDockerClient) RunContainer(ctx context.Context, args []string, containerName string) (ContainerResult, error) {
-	callArgs := m.Called(ctx, args, containerName)
+func (m *MockDockerClient) RunContainer(ctx context.Context, config SpinConfig, containerName string, hasNpmrc bool) (ContainerResult, error) {
+	callArgs := m.Called(ctx, config, containerName, hasNpmrc)
 	return callArgs.Get(0).(ContainerResult), callArgs.Error(1)
 }
 

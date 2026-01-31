@@ -290,13 +290,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				fmt.Printf("Creating container: %s\n", containerName)
 				fmt.Println("Cloning repository...")
 
-				dockerArgs, err := docker.BuildDockerRunCommand(config, containerName, validationResult.HasNpmrc)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
-					return err
-				}
-
-				runResult, _ := client.RunContainer(ctx, dockerArgs, containerName)
+				runResult, _ := client.RunContainer(ctx, config, containerName, validationResult.HasNpmrc)
 				if !runResult.Success {
 					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", runResult.Error)
 					return fmt.Errorf("failed to run container: %s", runResult.Error)
