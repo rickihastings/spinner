@@ -62,7 +62,6 @@ func execInContainer(t *testing.T, containerName string, command ...string) stri
 }
 
 // TestSetup_BasicBuild tests basic setup scenarios with different configurations
-// Maps to bash tests: 04-successful-build.sh, 05-image-exists.sh, 03-base-image-flag.sh
 func TestSetup_BasicBuild(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -108,7 +107,6 @@ func TestSetup_BasicBuild(t *testing.T) {
 }
 
 // TestSetup_InstalledTools tests that required tools are installed in the created image
-// Maps to bash tests: 06-git-verification.sh, 07-claude-verification.sh
 func TestSetup_InstalledTools(t *testing.T) {
 	tests := []struct {
 		name            string

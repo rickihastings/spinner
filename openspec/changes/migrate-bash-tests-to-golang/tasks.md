@@ -169,14 +169,14 @@
 
 **Goal:** Verify basic spin command end-to-end with real Docker
 
-- [ ] 9.1 Create `tests/integration/spin_test.go`
-- [ ] 9.2 Implement integration test for successful container creation (maps to bash test 06-successful-container-creation.sh)
-- [ ] 9.3 Implement integration test for container naming verification (maps to bash test 07-container-naming.sh)
-- [ ] 9.4 Implement integration test for container running status (maps to bash test 08-container-running.sh)
-- [ ] 9.5 Implement integration test for repository cloning (maps to bash test 09-repository-cloned.sh)
-- [ ] 9.6 Implement integration test for container exec capability (maps to bash test 11-container-exec.sh)
-- [ ] 9.7 Implement integration test for non-existent image error (maps to bash test 03-non-existent-image.sh)
-- [ ] 9.8 Add cleanup logic using `t.Cleanup()` for all integration tests
+- [x] 9.1 Create `tests/integration/spin_test.go`
+- [x] 9.2 Implement integration test for successful container creation (maps to bash test 06-successful-container-creation.sh)
+- [x] 9.3 Implement integration test for container naming verification (maps to bash test 07-container-naming.sh)
+- [x] 9.4 Implement integration test for container running status (maps to bash test 08-container-running.sh)
+- [x] 9.5 Implement integration test for repository cloning (maps to bash test 09-repository-cloned.sh)
+- [x] 9.6 Implement integration test for container exec capability (maps to bash test 11-container-exec.sh)
+- [x] 9.7 Implement integration test for non-existent image error (maps to bash test 03-non-existent-image.sh)
+- [x] 9.8 Add cleanup logic using `t.Cleanup()` for all integration tests
 
 **Validation:** `go test ./tests/integration/spin_test.go -v -run TestSpin_Basic` passes
 
@@ -256,7 +256,7 @@
 - [ ] 13.3 Compare results and verify equivalent coverage
 - [ ] 13.4 Address any discrepancies or failing tests
 - [ ] 13.5 Remove references in docs about bash tests
-- [ ] 13.6 Remove bash tests directory
+- [ ] 13.6 Remove bash tests directories
 - [ ] 13.7 Update test documentation to reference Go tests as primary
 
 **Validation:** All Go tests pass; bash tests deleted; documentation updated
