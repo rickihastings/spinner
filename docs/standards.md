@@ -1,38 +1,14 @@
 # Coding Standards
 
-## SOLID Principles
+## Communication Guidelines
 
-This project follows SOLID principles for maintainable, testable, and scalable code:
+- **Be honest about uncertainty**: Say "I don't know" when uncertain rather than providing incorrect information
+- **Probe for requirements**: Ask clarifying questions about requirements, constraints, and expected behavior before implementing
+- **Avoid assumptions**: When requirements are ambiguous, explicitly state assumptions and ask for confirmation
 
-### Single Responsibility Principle (SRP)
+## Design Principles
 
-- Each function should have one clear, well-defined purpose
-- Each module should have one reason to change
-- Example: `validatePrerequisites()` only validates, `executeDockerRun()` only executes
-
-### Open/Closed Principle (OCP)
-
-- Code should be open for extension, closed for modification
-- Use interfaces and abstractions to allow behavior changes without modifying existing code
-- Example: `SpinConfig` interface allows new fields without changing function signatures
-
-### Liskov Substitution Principle (LSP)
-
-- Subtypes must be substitutable for their base types
-- Return types should be consistent and predictable
-- Example: All validation functions return a result object with consistent structure
-
-### Interface Segregation Principle (ISP)
-
-- Keep interfaces focused and minimal
-- Don't force clients to depend on methods they don't use
-- Example: `ValidationResult`, `ContainerResult` - each interface serves a specific purpose
-
-### Dependency Inversion Principle (DIP)
-
-- Depend on abstractions, not concrete implementations
-- High-level modules should not depend on low-level modules
-- Example: `Spin.tsx` depends on utility function interfaces, not their implementation details
+Follow SOLID principles: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, and Dependency Inversion. Keep functions small and focused with one clear purpose. Depend on abstractions, not implementations.
 
 ## Go Standards
 
@@ -85,9 +61,8 @@ func DoSomething() error {
 
 ### Code Organization
 
-- Place command implementations in `cmd/` package
-- Place business logic in `internal/` packages
-- Keep internal packages focused (e.g., `internal/docker`, `internal/prerequisites`)
+- Commands: `cmd/` package - CLI command implementations
+- Business logic: `internal/` packages - Keep focused (e.g., `internal/docker`, `internal/prerequisites`)
 - Use Go modules for dependency management
 
 ## Code Documentation

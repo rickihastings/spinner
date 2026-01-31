@@ -29,13 +29,7 @@ src/
 
 ## Function Design
 
-- Functions should be small and focused (ideally < 30 lines)
+- Keep functions small and focused (ideally < 30 lines)
 - Use descriptive names that clearly indicate purpose
-- Document complex logic with JSDoc comments
 - Return structured results (interfaces) rather than throwing errors when possible
-
-## Error Handling
-
-- Utility functions return result objects with success/error fields
-- UI components handle error display
 - Preserve error context through the call stack

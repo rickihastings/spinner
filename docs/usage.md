@@ -51,36 +51,28 @@ Configuration values are applied in this order (highest to lowest priority):
 2. Environment variables
 3. Default values
 
-## Development & Debugging
+## Development Workflow
 
-### Running Commands
+### Build and Test
 
-- **Always build before testing**: Run `go build -o dist/spinner` before testing CLI commands to ensure latest changes are compiled
-- **Go build command**: Use `go build -o dist/spinner` to compile the binary
-- **Setup before spin**: When testing the `spin` command, always run `spinner setup` first to ensure the environment is properly configured
-
-### Common Debugging Steps
-
-1. Build the project: `go build -o dist/spinner`
-2. Run setup if needed: `./dist/spinner setup [options]`
-3. Test the command: `./dist/spinner spin [options]`
-4. Check Docker is running: `docker ps` should execute without errors
-5. Verify git repository state: Ensure you're in a git repository with proper configuration
-
-### Testing Workflow
-
-When testing changes to the spin command:
+Always build before testing CLI commands:
 
 ```bash
-# 1. Build the project
+# 1. Build
 go build -o dist/spinner
 
-# 2. Run setup (required before first spin)
+# 2. Setup (required before first spin)
 ./dist/spinner setup --name default
 
-# 3. Test your spin command
+# 3. Test
 ./dist/spinner spin --image default --repo . --prompt "your test prompt"
 ```
+
+### Debugging Checklist
+
+- Docker is running: `docker ps` should execute without errors
+- You're in a git repository with proper configuration
+- The `--image` matches a previous `--name` from setup
 
 ## Working Command Examples
 

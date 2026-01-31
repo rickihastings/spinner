@@ -22,34 +22,27 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 # Project Documentation
 
-This project's documentation is organized into focused guides:
+This project's documentation is organized into focused guides, follow these if you need to understand more about a
+specific subject.
 
-- **@docs/communication.md** - AI assistant communication guidelines and best practices
-- **@docs/usage.md** - Development workflow, package manager, and command examples
-- **@docs/standards.md** - Coding standards, SOLID principles, Go conventions, and git commit format
-- **@docs/system-design.md** - Architecture, code organization, and design patterns
-- **@docs/testing.md** - Testing approach, coverage requirements, and testability guidelines
+- **docs/usage.md** - Development workflow, package manager, and command examples
+- **docs/standards.md** - Coding standards, communication guidelines, Go conventions, and git commit format
+- **docs/system-design.md** - Architecture, code organization, and design patterns
+- **docs/testing.md** - Testing approach, coverage requirements, and testability guidelines
 
 ## Quick Reference
 
 ### Essential Commands
 
 ```bash
-# Build and test workflow
 go build -o dist/spinner
 ./dist/spinner setup --name default
 ./dist/spinner spin --image default --repo . --prompt "your task"
-
-# Or if binary is in PATH
-spinner setup --name default
-spinner spin --image default --repo . --prompt "your task"
 ```
 
 ### Key Principles
 
-- Always use **go build** to compile the binary
 - Build before testing CLI commands
-- Follow SOLID principles
 - All code must have tests
 - Keep functions small and focused
-- Use Go interfaces for clear contracts
+- Follow SOLID principles and Go conventions

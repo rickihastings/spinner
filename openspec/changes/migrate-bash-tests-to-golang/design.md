@@ -94,25 +94,66 @@ type DockerClient interface {
 - Implement cleanup with `t.Cleanup()` or `defer`
 - Use test fixtures for repeatable environments
 
-**Example Structure:**
+**Example Structure (with helper functions to reduce boilerplate):**
 ```go
-func TestSetup_SuccessfulBuild(t *testing.T) {
-    if testing.Short() {
-        t.Skip("skipping integration test")
-    }
+// Helper function encapsulates common setup pattern
+func setupTestImage(t *testing.T, setupArgs ...string) (imageTag string, imageName string) {
+    t.Helper()
+    testutil.SkipIfDockerNotAvailable(t)
+    testutil.BuildCLI(t)
 
-    // Build CLI binary
-    buildCLI(t)
-
-    // Run setup command
-    output := runCommand(t, "setup", "--name", "test-env")
-
-    // Verify image exists
-    assert.True(t, dockerImageExists(t, "spinner:test-env"))
+    imageTag = testutil.GenerateTestImageTag(t)
+    imageName = "spinner:" + imageTag
 
     t.Cleanup(func() {
-        removeDockerImage(t, "spinner:test-env")
+        testutil.RemoveDockerImage(t, imageName)
     })
+
+    args := append([]string{"setup", "--name", imageTag}, setupArgs...)
+    testutil.RunCommandExpectSuccess(t, args...)
+
+    return imageTag, imageName
+}
+
+// Test uses helper to eliminate boilerplate
+func TestSetup_BasicBuild(t *testing.T) {
+    tests := []struct {
+        name       string
+        setupArgs  []string
+        wantOutput string
+    }{
+        {
+            name:       "default base image",
+            setupArgs:  []string{},
+            wantOutput: "Docker image built successfully",
+        },
+        {
+            name:       "custom base image",
+            setupArgs:  []string{"--base-image", "ubuntu:22.04"},
+            wantOutput: "Docker image built successfully",
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            testutil.SkipIfDockerNotAvailable(t)
+            testutil.BuildCLI(t)
+
+            imageTag := testutil.GenerateTestImageTag(t)
+            imageName := "spinner:" + imageTag
+
+            t.Cleanup(func() {
+                testutil.RemoveDockerImage(t, imageName)
+            })
+
+            args := append([]string{"setup", "--name", imageTag}, tt.setupArgs...)
+            stdout, stderr := testutil.RunCommandExpectSuccess(t, args...)
+            output := stdout + stderr
+
+            assert.Contains(t, output, tt.wantOutput, "should show success message")
+            assert.True(t, testutil.DockerImageExists(t, imageName), "Docker image should exist")
+        })
+    }
 }
 ```
 
@@ -168,21 +209,37 @@ func NewSetupCommand(client DockerClient) *cobra.Command {
 ```
 tests/
 ├── testutil/
-│   ├── docker.go       # Docker test helpers
+│   ├── docker.go       # Docker test helpers (low-level utilities)
 │   ├── cli.go          # CLI execution helpers
 │   ├── fixtures.go     # Test data and fixtures
-│   └── assertions.go   # Custom assertions
+│   └── assertions.go   # Custom assertions (if needed)
 └── integration/
-    ├── setup_test.go
-    └── spin_test.go
+    ├── setup_test.go   # Includes setup-specific helpers
+    └── spin_test.go    # Includes spin-specific helpers
 ```
 
-**Utilities:**
-- `buildCLI(t)` - Build binary for integration tests
-- `runCommand(t, args...)` - Execute CLI and capture output
-- `dockerImageExists(t, image)` - Check image existence
-- `dockerContainerRunning(t, name)` - Check container status
-- `cleanup(t, resources...)` - Resource cleanup
+**Utilities (testutil package):**
+- `BuildCLI(t)` - Build binary for integration tests
+- `RunCommand(t, args...)` - Execute CLI and capture output
+- `RunCommandExpectSuccess(t, args...)` - Execute CLI and require success
+- `DockerImageExists(t, image)` - Check image existence
+- `DockerContainerRunning(t, name)` - Check container status
+- `RemoveDockerImage(t, image)` - Remove Docker image
+- `RemoveDockerContainer(t, name)` - Remove Docker container
+- `GenerateTestImageTag(t)` - Generate unique image tag
+- `SkipIfDockerNotAvailable(t)` - Skip test if Docker unavailable
+
+**Test-Specific Helpers (in test files):**
+Integration tests should define helper functions to reduce boilerplate:
+- `setupTestImage(t, args...)` - Build image with common setup/cleanup
+- `runContainerWithImage(t, imageName)` - Start container with cleanup
+- `execInContainer(t, containerName, cmd...)` - Execute command in container
+
+**Principle: Prefer Helper Functions Over Duplication**
+- Extract common setup patterns into helper functions
+- Use table-driven tests for similar scenarios with different inputs
+- Keep test helpers in the same file as tests (not in testutil) when they're specific to that test suite
+- Only promote helpers to testutil when they're genuinely reusable across multiple test files
 
 ## Migration Strategy
 
@@ -210,6 +267,112 @@ tests/
 3. Document any gaps or additional tests added
 4. Update CI/CD to run Go tests
 5. Deprecate bash tests (keep for reference)
+
+## Reducing Boilerplate in Tests
+
+**Principle:** Integration tests should focus on what's unique about each test case, not repeat common setup/teardown code.
+
+### Helper Functions Pattern
+
+Create helper functions within test files to encapsulate common patterns:
+
+```go
+// Helper: Setup image with automatic cleanup
+func setupTestImage(t *testing.T, setupArgs ...string) (imageTag string, imageName string) {
+    t.Helper()
+    testutil.SkipIfDockerNotAvailable(t)
+    testutil.BuildCLI(t)
+
+    imageTag = testutil.GenerateTestImageTag(t)
+    imageName = "spinner:" + imageTag
+
+    t.Cleanup(func() {
+        testutil.RemoveDockerImage(t, imageName)
+    })
+
+    args := append([]string{"setup", "--name", imageTag}, setupArgs...)
+    testutil.RunCommandExpectSuccess(t, args...)
+
+    return imageTag, imageName
+}
+
+// Helper: Run container with cleanup
+func runContainerWithImage(t *testing.T, imageName string) string {
+    t.Helper()
+    containerName := testutil.GenerateTestContainerName(t)
+
+    t.Cleanup(func() {
+        testutil.RemoveDockerContainer(t, containerName)
+    })
+
+    cmd := exec.Command("docker", "run", "-d", "--name", containerName, imageName, "tail", "-f", "/dev/null")
+    require.NoError(t, cmd.Run(), "should start container")
+
+    return containerName
+}
+
+// Helper: Execute command in container
+func execInContainer(t *testing.T, containerName string, command ...string) string {
+    t.Helper()
+    args := append([]string{"exec", containerName}, command...)
+    cmd := exec.Command("docker", args...)
+    output, err := cmd.Output()
+    require.NoError(t, err, "command should succeed in container")
+
+    return string(output)
+}
+```
+
+### Using Helpers in Tests
+
+With helpers, tests become concise and focused:
+
+```go
+func TestSetup_InstalledTools(t *testing.T) {
+    tests := []struct {
+        name            string
+        command         []string
+        wantOutputMatch string
+    }{
+        {
+            name:            "git installed",
+            command:         []string{"git", "--version"},
+            wantOutputMatch: "git version",
+        },
+        {
+            name:            "claude installed",
+            command:         []string{"claude", "--version"},
+            wantOutputMatch: "",
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            _, imageName := setupTestImage(t)                    // Helper handles setup+cleanup
+            containerName := runContainerWithImage(t, imageName) // Helper handles container+cleanup
+            output := execInContainer(t, containerName, tt.command...) // Helper handles exec
+
+            if tt.wantOutputMatch != "" {
+                assert.Contains(t, strings.ToLower(output), tt.wantOutputMatch)
+            }
+
+            assert.NotEmpty(t, output)
+        })
+    }
+}
+```
+
+### When to Create Helpers
+
+**Create a helper when:**
+- The same setup pattern appears in 2+ tests
+- Setup involves multiple steps that always go together
+- Cleanup logic needs to be paired with setup
+
+**Don't create a helper when:**
+- It's only used once
+- It obscures what the test is actually doing
+- The abstraction is leaky or confusing
 
 ## Test Naming Conventions
 
