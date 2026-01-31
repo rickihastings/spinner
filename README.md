@@ -2,6 +2,8 @@
 
 Run Claude agents in sandboxed Docker containers, unsupervised. Built for autonomous agent loops where you want isolation, reproducibility, and hands-off execution.
 
+Unlike opinionated agent frameworks, Spinner doesn't dictate how you structure your prompts, specs, or tasks—bring whatever workflow suits your project. And because you control the Docker environment through your own Dockerfile, you can build on any stack: Node, Python, Go, Rust, or anything else you need.
+
 ## Why Spinner?
 
 When running autonomous AI agents (like Ralph loops), you want:
