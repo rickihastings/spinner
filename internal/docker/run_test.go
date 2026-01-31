@@ -235,11 +235,6 @@ func TestExtractRepoName(t *testing.T) {
 	}
 }
 
-// NOTE: BuildDockerRunCommand tests were removed as the function was replaced
-// by buildContainerConfigs (internal to client.go). The logic is now tested
-// indirectly through RunContainer.
-
-
 // TestConvertSshToHttps tests SSH to HTTPS URL conversion
 func TestConvertSshToHttps(t *testing.T) {
 	tests := []struct {
