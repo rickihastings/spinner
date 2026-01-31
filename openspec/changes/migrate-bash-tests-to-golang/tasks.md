@@ -111,17 +111,17 @@
 
 **Goal:** Test spin command validation and logic without Docker
 
-- [ ] 6.1 Create `cmd/spin_test.go` with test suite skeleton
-- [ ] 6.2 Implement test for missing --image flag validation (maps to bash test 01-missing-image-flag.sh)
-- [ ] 6.3 Implement test for missing --repo flag validation (maps to bash test 02-missing-repo-flag.sh)
-- [ ] 6.4 Implement test for --prompt flag parsing
-- [ ] 6.5 Implement test for --branch flag parsing
-- [ ] 6.6 Implement test for --max-iterations flag parsing and default value (maps to bash test 14-max-iterations-default.sh)
-- [ ] 6.7 Implement test for --recreate flag parsing (maps to bash test 18-recreate-flag.sh)
-- [ ] 6.8 Implement test for --setup flag parsing and validation
-- [ ] 6.9 Implement test for --setup with --base-image validation (maps to bash test 22-setup-flag-required-for-base-image.sh)
-- [ ] 6.10 Implement test for --setup with mutually exclusive flags (maps to bash test 21-setup-mutually-exclusive-flags.sh)
-- [ ] 6.11 Create table-driven test for all flag combinations
+- [x] 6.1 Create `cmd/spin_test.go` with test suite skeleton
+- [x] 6.2 Implement test for missing --image flag validation (maps to bash test 01-missing-image-flag.sh)
+- [x] 6.3 Implement test for missing --repo flag validation (maps to bash test 02-missing-repo-flag.sh)
+- [x] 6.4 Implement test for --prompt flag parsing
+- [x] 6.5 Implement test for --branch flag parsing
+- [x] 6.6 Implement test for --max-iterations flag parsing and default value (maps to bash test 14-max-iterations-default.sh)
+- [x] 6.7 Implement test for --recreate flag parsing (maps to bash test 18-recreate-flag.sh)
+- [x] 6.8 Implement test for --setup flag parsing and validation
+- [x] 6.9 Implement test for --setup with --base-image validation (maps to bash test 22-setup-flag-required-for-base-image.sh)
+- [x] 6.10 Implement test for --setup with mutually exclusive flags (maps to bash test 21-setup-mutually-exclusive-flags.sh)
+- [x] 6.11 Create table-driven test for all flag combinations
 
 **Validation:** `go test ./cmd/spin_test.go -v` passes with 100% coverage of validation logic
 
