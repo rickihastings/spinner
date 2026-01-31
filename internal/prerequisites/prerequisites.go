@@ -82,16 +82,3 @@ func CheckEnvironmentVariables() error {
 
 	return nil
 }
-
-// CheckAllPrerequisites verifies both tools and environment variables.
-func CheckAllPrerequisites() error {
-	if err := CheckPrerequisites(); err != nil {
-		return err
-	}
-
-	if err := CheckEnvironmentVariables(); err != nil {
-		return err
-	}
-
-	return nil
-}
