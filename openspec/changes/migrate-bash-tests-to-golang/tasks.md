@@ -92,14 +92,14 @@
 
 **Goal:** Verify setup command end-to-end with real Docker
 
-- [ ] 5.1 Create `tests/integration/setup_test.go`
-- [ ] 5.2 Implement integration test for successful image build (maps to bash test 04-successful-build.sh)
-- [ ] 5.3 Implement integration test for image existence verification (maps to bash test 05-image-exists.sh)
-- [ ] 5.4 Implement integration test for git installation verification (maps to bash test 06-git-verification.sh)
-- [ ] 5.5 Implement integration test for claude-code installation verification (maps to bash test 07-claude-verification.sh)
-- [ ] 5.6 Implement integration test for custom base-image flag (maps to bash test 03-base-image-flag.sh)
-- [ ] 5.7 Add cleanup logic using `t.Cleanup()` for all integration tests
-- [ ] 5.8 Verify all setup bash tests have Go equivalents (cross-reference)
+- [x] 5.1 Create `tests/integration/setup_test.go`
+- [x] 5.2 Implement integration test for successful image build (maps to bash test 04-successful-build.sh)
+- [x] 5.3 Implement integration test for image existence verification (maps to bash test 05-image-exists.sh)
+- [x] 5.4 Implement integration test for git installation verification (maps to bash test 06-git-verification.sh)
+- [x] 5.5 Implement integration test for claude-code installation verification (maps to bash test 07-claude-verification.sh)
+- [x] 5.6 Implement integration test for custom base-image flag (maps to bash test 03-base-image-flag.sh)
+- [x] 5.7 Add cleanup logic using `t.Cleanup()` for all integration tests
+- [x] 5.8 Verify all setup bash tests have Go equivalents (cross-reference)
 
 **Validation:** `go test ./tests/integration/setup_test.go -v` passes and creates/cleans Docker images
 

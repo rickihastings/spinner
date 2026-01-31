@@ -18,9 +18,18 @@ func GenerateTestID(t *testing.T) string {
 }
 
 // GenerateTestImageName creates a unique Docker image name for testing
+// Returns the full image name (repository:tag format)
 func GenerateTestImageName(t *testing.T) string {
 	t.Helper()
 	return fmt.Sprintf("spinner:test-%d", time.Now().Unix())
+}
+
+// GenerateTestImageTag creates a unique Docker image tag for testing
+// Returns just the tag part (without the "spinner:" prefix)
+// Use this with the setup command's --name flag
+func GenerateTestImageTag(t *testing.T) string {
+	t.Helper()
+	return fmt.Sprintf("test-%d", time.Now().Unix())
 }
 
 // GenerateTestContainerName creates a unique Docker container name for testing
