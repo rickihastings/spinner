@@ -1,180 +1,145 @@
 # Spinner
 
-CLI tool for running code in isolated Docker containers.
+Run Claude agents in sandboxed Docker containers, unsupervised. Built for autonomous agent loops where you want isolation, reproducibility, and hands-off execution.
 
-## Features
+## Why Spinner?
 
-- **Setup Command**: Build Docker sandbox images with custom base images or Dockerfiles
-- **Spin Command**: Spin up development containers from pre-built images with repository cloning
+When running autonomous AI agents (like Ralph loops), you want:
 
-## Installation
+- **Isolation** - Agents run in ephemeral Docker containers, so they can't affect your host system
+- **Reproducibility** - Same container image, same environment, every time
+- **Hands-off execution** - Start a task and walk away; the agent works until it's done or hits the iteration limit
+
+Spinner handles the container orchestration so you can focus on the prompts.
+
+## Quick Start
 
 ### Prerequisites
 
-- Docker
-- Git
-- Go 1.21+ (for building from source)
-- GitHub Personal Access Token (for spin command)
+- Docker (running)
+- Go 1.21+ (for building)
+- `GITHUB_TOKEN` environment variable (for cloning repos)
+- `CLAUDE_CODE_OAUTH_TOKEN` environment variable (for the agent)
 
-### Build from Source
+### Build
 
 ```bash
-# Clone the repository
 git clone https://github.com/rickihastings/spinner.git
 cd spinner
-
-# Build the binary
 go build -o dist/spinner
-
-# Optional: Install globally
-cp dist/spinner /usr/local/bin/spinner
-# Or add dist/ to your PATH
 ```
 
-### Quick Install
+### Create a Sandbox Image
 
 ```bash
-go build -o dist/spinner
-# Then use ./dist/spinner or copy to your PATH
+./dist/spinner setup --name default
 ```
 
-## Usage
+This builds a Docker image with Claude Code and git pre-installed.
 
-### Setup Command
-
-Build a Docker sandbox image with a custom base image or Dockerfile:
-
-```bash
-spinner setup --name my-sandbox [--base-image <image> | --dockerfile <path>]
-```
-
-The setup command ensures git and claude-code are installed in the final image. You can:
-
-- Use the default ubuntu:22.04 base (no flags needed)
-- Specify a custom base image with `--base-image`
-- Provide your own Dockerfile with `--dockerfile`
-
-**Note**: Only Ubuntu/Debian-based images are supported (requires apt-get).
-
-Examples:
-
-```bash
-# Use default ubuntu:22.04 base
-spinner setup --name my-env
-
-# Use a Node.js base image
-spinner setup --name node-env --base-image node:20-bullseye
-
-# Use a custom Dockerfile
-spinner setup --name custom-env --dockerfile ./Dockerfile.custom
-```
-
-### Spin Command
-
-Spin up a development container with a cloned repository:
-
-```bash
-export GITHUB_TOKEN=<your-github-token>
-spinner spin --image <docker-image> --repo <git-url>
-```
-
-Example:
+### Run an Agent
 
 ```bash
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-spinner spin --image spinner:my-env --repo https://github.com/octocat/Hello-World.git
+export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
+
+./dist/spinner spin \
+  --image default \
+  --repo https://github.com/your-org/your-repo \
+  --prompt "implement the feature described in TASKS.md"
 ```
 
-The container will:
+The agent will clone the repo, start working, and continue until it signals completion or hits the iteration limit.
 
-- Use GitHub Personal Access Token for git authentication
-- Mount your ~/.npmrc for npm registry access
-- Clone the repository into /home/spinner/workspace
-- Run in the background for multiple exec sessions
+## Writing Effective Prompts
 
-Access the container:
+**Spec-driven development works best.** Point the agent at a specification file, design doc, or task list in your repo:
+
+```bash
+--prompt "implement the changes described in specs/feature-x.md"
+```
+
+**Task lists are also effective.** If you don't have a spec, a clear task list in your prompt works well:
+
+```bash
+--prompt "1. Add user authentication 2. Create login page 3. Add session management 4. Write tests"
+```
+
+The more context you provide upfront, the better the agent performs autonomously.
+
+## Command Reference
+
+### setup
+
+Build a sandbox Docker image:
+
+```bash
+# Default Ubuntu base
+./dist/spinner setup --name my-env
+
+# Custom base image
+./dist/spinner setup --name node-env --base-image node:20-bullseye
+
+# Custom Dockerfile
+./dist/spinner setup --name custom-env --dockerfile ./Dockerfile.custom
+```
+
+### spin
+
+Launch a container and optionally start an agent:
+
+```bash
+./dist/spinner spin \
+  --image <image-name> \
+  --repo <git-url> \
+  [--prompt "task description"] \
+  [--branch feature-branch] \
+  [--max-iterations 50] \
+  [--recreate]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--image` | Docker image from setup (required) |
+| `--repo` | Git repository URL (required) |
+| `--prompt` | Task for the agent; if omitted, container stays idle |
+| `--branch` | Git branch to checkout |
+| `--max-iterations` | Stop after N iterations (default: 30) |
+| `--recreate` | Force fresh container, removing any existing one |
+
+### Container Access
+
+Containers persist after the agent finishes. Access them directly:
 
 ```bash
 docker exec -it <container-name> bash
 ```
 
-#### GitHub Token Setup
+Container names are deterministic: `spinner-<image>-<repo>[-branch]`
 
-To use the spin command, you need a GitHub Personal Access Token:
+## Ephemeral by Design
 
-1. Generate a token at https://github.com/settings/tokens
-2. Required scopes:
-    - `repo` - Full control of private repositories (required for private repos)
-    - For public repos only, no scopes are technically required, but `public_repo` is recommended
-3. Set the token as an environment variable:
-   ```bash
-   export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-   ```
+Spinner containers are meant to be disposable. When you're done:
 
-**Security Note**: The token is passed to the container via environment variable (not CLI flag) to prevent exposure in
-bash history.
+```bash
+docker stop <container-name>
+docker rm <container-name>
+```
+
+Or use `--recreate` on the next run to start fresh.
 
 ## Development
 
-### Building
+For contributing to Spinner itself, see the development documentation:
 
-```bash
-# Build the binary
-go build -o dist/spinner
-
-# Build with specific flags
-go build -ldflags "-s -w" -o dist/spinner  # Smaller binary
-```
-
-### Testing
-
-The project uses Go's native testing framework with both unit and integration tests.
-
-```bash
-# Run all tests (unit + integration)
-go test ./...
-
-# Run only unit tests (fast, no Docker required)
-go test -short ./...
-
-# Run only integration tests (requires Docker)
-go test ./tests/integration/...
-
-# Run with coverage
-go test -cover ./...
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out -o coverage.html
-```
-
-**Prerequisites for integration tests:**
-- Docker installed and running
-- `GITHUB_TOKEN` environment variable set
-- `CLAUDE_CODE_OAUTH_TOKEN` environment variable set
-
-See [tests/README.md](tests/README.md) for comprehensive testing documentation.
-
-## Project Structure
-
-```
-.
-├── cmd/                    # Command implementations (Cobra commands)
-│   ├── root.go            # Root command with version and help
-│   ├── setup.go           # Setup command implementation
-│   └── spin.go            # Spin command implementation
-├── internal/              # Internal packages (not importable by external projects)
-│   ├── docker/            # Docker operations and Dockerfile generation
-│   └── prerequisites/     # Prerequisite checking logic
-├── dist/                  # Build output directory
-│   └── spinner           # Compiled binary
-├── tests/                 # Integration tests
-├── docs/                  # Documentation
-└── main.go               # Entry point
-
-```
+- [docs/usage.md](docs/usage.md) - Development workflow and commands
+- [docs/standards.md](docs/standards.md) - Coding standards and conventions
+- [docs/testing.md](docs/testing.md) - Testing approach and requirements
+- [docs/system-design.md](docs/system-design.md) - Architecture overview
 
 ## Requirements
 
 - Docker
-- Git
-- Go 1.21+ (for building)
-- GitHub Personal Access Token (for spin command)
+- Go 1.21+
+- GitHub Personal Access Token
+- Claude Code OAuth Token
