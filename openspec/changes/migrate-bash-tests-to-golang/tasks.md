@@ -133,14 +133,14 @@
 
 **Goal:** Test Docker container operations with mocked client
 
-- [ ] 7.1 Create `internal/docker/run_test.go`
-- [ ] 7.2 Implement test for successful container creation
-- [ ] 7.3 Implement test for container naming logic (maps to bash test 07-container-naming.sh)
-- [ ] 7.4 Implement test for container name sanitization (maps to bash test 17-name-sanitization.sh)
-- [ ] 7.5 Implement test for deterministic naming with branch (maps to bash test 16-deterministic-naming-with-branch.sh)
-- [ ] 7.6 Implement test for container reuse logic (maps to bash test 14-reuse-running-container.sh)
-- [ ] 7.7 Implement test for container recreation logic (maps to bash test 15-restart-stopped-container.sh)
-- [ ] 7.8 Create table-driven test for various naming scenarios
+- [x] 7.1 Create `internal/docker/run_test.go`
+- [x] 7.2 Implement test for successful container creation
+- [x] 7.3 Implement test for container naming logic (maps to bash test 07-container-naming.sh)
+- [x] 7.4 Implement test for container name sanitization (maps to bash test 17-name-sanitization.sh)
+- [x] 7.5 Implement test for deterministic naming with branch (maps to bash test 16-deterministic-naming-with-branch.sh)
+- [x] 7.6 Implement test for container reuse logic (maps to bash test 14-reuse-running-container.sh)
+- [x] 7.7 Implement test for container recreation logic (maps to bash test 15-restart-stopped-container.sh)
+- [x] 7.8 Create table-driven test for various naming scenarios
 
 **Validation:** `go test ./internal/docker/run_test.go -v` passes
 

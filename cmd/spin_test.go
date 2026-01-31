@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rickihastings/spinner/internal/docker"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -50,6 +51,21 @@ func (m *MockDockerClient) RestartContainer(ctx context.Context, containerName s
 	return args.Get(0).(docker.ContainerResult), args.Error(1)
 }
 
+func setupSpinCommandWithMocks() *cobra.Command {
+	mockClient := new(MockDockerClient)
+	cmd := NewSpinCommand(mockClient)
+
+	// Mock the prerequisites validation to pass
+	mockClient.On("ImageExists", mock.Anything, "spinner:test").Return(true, nil)
+
+	// Mock container operations
+	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusNone, nil)
+	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+
+	return cmd
+}
+
 // TestSpinCommand_MissingImageFlag tests that spin command fails when --image flag is missing
 func TestSpinCommand_MissingImageFlag(t *testing.T) {
 	mockClient := new(MockDockerClient)
@@ -84,16 +100,7 @@ func TestSpinCommand_MissingRepoFlag(t *testing.T) {
 
 // TestSpinCommand_PromptFlagParsing tests that --prompt flag is correctly parsed
 func TestSpinCommand_PromptFlagParsing(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
-
-	// Mock the prerequisites validation to pass
-	mockClient.On("ImageExists", mock.Anything, "spinner:test").Return(true, nil)
-
-	// Mock container operations
-	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusNone, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	cmd := setupSpinCommandWithMocks()
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -108,16 +115,7 @@ func TestSpinCommand_PromptFlagParsing(t *testing.T) {
 
 // TestSpinCommand_BranchFlagParsing tests that --branch flag is correctly parsed
 func TestSpinCommand_BranchFlagParsing(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
-
-	// Mock the prerequisites validation to pass
-	mockClient.On("ImageExists", mock.Anything, "spinner:test").Return(true, nil)
-
-	// Mock container operations
-	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusNone, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	cmd := setupSpinCommandWithMocks()
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -131,16 +129,7 @@ func TestSpinCommand_BranchFlagParsing(t *testing.T) {
 
 // TestSpinCommand_MaxIterationsFlagParsing tests that --max-iterations flag is correctly parsed
 func TestSpinCommand_MaxIterationsFlagParsing(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
-
-	// Mock the prerequisites validation to pass
-	mockClient.On("ImageExists", mock.Anything, "spinner:test").Return(true, nil)
-
-	// Mock container operations
-	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusNone, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	cmd := setupSpinCommandWithMocks()
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
