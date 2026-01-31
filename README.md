@@ -128,17 +128,44 @@ go build -ldflags "-s -w" -o dist/spinner  # Smaller binary
 
 ### Testing
 
-Run the complete test suite:
+The project uses Go's native testing framework with both unit and integration tests.
+
+```bash
+# Run all tests (unit + integration)
+go test ./...
+
+# Run only unit tests (fast, no Docker required)
+go test -short ./...
+
+# Run only integration tests (requires Docker)
+go test ./tests/integration/...
+
+# Run with coverage
+go test -cover ./...
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+```
+
+**Prerequisites for integration tests:**
+- Docker installed and running
+- `GITHUB_TOKEN` environment variable set
+- `ANTHROPIC_API_KEY` environment variable set
+
+See [tests/README.md](tests/README.md) for comprehensive testing documentation.
+
+#### Legacy Bash Tests (Deprecated)
+
+The project previously used bash tests which have been migrated to Go. Legacy bash tests can still be run:
 
 ```bash
 # Build first
 go build -o dist/spinner
 
-# Run all tests
+# Run bash tests
 ./tests/run.sh
 ```
 
-See [tests/README.md](tests/README.md) for more details.
+**Note:** Bash tests are deprecated and will be removed. Use Go tests for all testing needs.
 
 ## Project Structure
 

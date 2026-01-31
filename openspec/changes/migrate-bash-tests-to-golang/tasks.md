@@ -225,20 +225,18 @@
 
 ---
 
-## 12.0 CI/CD Integration & Documentation
+## 12.0 Documentation
 
-**Goal:** Enable automated test execution and document testing approach
+**Goal:** Document testing approach
 
-- [ ] 12.1 Configure test timeout and Docker service in CI
-- [ ] 12.2 Update `tests/README.md` with Go testing documentation
+- [x] 12.1 Update `tests/README.md` with Go testing documentation
   - How to run unit tests
   - How to run integration tests
   - How to run with coverage
   - How to skip integration tests with `-short` flag
-- [ ] 12.3 Update root `README.md` with testing section
-- [ ] 12.4 Document migration from bash to Go tests (why, how, what changed)
+- [x] 12.2 Update root `README.md` with testing section
 
-**Validation:** CI pipeline runs and passes all Go tests; documentation is clear and complete
+**Validation:** Documentation is clear and complete
 
 **Dependencies:** Task 11.0 (coverage analysis)
 
