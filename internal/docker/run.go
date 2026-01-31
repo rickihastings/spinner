@@ -79,14 +79,6 @@ func convertSshToHttps(repoURL string) string {
 	return repoURL
 }
 
-// ValidatePrerequisites validates prerequisites for spinning up a container.
-// Checks: Docker image exists, valid git repo URL, GITHUB_TOKEN is set, CLAUDE_CODE_OAUTH_TOKEN is set, npmrc availability.
-// This is a convenience function that uses the default RealDockerClient.
-func ValidatePrerequisites(config SpinConfig) ValidationResult {
-	client := NewRealDockerClient()
-	return ValidatePrerequisitesWithClient(context.Background(), client, config)
-}
-
 // ValidatePrerequisitesWithClient validates prerequisites using a provided DockerClient.
 func ValidatePrerequisitesWithClient(ctx context.Context, client DockerClient, config SpinConfig) ValidationResult {
 	warnings := []string{}
@@ -249,15 +241,6 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 	return dockerArgs, nil
 }
 
-// ExecuteDockerRun executes the docker run command.
-// This is a convenience function that uses the default RealDockerClient.
-func ExecuteDockerRun(dockerArgs []string, containerName string) ContainerResult {
-	client := NewRealDockerClient()
-	result, _ := client.RunContainer(context.Background(), dockerArgs, containerName)
-
-	return result
-}
-
 // VerifyContainerStatus verifies that the container is running.
 // This is a convenience function that uses the default RealDockerClient.
 func VerifyContainerStatus(containerName string) ContainerResult {
@@ -265,18 +248,6 @@ func VerifyContainerStatus(containerName string) ContainerResult {
 	result, _ := client.VerifyContainerStatus(context.Background(), containerName)
 
 	return result
-}
-
-// CheckContainerExists checks if a container exists and returns its status.
-// Returns 'running' if container exists and is running,
-// 'stopped' if container exists but is not running,
-// 'none' if container does not exist.
-// This is a convenience function that uses the default RealDockerClient.
-func CheckContainerExists(containerName string) ContainerStatus {
-	client := NewRealDockerClient()
-	status, _ := client.ContainerExists(context.Background(), containerName)
-
-	return status
 }
 
 // RestartContainer restarts a stopped container.

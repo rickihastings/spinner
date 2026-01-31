@@ -10,6 +10,35 @@
 
 Follow SOLID principles: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, and Dependency Inversion. Keep functions small and focused with one clear purpose. Depend on abstractions, not implementations.
 
+## Code Integration Policy
+
+**Principle: Integrate or don't implement. No dead code, no "just in case" code.**
+
+- ✅ **Integrate immediately**: If code serves a current need, integrate and use it right away
+- ✅ **Skip implementation**: If there's no current use case, don't write it at all
+- ❌ **No "just in case" code**: Don't create unused functions for hypothetical future needs
+- ❌ **No dead code**: Remove unused code rather than leaving it around
+- 📝 **Document decisions**: When removing code or deciding not to implement something, document why
+
+**Rationale**: Dead code creates maintenance burden, confusion, and false assumptions about what's actually used. If we need functionality later, we can implement it then with full context of the actual requirements.
+
+**Example**:
+```go
+// ❌ Bad: Creating unused helper "just in case"
+func CheckAllPrerequisites() error {
+    // Not called anywhere, keeping for potential future use
+}
+
+// ✅ Good: Only implement what's needed now
+func CheckPrerequisites() error {
+    // Used in setup command
+}
+
+func CheckEnvironmentVariables() error {
+    // Used in spin command validation
+}
+```
+
 ## Go Standards
 
 ### Type Safety and Conventions
