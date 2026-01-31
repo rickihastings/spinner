@@ -67,6 +67,54 @@ The agent will clone the repo, start working, and continue until it signals comp
 
 The more context you provide upfront, the better the agent performs autonomously.
 
+## Optimizing Agent Performance
+
+### Minimize Context Window Bloat
+
+Long-running agents accumulate context, leading to degraded performance and hallucinations. Structure your tasks to keep context windows fresh:
+
+**Work in vertical slices.** Instruct your agent to complete tasks one at a time:
+
+```
+For each task:
+1. Implement the change
+2. Add tests
+3. Run formatting and linting
+4. Verify tests pass
+5. Commit
+6. Move to next task
+```
+
+This pattern keeps each unit of work small and verifiable.
+
+### Use Back Pressure for Correctness
+
+Configure your project with automated checks that run on each iteration:
+
+- **Formatting** (prettier, gofmt, black)
+- **Linting** (eslint, golangci-lint, ruff)
+- **Type checking** (tsc, mypy)
+- **Tests** (unit → integration → e2e)
+
+When these checks fail, the agent must fix issues before proceeding. This "back pressure" forces correctness and naturally segments work into smaller context windows.
+
+Spinner automatically pushes changes after each iteration, so progress is preserved even if the agent needs to restart with a fresh context.
+
+### Example Task Structure
+
+```markdown
+## Tasks
+
+Work through each task individually. After completing each one, run the
+test suite, fix any failures, then commit before moving to the next task.
+
+1. Add user model with email validation
+2. Create registration endpoint
+3. Add login endpoint with JWT tokens
+4. Implement session middleware
+5. Add integration tests for auth flow
+```
+
 ## Command Reference
 
 ### setup
