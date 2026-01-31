@@ -149,23 +149,9 @@ go tool cover -html=coverage.out -o coverage.html
 **Prerequisites for integration tests:**
 - Docker installed and running
 - `GITHUB_TOKEN` environment variable set
-- `ANTHROPIC_API_KEY` environment variable set
+- `CLAUDE_CODE_OAUTH_TOKEN` environment variable set
 
 See [tests/README.md](tests/README.md) for comprehensive testing documentation.
-
-#### Legacy Bash Tests (Deprecated)
-
-The project previously used bash tests which have been migrated to Go. Legacy bash tests can still be run:
-
-```bash
-# Build first
-go build -o dist/spinner
-
-# Run bash tests
-./tests/run.sh
-```
-
-**Note:** Bash tests are deprecated and will be removed. Use Go tests for all testing needs.
 
 ## Project Structure
 

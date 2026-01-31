@@ -15,7 +15,7 @@
     "format": "go fmt ./...",
     "format:check": "test -z $(gofmt -l .)",
     "lint": "go vet ./... && $(go env GOPATH)/bin/golangci-lint run",
-    "test": "go build -o dist/spinner && bash tests/run.sh",
+    "test": "go build -o dist/spinner && go test ./...",
     "prepare": "husky"
   },
   "devDependencies": {

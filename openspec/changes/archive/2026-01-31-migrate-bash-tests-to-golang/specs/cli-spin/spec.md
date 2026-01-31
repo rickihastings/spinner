@@ -92,7 +92,7 @@ The prerequisite validation SHALL have unit tests that verify all required token
 - **THEN** the test SHALL verify an error is returned indicating missing GitHub token
 
 #### Scenario: Test Claude token validation
-- **GIVEN** ANTHROPIC_API_KEY environment variable is not set
+- **GIVEN** CLAUDE_CODE_OAUTH_TOKEN environment variable is not set
 - **WHEN** prerequisites are checked
 - **THEN** the test SHALL verify an error is returned indicating missing Anthropic API key
 

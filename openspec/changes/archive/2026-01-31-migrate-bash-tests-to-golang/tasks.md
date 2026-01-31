@@ -246,13 +246,13 @@
 
 **Goal:** Validate Go tests match bash test behavior and deprecate bash tests
 
-- [ ] 13.1 Run all bash tests: `./tests/run.sh`
-- [ ] 13.2 Run all Go tests: `go test ./...`
-- [ ] 13.3 Compare results and verify equivalent coverage
-- [ ] 13.4 Address any discrepancies or failing tests
-- [ ] 13.5 Remove references in docs about bash tests
-- [ ] 13.6 Remove bash tests directories
-- [ ] 13.7 Update test documentation to reference Go tests as primary
+- [x] 13.1 Run all bash tests: `./tests/run.sh`
+- [x] 13.2 Run all Go tests: `go test ./...`
+- [x] 13.3 Compare results and verify equivalent coverage
+- [x] 13.4 Address any discrepancies or failing tests
+- [x] 13.5 Remove references in docs about bash tests
+- [x] 13.6 Remove bash tests directories
+- [x] 13.7 Update test documentation to reference Go tests as primary
 
 **Validation:** All Go tests pass; bash tests deleted; documentation updated
 

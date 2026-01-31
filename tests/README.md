@@ -41,8 +41,6 @@ tests/
 │   ├── cli.go           # CLI execution helpers
 │   ├── docker.go        # Docker test helpers
 │   └── fixtures.go      # Test fixtures and utilities
-├── setup/               # [DEPRECATED] Bash setup tests
-├── spin/                # [DEPRECATED] Bash spin tests
 └── README.md            # This file
 
 cmd/
@@ -102,7 +100,7 @@ go test ./tests/integration/...
 **Prerequisites:**
 - Docker installed and running
 - `GITHUB_TOKEN` environment variable set
-- `ANTHROPIC_API_KEY` environment variable set
+- `CLAUDE_CODE_OAUTH_TOKEN` environment variable set
 
 **Examples:**
 - `setup_test.go` - Setup command end-to-end (image building, verification)
@@ -343,7 +341,7 @@ Integration tests require:
 2. **Environment Variables** - For Git and Claude operations
    ```bash
    export GITHUB_TOKEN="your-github-token"
-   export ANTHROPIC_API_KEY="your-claude-api-key"
+   export CLAUDE_CODE_OAUTH_TOKEN="your-claude-api-key"
    ```
 
 3. **Go Binary Built** - Tests use the compiled binary
@@ -364,51 +362,3 @@ docker ps -a | grep -E "spinner-test-|test-" | awk '{print $1}' | xargs docker r
 # Remove test images
 docker images | grep -E "spinner:test-|test-env" | awk '{print $3}' | xargs docker rmi -f
 ```
-
-## CI/CD Integration
-
-The test suite is designed for CI/CD environments:
-
-```yaml
-# Example GitHub Actions workflow
-- name: Run unit tests
-  run: go test -short ./...
-
-- name: Run integration tests
-  run: go test ./tests/integration/...
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
-- name: Generate coverage
-  run: |
-    go test -coverprofile=coverage.out ./...
-    go tool cover -func=coverage.out
-```
-
-## Migration from Bash Tests
-
-**Status:** ✅ Migration complete
-
-All 31 bash tests have been migrated to Go:
-- 7 setup tests → 11 Go tests (5 integration + 6 unit)
-- 24 spin tests → 54+ Go tests (20 integration + 34 unit)
-
-**Bash tests are deprecated** and will be removed after validation. Use Go tests for all new testing needs.
-
-### Running Legacy Bash Tests
-
-If needed, bash tests can still be run:
-
-```bash
-# Run all bash tests
-./tests/run.sh
-
-# Run setup bash tests
-./tests/setup/run-all.sh
-
-# Run spin bash tests
-./tests/spin/run-all.sh
-```
-
-**Note:** Bash tests require `npm run build` first and are maintained only for migration validation.
