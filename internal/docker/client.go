@@ -1,13 +1,19 @@
 package docker
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 )
 
 // DockerClient defines the interface for Docker operations.
@@ -35,16 +41,37 @@ type DockerClient interface {
 	VerifyContainerStatus(ctx context.Context, name string) (ContainerResult, error)
 }
 
-// RealDockerClient implements DockerClient using actual Docker CLI commands.
-type RealDockerClient struct{}
+// RealDockerClient implements DockerClient using the Docker SDK.
+type RealDockerClient struct {
+	cli *client.Client
+}
 
 // NewRealDockerClient creates a new RealDockerClient instance.
 func NewRealDockerClient() *RealDockerClient {
-	return &RealDockerClient{}
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		// Return a client that will fail gracefully on operations
+		return &RealDockerClient{cli: nil}
+	}
+
+	return &RealDockerClient{cli: cli}
+}
+
+// ensureClient checks if the Docker client is initialized and returns an error if not.
+func (c *RealDockerClient) ensureClient() error {
+	if c.cli == nil {
+		return fmt.Errorf("docker client not initialized - is Docker running?")
+	}
+
+	return nil
 }
 
 // BuildImage builds a Docker image with the given configuration.
 func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) error {
+	if err := c.ensureClient(); err != nil {
+		return err
+	}
+
 	buildContext := filepath.Join(os.TempDir(), fmt.Sprintf("spinner-%d", time.Now().UnixNano()))
 	if err := os.MkdirAll(buildContext, 0755); err != nil {
 		return fmt.Errorf("failed to create build context: %w", err)
@@ -61,11 +88,9 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	// If user provided a Dockerfile, build it first
 	if config.Dockerfile != "" {
 		userBaseImageTag := fmt.Sprintf("spinner-base:%s", config.Name)
-		cmd := exec.CommandContext(ctx, "docker", "build", "-t", userBaseImageTag, "-f", config.Dockerfile, ".")
-		cmd.Stdout = os.Stdout
 
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
+		// Build user's Dockerfile from current directory
+		if err := c.buildFromDockerfile(ctx, ".", config.Dockerfile, userBaseImageTag); err != nil {
 			return fmt.Errorf("failed to build user Dockerfile: %w", err)
 		}
 
@@ -104,20 +129,104 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 
 	// Build the final image
 	imageName := fmt.Sprintf("spinner:%s", config.Name)
-	cmd := exec.CommandContext(ctx, "docker", "build", "-t", imageName, ".")
-	cmd.Dir = buildContext
-	cmd.Stdout = os.Stdout
-
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := c.buildFromDockerfile(ctx, buildContext, "Dockerfile", imageName); err != nil {
 		return fmt.Errorf("failed to build Docker image: %w", err)
 	}
 
 	return nil
 }
 
+// buildFromDockerfile builds an image from a Dockerfile using the SDK.
+func (c *RealDockerClient) buildFromDockerfile(ctx context.Context, contextDir, dockerfilePath, tag string) error {
+	// Create a tar archive of the build context
+	tarBuffer, err := createTarArchive(contextDir)
+	if err != nil {
+		return fmt.Errorf("failed to create build context tar: %w", err)
+	}
+
+	buildOptions := types.ImageBuildOptions{
+		Tags:       []string{tag},
+		Dockerfile: dockerfilePath,
+		Remove:     true,
+	}
+
+	resp, err := c.cli.ImageBuild(ctx, tarBuffer, buildOptions)
+	if err != nil {
+		return fmt.Errorf("image build failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Stream build output to stdout
+	if _, err := io.Copy(os.Stdout, resp.Body); err != nil {
+		return fmt.Errorf("failed to read build output: %w", err)
+	}
+
+	return nil
+}
+
+// createTarArchive creates a tar archive of a directory for Docker build context.
+func createTarArchive(srcDir string) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	tw := tar.NewWriter(buf)
+	defer tw.Close()
+
+	err := filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Get relative path
+		relPath, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+
+		// Skip the root directory itself
+		if relPath == "." {
+			return nil
+		}
+
+		// Create tar header
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+
+		header.Name = relPath
+
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// Write file content if it's a regular file
+		if !info.IsDir() {
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			if _, err := io.Copy(tw, file); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return buf, err
+}
+
 // RunContainer creates and starts a container with the given arguments.
 func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, containerName string) (ContainerResult, error) {
+	if err := c.ensureClient(); err != nil {
+		return ContainerResult{
+			Success:       false,
+			ContainerName: containerName,
+			Error:         err.Error(),
+		}, err
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return ContainerResult{
@@ -136,26 +245,51 @@ func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, cont
 		}, err
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", args...)
-
-	output, err := cmd.CombinedOutput()
+	// Parse the args slice into container config
+	// Expected format: run -d --name <name> -e KEY=VAL ... -v src:dst ... <image>
+	containerConfig, hostConfig, _, err := parseDockerRunArgs(args)
 	if err != nil {
-		// Container may have started but clone failed
-		// Try to get the git error message from container logs
-		logsCmd := exec.CommandContext(ctx, "docker", "logs", containerName)
-		if logsOutput, logsErr := logsCmd.CombinedOutput(); logsErr == nil {
-			return ContainerResult{
-				Success:       false,
-				ContainerName: containerName,
-				Error:         fmt.Sprintf("Git clone failed: %s", strings.TrimSpace(string(logsOutput))),
-			}, err
-		}
+		return ContainerResult{
+			Success:       false,
+			ContainerName: containerName,
+			Error:         fmt.Sprintf("Failed to parse docker run args: %s", err.Error()),
+		}, err
+	}
+
+	// Create the container
+	createResp, err := c.cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, containerName)
+	if err != nil {
+		return ContainerResult{
+			Success:       false,
+			ContainerName: containerName,
+			Error:         fmt.Sprintf("Failed to create container: %s", err.Error()),
+		}, err
+	}
+
+	// Start the container
+	if err := c.cli.ContainerStart(ctx, createResp.ID, types.ContainerStartOptions{}); err != nil {
+		// Try to get logs to show what went wrong
+		logs, _ := c.getContainerLogs(ctx, containerName)
 
 		return ContainerResult{
 			Success:       false,
 			ContainerName: containerName,
-			Error:         strings.TrimSpace(string(output)),
+			Error:         fmt.Sprintf("Git clone failed: %s", strings.TrimSpace(logs)),
 		}, err
+	}
+
+	// Wait briefly and check if container is still running (clone might fail immediately)
+	time.Sleep(2 * time.Second)
+
+	inspect, err := c.cli.ContainerInspect(ctx, createResp.ID)
+	if err == nil && !inspect.State.Running && inspect.State.ExitCode != 0 {
+		logs, _ := c.getContainerLogs(ctx, containerName)
+
+		return ContainerResult{
+			Success:       false,
+			ContainerName: containerName,
+			Error:         fmt.Sprintf("Git clone failed: %s", strings.TrimSpace(logs)),
+		}, fmt.Errorf("container exited with code %d", inspect.State.ExitCode)
 	}
 
 	return ContainerResult{
@@ -164,11 +298,95 @@ func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, cont
 	}, nil
 }
 
+// parseDockerRunArgs parses docker run arguments into container and host configs.
+func parseDockerRunArgs(args []string) (*container.Config, *container.HostConfig, string, error) {
+	containerConfig := &container.Config{
+		Env: []string{},
+	}
+
+	hostConfig := &container.HostConfig{
+		Binds: []string{},
+	}
+
+	var imageName string
+
+	i := 0
+	for i < len(args) {
+		arg := args[i]
+
+		switch arg {
+		case "run", "-d", "--detach":
+			i++
+		case "--name":
+			i += 2 // Skip --name and the name value (already handled by caller)
+		case "-e", "--env":
+			if i+1 < len(args) {
+				containerConfig.Env = append(containerConfig.Env, args[i+1])
+				i += 2
+			} else {
+				i++
+			}
+		case "-v", "--volume":
+			if i+1 < len(args) {
+				hostConfig.Binds = append(hostConfig.Binds, args[i+1])
+				i += 2
+			} else {
+				i++
+			}
+		default:
+			// If it doesn't start with -, it's probably the image name
+			if !strings.HasPrefix(arg, "-") {
+				imageName = arg
+			}
+
+			i++
+		}
+	}
+
+	if imageName == "" {
+		return nil, nil, "", fmt.Errorf("no image specified in docker run args")
+	}
+
+	containerConfig.Image = imageName
+
+	return containerConfig, hostConfig, imageName, nil
+}
+
+// getContainerLogs retrieves logs from a container.
+func (c *RealDockerClient) getContainerLogs(ctx context.Context, containerName string) (string, error) {
+	options := types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       "100",
+	}
+
+	logs, err := c.cli.ContainerLogs(ctx, containerName, options)
+	if err != nil {
+		return "", err
+	}
+	defer logs.Close()
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, logs); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
 // ImageExists checks if a Docker image exists.
-func (c *RealDockerClient) ImageExists(ctx context.Context, image string) (bool, error) {
-	cmd := exec.CommandContext(ctx, "docker", "image", "inspect", image)
-	if err := cmd.Run(); err != nil {
-		return false, nil
+func (c *RealDockerClient) ImageExists(ctx context.Context, imageName string) (bool, error) {
+	if err := c.ensureClient(); err != nil {
+		return false, err
+	}
+
+	_, _, err := c.cli.ImageInspectWithRaw(ctx, imageName)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			return false, nil
+		}
+
+		return false, err
 	}
 
 	return true, nil
@@ -176,16 +394,20 @@ func (c *RealDockerClient) ImageExists(ctx context.Context, image string) (bool,
 
 // ContainerExists checks if a container exists and returns its status.
 func (c *RealDockerClient) ContainerExists(ctx context.Context, name string) (ContainerStatus, error) {
-	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Status}}", name)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Container doesn't exist
-		return StatusNone, nil
+	if err := c.ensureClient(); err != nil {
+		return StatusNone, err
 	}
 
-	status := strings.TrimSpace(string(output))
-	if status == string(StatusRunning) {
+	inspect, err := c.cli.ContainerInspect(ctx, name)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			return StatusNone, nil
+		}
+
+		return StatusNone, err
+	}
+
+	if inspect.State.Running {
 		return StatusRunning, nil
 	}
 
@@ -194,14 +416,23 @@ func (c *RealDockerClient) ContainerExists(ctx context.Context, name string) (Co
 
 // RemoveContainer removes a container, forcing removal if it's running.
 func (c *RealDockerClient) RemoveContainer(ctx context.Context, name string) (ContainerResult, error) {
-	cmd := exec.CommandContext(ctx, "docker", "rm", "-f", name)
+	if err := c.ensureClient(); err != nil {
+		return ContainerResult{
+			Success:       false,
+			ContainerName: name,
+			Error:         err.Error(),
+		}, err
+	}
 
-	output, err := cmd.CombinedOutput()
+	err := c.cli.ContainerRemove(ctx, name, types.ContainerRemoveOptions{
+		Force:         true,
+		RemoveVolumes: true,
+	})
 	if err != nil {
 		return ContainerResult{
 			Success:       false,
 			ContainerName: name,
-			Error:         strings.TrimSpace(string(output)),
+			Error:         err.Error(),
 		}, err
 	}
 
@@ -213,14 +444,20 @@ func (c *RealDockerClient) RemoveContainer(ctx context.Context, name string) (Co
 
 // RestartContainer restarts a stopped container.
 func (c *RealDockerClient) RestartContainer(ctx context.Context, name string) (ContainerResult, error) {
-	cmd := exec.CommandContext(ctx, "docker", "start", name)
+	if err := c.ensureClient(); err != nil {
+		return ContainerResult{
+			Success:       false,
+			ContainerName: name,
+			Error:         err.Error(),
+		}, err
+	}
 
-	output, err := cmd.CombinedOutput()
+	err := c.cli.ContainerStart(ctx, name, types.ContainerStartOptions{})
 	if err != nil {
 		return ContainerResult{
 			Success:       false,
 			ContainerName: name,
-			Error:         strings.TrimSpace(string(output)),
+			Error:         err.Error(),
 		}, err
 	}
 
@@ -232,9 +469,15 @@ func (c *RealDockerClient) RestartContainer(ctx context.Context, name string) (C
 
 // VerifyContainerStatus verifies that a container is running.
 func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name string) (ContainerResult, error) {
-	cmd := exec.CommandContext(ctx, "docker", "inspect", "-f", "{{.State.Status}}", name)
+	if err := c.ensureClient(); err != nil {
+		return ContainerResult{
+			Success:       false,
+			ContainerName: name,
+			Error:         err.Error(),
+		}, err
+	}
 
-	output, err := cmd.CombinedOutput()
+	inspect, err := c.cli.ContainerInspect(ctx, name)
 	if err != nil {
 		return ContainerResult{
 			Success:       false,
@@ -243,17 +486,15 @@ func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name strin
 		}, err
 	}
 
-	status := strings.TrimSpace(string(output))
-	if status != string(StatusRunning) {
+	if !inspect.State.Running {
 		// Get logs to show what went wrong
-		logsCmd := exec.CommandContext(ctx, "docker", "logs", name)
-		logsOutput, _ := logsCmd.CombinedOutput()
+		logs, _ := c.getContainerLogs(ctx, name)
 
 		return ContainerResult{
 			Success:       false,
 			ContainerName: name,
-			Error:         fmt.Sprintf("Container exited. Logs: %s", strings.TrimSpace(string(logsOutput))),
-		}, fmt.Errorf("container not running: %s", status)
+			Error:         fmt.Sprintf("Container exited. Logs: %s", strings.TrimSpace(logs)),
+		}, fmt.Errorf("container not running: %s", inspect.State.Status)
 	}
 
 	return ContainerResult{
