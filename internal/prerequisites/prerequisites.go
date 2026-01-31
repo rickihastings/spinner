@@ -1,6 +1,7 @@
 package prerequisites
 
 import (
+	"os"
 	"os/exec"
 )
 
@@ -45,6 +46,51 @@ func CheckPrerequisites() error {
 		if err := cmd.Run(); err != nil {
 			return &PrerequisiteError{Prerequisite: prereq}
 		}
+	}
+
+	return nil
+}
+
+// EnvironmentVariableError is returned when a required environment variable is missing.
+type EnvironmentVariableError struct {
+	Variable string
+	Message  string
+}
+
+func (e *EnvironmentVariableError) Error() string {
+	return e.Message
+}
+
+// CheckEnvironmentVariables verifies that all required environment variables are set.
+// This includes GITHUB_TOKEN and CLAUDE_CODE_OAUTH_TOKEN.
+func CheckEnvironmentVariables() error {
+	githubToken := os.Getenv("GITHUB_TOKEN")
+	if githubToken == "" {
+		return &EnvironmentVariableError{
+			Variable: "GITHUB_TOKEN",
+			Message:  "GITHUB_TOKEN environment variable not set. Please set GITHUB_TOKEN before running spin.",
+		}
+	}
+
+	claudeToken := os.Getenv("CLAUDE_CODE_OAUTH_TOKEN")
+	if claudeToken == "" {
+		return &EnvironmentVariableError{
+			Variable: "CLAUDE_CODE_OAUTH_TOKEN",
+			Message:  "CLAUDE_CODE_OAUTH_TOKEN environment variable not set. Please set CLAUDE_CODE_OAUTH_TOKEN before running spin.",
+		}
+	}
+
+	return nil
+}
+
+// CheckAllPrerequisites verifies both tools and environment variables.
+func CheckAllPrerequisites() error {
+	if err := CheckPrerequisites(); err != nil {
+		return err
+	}
+
+	if err := CheckEnvironmentVariables(); err != nil {
+		return err
 	}
 
 	return nil

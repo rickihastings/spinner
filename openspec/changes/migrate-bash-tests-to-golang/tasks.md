@@ -152,12 +152,12 @@
 
 **Goal:** Test prerequisite validation independently
 
-- [ ] 8.1 Create `internal/prerequisites/prerequisites_test.go`
-- [ ] 8.2 Implement test for GitHub token validation (maps to bash test 04-github-token-not-set.sh)
-- [ ] 8.3 Implement test for Claude token validation (maps to bash test 05-claude-token-not-set.sh)
-- [ ] 8.4 Implement test for Docker availability check
-- [ ] 8.5 Implement test for all prerequisites passing
-- [ ] 8.6 Create table-driven test for various prerequisite failure scenarios
+- [x] 8.1 Create `internal/prerequisites/prerequisites_test.go`
+- [x] 8.2 Implement test for GitHub token validation (maps to bash test 04-github-token-not-set.sh)
+- [x] 8.3 Implement test for Claude token validation (maps to bash test 05-claude-token-not-set.sh)
+- [x] 8.4 Implement test for Docker availability check
+- [x] 8.5 Implement test for all prerequisites passing
+- [x] 8.6 Create table-driven test for various prerequisite failure scenarios
 
 **Validation:** `go test ./internal/prerequisites/prerequisites_test.go -v` passes
 
@@ -255,11 +255,11 @@
 - [ ] 13.2 Run all Go tests: `go test ./...`
 - [ ] 13.3 Compare results and verify equivalent coverage
 - [ ] 13.4 Address any discrepancies or failing tests
-- [ ] 13.5 Add deprecation notice to `tests/README.md` about bash tests
-- [ ] 13.6 Move bash tests to `tests/bash-legacy/` directory (preserve for reference)
+- [ ] 13.5 Remove references in docs about bash tests
+- [ ] 13.6 Remove bash tests directory
 - [ ] 13.7 Update test documentation to reference Go tests as primary
 
-**Validation:** All Go tests pass; bash tests deprecated but preserved; documentation updated
+**Validation:** All Go tests pass; bash tests deleted; documentation updated
 
 **Dependencies:** Tasks 3.0-12.0 (all Go tests implemented and validated)
 
