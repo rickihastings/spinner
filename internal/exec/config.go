@@ -13,7 +13,7 @@ type Config struct {
 	MaxIterations int
 	Branch        string
 	LogDir        string
-	ContainerName string
+	StateDir      string
 }
 
 // LoadConfig loads configuration from environment variables using viper.
@@ -21,12 +21,15 @@ func LoadConfig() (*Config, error) {
 	v := viper.New()
 	v.AutomaticEnv()
 
+	// Set defaults
+	v.SetDefault("STATE_DIR", "/state")
+
 	config := &Config{
 		Prompt:        v.GetString("PROMPT"),
 		MaxIterations: v.GetInt("MAX_ITERATIONS"),
 		Branch:        v.GetString("BRANCH"),
 		LogDir:        v.GetString("LOG_DIR"),
-		ContainerName: v.GetString("CONTAINER_NAME"),
+		StateDir:      v.GetString("STATE_DIR"),
 	}
 
 	// Validate MAX_ITERATIONS

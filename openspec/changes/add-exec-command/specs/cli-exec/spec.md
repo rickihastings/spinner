@@ -27,13 +27,13 @@ The exec command SHALL load configuration from environment variables.
 
 #### Scenario: All environment variables present
 
-- **WHEN** PROMPT, MAX_ITERATIONS, LOG_DIR, BRANCH, CONTAINER_NAME are set
+- **WHEN** PROMPT, MAX_ITERATIONS, LOG_DIR, BRANCH, STATE_DIR are set
 - **THEN** configuration SHALL be loaded with all values
 
 #### Scenario: Optional environment variables missing
 
-- **WHEN** PROMPT and MAX_ITERATIONS are set but LOG_DIR is not
-- **THEN** configuration SHALL use default LOG_DIR value of "/logs"
+- **WHEN** PROMPT and MAX_ITERATIONS are set but LOG_DIR and STATE_DIR are not
+- **THEN** configuration SHALL use default STATE_DIR value of "/state"
 
 #### Scenario: Required environment variable missing
 
@@ -42,7 +42,7 @@ The exec command SHALL load configuration from environment variables.
 
 ### Requirement: State File Management
 
-The exec command SHALL maintain iteration state in a JSON file at `~/.spinner/{CONTAINER_NAME}/state.json`.
+The exec command SHALL maintain iteration state in a JSON file at `${STATE_DIR}/state.json` where STATE_DIR defaults to `/state`.
 
 #### Scenario: State file does not exist
 

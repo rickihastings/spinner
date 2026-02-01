@@ -208,6 +208,8 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 		fmt.Sprintf("REPO_URL=%s", repoURL),
 		"-v",
 		fmt.Sprintf("%s/.spinner/%s/logs:/logs", homeDir, containerName),
+		"-v",
+		fmt.Sprintf("%s/.spinner/%s/state:/state", homeDir, containerName),
 	}
 
 	// Add Ralph loop environment variables if prompt is provided

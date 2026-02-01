@@ -29,10 +29,10 @@ ENVIRONMENT VARIABLES:
   MAX_ITERATIONS     Maximum number of iterations (required)
   BRANCH             Git branch name (optional)
   LOG_DIR            Directory for log files (optional)
-  CONTAINER_NAME     Container name for state file location (optional)
+  STATE_DIR          Directory for state file (optional, defaults to /state)
 
 STATE MANAGEMENT:
-  State is persisted to ~/.spinner/{CONTAINER_NAME}/state.json
+  State is persisted to ${STATE_DIR}/state.json (mounted from host)
   This allows iteration progress to survive container restarts.
 
 EXAMPLES:
@@ -49,20 +49,8 @@ EXAMPLES:
 				return err
 			}
 
-			// Determine state file path
-			home, err := os.UserHomeDir()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error getting home directory: %v\n", err)
-				return err
-			}
-
-			// Use container name if available, otherwise use "default"
-			containerDir := "default"
-			if config.ContainerName != "" {
-				containerDir = config.ContainerName
-			}
-
-			statePath := filepath.Join(home, ".spinner", containerDir, "state.json")
+			// Build state file path from STATE_DIR (defaults to /state)
+			statePath := filepath.Join(config.StateDir, "state.json")
 
 			// Load or initialize state
 			state, err := exec.LoadState(statePath)

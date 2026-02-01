@@ -10,7 +10,7 @@ testing.
 ## What Changes
 
 - **New CLI command**: `spinner exec` that runs inside Docker containers
-- **State management**: JSON state file mounted at `~/.spinner/{container_name}/state.json` tracking:
+- **State management**: JSON state file at `${STATE_DIR}/state.json` (defaults to `/state`, mounted from host) tracking:
     - Branch name
     - Iteration count
     - Status (running/completed/rate_limited/error/auth_error)

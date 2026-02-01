@@ -43,7 +43,7 @@ type ClaudeResult struct {
 
 // RunClaude executes the Claude CLI with the given prompt and logs output.
 func RunClaude(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
-	cmd := exec.CommandContext(ctx, "claude", "-p", prompt, "--output-format=stream-json")
+	cmd := exec.CommandContext(ctx, "claude", "-p", prompt, "--dangerously-skip-permissions", "--output-format=stream-json", "--verbose")
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

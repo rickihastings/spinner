@@ -32,12 +32,12 @@ The CLI SHALL mount a state directory from the host into containers for state pe
 #### Scenario: State directory created on host
 
 - **WHEN** `spinner spin` creates a container
-- **THEN** it SHALL create `~/.spinner/{CONTAINER_NAME}` directory on the host if it doesn't exist
+- **THEN** it SHALL create `~/.spinner/{CONTAINER_NAME}/state` directory on the host if it doesn't exist
 
 #### Scenario: State directory mounted in container
 
 - **WHEN** `spinner spin` runs the container
-- **THEN** it SHALL mount `~/.spinner/{CONTAINER_NAME}` to `/home/spinner/.spinner/{CONTAINER_NAME}` in the container
+- **THEN** it SHALL mount `~/.spinner/{CONTAINER_NAME}/state` to `/state` in the container
 
 #### Scenario: State persists across container recreations
 

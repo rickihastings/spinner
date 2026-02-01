@@ -11,7 +11,7 @@ func TestLoadConfig_Success(t *testing.T) {
 	_ = os.Setenv("MAX_ITERATIONS", "10")
 	_ = os.Setenv("BRANCH", "main")
 	_ = os.Setenv("LOG_DIR", "/tmp/logs")
-	_ = os.Setenv("CONTAINER_NAME", "test-container")
+	_ = os.Setenv("STATE_DIR", "/tmp/state")
 
 	defer clearEnv()
 
@@ -36,8 +36,8 @@ func TestLoadConfig_Success(t *testing.T) {
 		t.Errorf("expected log dir '/tmp/logs', got %s", config.LogDir)
 	}
 
-	if config.ContainerName != "test-container" {
-		t.Errorf("expected container name 'test-container', got %s", config.ContainerName)
+	if config.StateDir != "/tmp/state" {
+		t.Errorf("expected state dir '/tmp/state', got %s", config.StateDir)
 	}
 }
 
@@ -110,7 +110,7 @@ func TestLoadConfig_OptionalFieldsMissing(t *testing.T) {
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	// Optional fields should be empty strings, not errors
+	// Optional fields should be empty strings or defaults
 	if config.Branch != "" {
 		t.Errorf("expected empty branch, got %s", config.Branch)
 	}
@@ -119,8 +119,8 @@ func TestLoadConfig_OptionalFieldsMissing(t *testing.T) {
 		t.Errorf("expected empty log dir, got %s", config.LogDir)
 	}
 
-	if config.ContainerName != "" {
-		t.Errorf("expected empty container name, got %s", config.ContainerName)
+	if config.StateDir != "/state" {
+		t.Errorf("expected default state dir '/state', got %s", config.StateDir)
 	}
 }
 
@@ -129,5 +129,5 @@ func clearEnv() {
 	_ = os.Unsetenv("MAX_ITERATIONS")
 	_ = os.Unsetenv("BRANCH")
 	_ = os.Unsetenv("LOG_DIR")
-	_ = os.Unsetenv("CONTAINER_NAME")
+	_ = os.Unsetenv("STATE_DIR")
 }
