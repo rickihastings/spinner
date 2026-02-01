@@ -22,7 +22,6 @@ type buildFile struct {
 // buildFiles lists all files to copy into the Docker build context
 var buildFiles = []buildFile{
 	{src: "scripts/startup.sh", dst: "scripts/startup.sh"},
-	{src: "scripts/ralph-loop.sh", dst: "scripts/ralph-loop.sh"},
 }
 
 // copyFile copies a file from src to dst

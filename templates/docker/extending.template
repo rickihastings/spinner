@@ -28,14 +28,14 @@ RUN command -v claude > /dev/null 2>&1 || \
     (curl -fsSL https://claude.ai/install.sh | bash)
 ENV PATH=/home/spinner/.local/bin:${PATH}
 
-# Copy and set up startup script
+# Copy spinner CLI binary
 USER root
+COPY spinner /usr/local/bin/spinner
+RUN chmod +x /usr/local/bin/spinner
+
+# Copy and set up startup script
 COPY templates/scripts/startup.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
-
-# Copy and set up Ralph loop script
-COPY templates/scripts/ralph-loop.sh /usr/local/bin/ralph-loop.sh
-RUN chmod +x /usr/local/bin/ralph-loop.sh
 
 # Set up workspace directory with correct ownership
 RUN mkdir -p /home/spinner/workspace && chown spinner:spinner /home/spinner/workspace

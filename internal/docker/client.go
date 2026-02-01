@@ -102,6 +102,18 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 		}
 	}
 
+	// Build spinner CLI binary for linux/amd64
+	spinnerBinaryPath := filepath.Join(buildContext, "spinner")
+	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", spinnerBinaryPath)
+
+	buildCmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64")
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+
+	if err := buildCmd.Run(); err != nil {
+		return fmt.Errorf("failed to build spinner binary: %w", err)
+	}
+
 	// Build the final image
 	imageName := fmt.Sprintf("spinner:%s", config.Name)
 	cmd := exec.CommandContext(ctx, "docker", "build", "-t", imageName, ".")

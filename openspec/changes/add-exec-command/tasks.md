@@ -56,13 +56,13 @@
 
 ## 7.0 Update Docker templates
 
-- [ ] 7.1 Modify `templates/docker/extending.template` to add build stage copying CLI binary
-- [ ] 7.2 Update Dockerfile to compile CLI for linux/amd64 and copy to /usr/local/bin/spinner
-- [ ] 7.3 Modify `templates/scripts/startup.sh` to call `spinner exec` instead of ralph-loop.sh
-- [ ] 7.4 Remove call to /usr/local/bin/ralph-loop.sh
-- [ ] 7.5 Test template rendering with `spinner setup` command
-- [ ] 7.6 Verify generated Dockerfile contains CLI binary copy
-- [ ] 7.7 Verify startup.sh calls `spinner exec`
+- [x] 7.1 Modify `templates/docker/extending.template` to add build stage copying CLI binary
+- [x] 7.2 Update Dockerfile to compile CLI for linux/amd64 and copy to /usr/local/bin/spinner
+- [x] 7.3 Modify `templates/scripts/startup.sh` to call `spinner exec` instead of ralph-loop.sh
+- [x] 7.4 Remove call to /usr/local/bin/ralph-loop.sh
+- [x] 7.5 Test template rendering with `spinner setup` command
+- [x] 7.6 Verify generated Dockerfile contains CLI binary copy
+- [x] 7.7 Verify startup.sh calls `spinner exec`
 
 ## 8.0 Remove old bash implementation
 

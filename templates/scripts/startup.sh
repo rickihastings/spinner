@@ -77,10 +77,10 @@ if [ -n "$PROMPT" ]; then
 
   echo "Current branch: $(git branch --show-current)"
   echo ""
-  echo "Starting Ralph loop for autonomous implementation..."
+  echo "Starting autonomous implementation loop..."
 
-  # Execute Ralph loop
-  /usr/local/bin/ralph-loop.sh
+  # Execute spinner exec command
+  spinner exec
 else
   echo ""
   echo "Repository cloned successfully. Container is ready."
