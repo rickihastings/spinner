@@ -28,11 +28,11 @@
 
 ## 4.0 Implement Git push automation
 
-- [ ] 4.1 Create `internal/exec/git.go` with PushChanges function
-- [ ] 4.2 Implement simple push logic: try `git push`, if fails try `git push -u origin <branch>`
-- [ ] 4.3 Add error handling that continues on failure (non-blocking)
-- [ ] 4.4 Add unit tests for push function with mock exec.Command
-- [ ] 4.5 Verify tests pass
+- [x] 4.1 Create `internal/exec/git.go` with PushChanges function
+- [x] 4.2 Implement simple push logic: try `git push`, if fails try `git push -u origin <branch>`
+- [x] 4.3 Add error handling that continues on failure (non-blocking)
+- [x] 4.4 Add unit tests for push function with mock exec.Command
+- [x] 4.5 Verify tests pass
 
 ## 5.0 Implement main iteration loop
 
