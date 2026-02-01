@@ -46,13 +46,13 @@
 
 ## 6.0 Implement exec CLI command
 
-- [ ] 6.1 Create `cmd/exec.go` registering command with root
-- [ ] 6.2 Create `cmd/constructors_exec.go` with NewExecCommand constructor
-- [ ] 6.3 Add signal handling for Ctrl+C (exit 130)
-- [ ] 6.4 Wire up config loading, state initialization, loop execution
-- [ ] 6.5 Add help text and command description
-- [ ] 6.6 Add unit tests for command construction
-- [ ] 6.7 Verify tests pass and `spinner exec --help` works
+- [x] 6.1 Create `cmd/exec.go` registering command with root
+- [x] 6.2 Create `cmd/constructors_exec.go` with NewExecCommand constructor
+- [x] 6.3 Add signal handling for Ctrl+C (exit 130)
+- [x] 6.4 Wire up config loading, state initialization, loop execution
+- [x] 6.5 Add help text and command description
+- [x] 6.6 Add unit tests for command construction
+- [x] 6.7 Verify tests pass and `spinner exec --help` works
 
 ## 7.0 Update Docker templates
 
