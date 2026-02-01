@@ -18,13 +18,13 @@
 
 ## 3.0 Implement Claude CLI integration
 
-- [ ] 3.1 Create `internal/exec/claude.go` with ClaudeMessage struct for JSON parsing
-- [ ] 3.2 Implement RunClaude function using exec.Command with streaming JSON output
-- [ ] 3.3 Add JSON parsing with error detection (rate_limit_error, auth_error)
-- [ ] 3.4 Add completion signal detection in message text
-- [ ] 3.5 Implement log file writing with TeeReader pattern
-- [ ] 3.6 Add unit tests for JSON parsing various Claude output formats
-- [ ] 3.7 Verify tests pass
+- [x] 3.1 Create `internal/exec/claude.go` with ClaudeMessage struct for JSON parsing
+- [x] 3.2 Implement RunClaude function using exec.Command with streaming JSON output
+- [x] 3.3 Add JSON parsing with error detection (rate_limit_error, auth_error)
+- [x] 3.4 Add completion signal detection in message text
+- [x] 3.5 Implement log file writing with TeeReader pattern
+- [x] 3.6 Add unit tests for JSON parsing various Claude output formats
+- [x] 3.7 Verify tests pass
 
 ## 4.0 Implement Git push automation
 

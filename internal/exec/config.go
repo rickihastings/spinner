@@ -2,8 +2,8 @@ package exec
 
 import (
 	"fmt"
-	"os"
-	"strconv"
+
+	"github.com/spf13/viper"
 )
 
 // Config represents the configuration for the exec command.
@@ -16,31 +16,27 @@ type Config struct {
 	ContainerName string
 }
 
-// LoadConfig loads configuration from environment variables.
+// LoadConfig loads configuration from environment variables using viper.
 func LoadConfig() (*Config, error) {
+	v := viper.New()
+	v.AutomaticEnv()
+
 	config := &Config{
-		Prompt:        os.Getenv("PROMPT"),
-		Branch:        os.Getenv("BRANCH"),
-		LogDir:        os.Getenv("LOG_DIR"),
-		ContainerName: os.Getenv("CONTAINER_NAME"),
+		Prompt:        v.GetString("PROMPT"),
+		MaxIterations: v.GetInt("MAX_ITERATIONS"),
+		Branch:        v.GetString("BRANCH"),
+		LogDir:        v.GetString("LOG_DIR"),
+		ContainerName: v.GetString("CONTAINER_NAME"),
 	}
 
-	// Parse MAX_ITERATIONS
-	maxIterStr := os.Getenv("MAX_ITERATIONS")
-	if maxIterStr == "" {
+	// Validate MAX_ITERATIONS
+	if config.MaxIterations == 0 {
 		return nil, fmt.Errorf("MAX_ITERATIONS is required")
 	}
 
-	maxIter, err := strconv.Atoi(maxIterStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid MAX_ITERATIONS: %w", err)
-	}
-
-	if maxIter <= 0 {
+	if config.MaxIterations < 0 {
 		return nil, fmt.Errorf("MAX_ITERATIONS must be greater than 0")
 	}
-
-	config.MaxIterations = maxIter
 
 	// Validate required fields
 	if config.Prompt == "" {
