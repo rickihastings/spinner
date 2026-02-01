@@ -2,11 +2,11 @@
 
 ## 1.0 Implement state management
 
-- [ ] 1.1 Create `internal/exec/state.go` with State struct (branch, iteration count, status, timestamps)
-- [ ] 1.2 Implement LoadState function with JSON unmarshaling and validation
-- [ ] 1.3 Implement SaveState function with atomic write (temp file + rename)
-- [ ] 1.4 Add unit tests for state load/save with various scenarios
-- [ ] 1.5 Verify tests pass
+- [x] 1.1 Create `internal/exec/state.go` with State struct (branch, iteration count, status, timestamps)
+- [x] 1.2 Implement LoadState function with JSON unmarshaling and validation
+- [x] 1.3 Implement SaveState function with atomic write (temp file + rename)
+- [x] 1.4 Add unit tests for state load/save with various scenarios
+- [x] 1.5 Verify tests pass
 
 ## 2.0 Implement configuration loading
 
