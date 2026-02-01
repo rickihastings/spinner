@@ -36,13 +36,13 @@
 
 ## 5.0 Implement main iteration loop
 
-- [ ] 5.1 Create `internal/exec/loop.go` with main Run function
-- [ ] 5.2 Implement iteration loop matching bash logic (for loop up to MAX_ITERATIONS)
-- [ ] 5.3 Add rate limit wait function with countdown timer
-- [ ] 5.4 Integrate Claude execution, git push, state updates per iteration
-- [ ] 5.5 Handle completion signal, rate limits, auth errors with proper exit codes
-- [ ] 5.6 Add integration tests for full loop execution with mocks
-- [ ] 5.7 Verify tests pass
+- [x] 5.1 Create `internal/exec/loop.go` with main Run function
+- [x] 5.2 Implement iteration loop matching bash logic (for loop up to MAX_ITERATIONS)
+- [x] 5.3 Add rate limit wait function with countdown timer
+- [x] 5.4 Integrate Claude execution, git push, state updates per iteration
+- [x] 5.5 Handle completion signal, rate limits, auth errors with proper exit codes
+- [x] 5.6 Add integration tests for full loop execution with mocks
+- [x] 5.7 Verify tests pass
 
 ## 6.0 Implement exec CLI command
 
