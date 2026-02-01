@@ -37,25 +37,28 @@ Follow this sequence for each vertical slice:
 
 ### 3. Implement Slice
 
-Complete ALL sub-tasks in the vertical slice using this cycle:
+Complete ALL sub-tasks in the vertical slice before committing.
 
-**Per Sub-Task:**
+**For EACH sub-task in the slice (X.1, X.2, X.3...):**
 
 1. **Investigate** - Search codebase for existing patterns before coding
 2. **Implement** - Make minimal, focused changes following existing patterns
 3. **Verify** - Run builds and tests; fix any failures before proceeding
 4. **Mark Complete** - Check off the sub-task in tasks.md (`- [x]`)
 
+**Repeat the above cycle for ALL sub-tasks in the slice before proceeding to step 4.**
+
 **Rules:**
 
 - Complete the entire vertical slice (all sub-tasks X.1, X.2, X.3...) in one session
+- Do NOT commit after each sub-task—commit only after the entire slice is complete
 - Each commit should leave the codebase in a valid, tested state
 - Never defer tests—they are part of the vertical slice, not a separate phase
 - If implementation diverges from spec, update the spec immediately
 
 ### 4. Finalize Slice
 
-After completing all sub-tasks in the slice:
+**ONLY after completing ALL sub-tasks in the slice:**
 
 1. **Update tasks.md** - Mark the slice header complete with `- [x]`
 2. **Commit** - Create meaningful commit message
