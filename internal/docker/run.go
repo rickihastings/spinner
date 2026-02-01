@@ -54,7 +54,7 @@ const (
 	ActionRestarted ReuseAction = "restarted"
 )
 
-// DefaultMaxIterations is the default maximum number of iterations for ralph-loop.
+// DefaultMaxIterations is the default maximum number of iterations for the exec loop.
 const DefaultMaxIterations = "100"
 
 // ReuseResult contains the status and action taken for container reuse.

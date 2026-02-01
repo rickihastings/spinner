@@ -66,10 +66,10 @@
 
 ## 8.0 Remove old bash implementation
 
-- [ ] 8.1 Delete `templates/scripts/ralph-loop.sh`
-- [ ] 8.2 Update any references in documentation
-- [ ] 8.3 Verify no remaining references with grep
-- [ ] 8.4 Commit removal
+- [x] 8.1 Delete `templates/scripts/ralph-loop.sh`
+- [x] 8.2 Update any references in documentation
+- [x] 8.3 Verify no remaining references with grep
+- [x] 8.4 Commit removal
 
 ## 9.0 Integration testing
 

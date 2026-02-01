@@ -140,9 +140,9 @@ func NewSpinCommand(client docker.DockerClient) *cobra.Command {
 SPIN OPTIONS:
   --image <image>            Docker image to use (required)
   --repo <repo>              Git repository URL (required)
-  --prompt <prompt>          Task prompt for ralph-loop (optional)
+  --prompt <prompt>          Task prompt for autonomous execution (optional)
   --branch <branch>          Git branch to checkout (optional)
-  --max-iterations <num>     Maximum iterations for ralph-loop (optional, default: 100)
+  --max-iterations <num>     Maximum iterations for autonomous execution (optional, default: 100)
   --recreate                 Force recreation of existing container (optional)
 
 SETUP OPTIONS (use with --setup flag):
@@ -359,9 +359,9 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 
 	cmd.Flags().StringVar(&spinImage, "image", "", "Docker image to use (required)")
 	cmd.Flags().StringVar(&spinRepo, "repo", "", "Git repository URL (required)")
-	cmd.Flags().StringVar(&spinPrompt, "prompt", "", "Task prompt for ralph-loop (optional)")
+	cmd.Flags().StringVar(&spinPrompt, "prompt", "", "Task prompt for autonomous execution (optional)")
 	cmd.Flags().StringVar(&spinBranch, "branch", "", "Git branch to checkout (optional)")
-	cmd.Flags().StringVar(&spinMaxIterations, "max-iterations", "", "Maximum iterations for ralph-loop (optional, default: 100)")
+	cmd.Flags().StringVar(&spinMaxIterations, "max-iterations", "", "Maximum iterations for autonomous execution (optional, default: 100)")
 	cmd.Flags().BoolVar(&spinRecreate, "recreate", false, "Force recreation of existing container (optional)")
 	cmd.Flags().BoolVar(&spinSetup, "setup", false, "Build/rebuild the Docker image before spinning (optional)")
 	cmd.Flags().StringVar(&spinBaseImage, "base-image", "", "Base Docker image (optional, default: ubuntu:22.04, requires --setup)")
