@@ -10,11 +10,11 @@
 
 ## 2.0 Implement configuration loading
 
-- [ ] 2.1 Create `internal/exec/config.go` with Config struct matching env vars
-- [ ] 2.2 Implement LoadConfig function reading PROMPT, MAX_ITERATIONS, BRANCH, LOG_DIR, CONTAINER_NAME
-- [ ] 2.3 Add validation for required fields (PROMPT, MAX_ITERATIONS)
-- [ ] 2.4 Add unit tests for config loading with missing/present env vars
-- [ ] 2.5 Verify tests pass
+- [x] 2.1 Create `internal/exec/config.go` with Config struct matching env vars
+- [x] 2.2 Implement LoadConfig function reading PROMPT, MAX_ITERATIONS, BRANCH, LOG_DIR, CONTAINER_NAME
+- [x] 2.3 Add validation for required fields (PROMPT, MAX_ITERATIONS)
+- [x] 2.4 Add unit tests for config loading with missing/present env vars
+- [x] 2.5 Verify tests pass
 
 ## 3.0 Implement Claude CLI integration
 
