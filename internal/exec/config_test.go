@@ -7,11 +7,12 @@ import (
 
 func TestLoadConfig_Success(t *testing.T) {
 	// Set required env vars
-	os.Setenv("PROMPT", "test prompt")
-	os.Setenv("MAX_ITERATIONS", "10")
-	os.Setenv("BRANCH", "main")
-	os.Setenv("LOG_DIR", "/tmp/logs")
-	os.Setenv("CONTAINER_NAME", "test-container")
+	_ = os.Setenv("PROMPT", "test prompt")
+	_ = os.Setenv("MAX_ITERATIONS", "10")
+	_ = os.Setenv("BRANCH", "main")
+	_ = os.Setenv("LOG_DIR", "/tmp/logs")
+	_ = os.Setenv("CONTAINER_NAME", "test-container")
+
 	defer clearEnv()
 
 	config, err := LoadConfig()
@@ -41,7 +42,8 @@ func TestLoadConfig_Success(t *testing.T) {
 }
 
 func TestLoadConfig_MissingPrompt(t *testing.T) {
-	os.Setenv("MAX_ITERATIONS", "10")
+	_ = os.Setenv("MAX_ITERATIONS", "10")
+
 	defer clearEnv()
 
 	_, err := LoadConfig()
@@ -51,7 +53,8 @@ func TestLoadConfig_MissingPrompt(t *testing.T) {
 }
 
 func TestLoadConfig_MissingMaxIterations(t *testing.T) {
-	os.Setenv("PROMPT", "test prompt")
+	_ = os.Setenv("PROMPT", "test prompt")
+
 	defer clearEnv()
 
 	_, err := LoadConfig()
@@ -61,8 +64,9 @@ func TestLoadConfig_MissingMaxIterations(t *testing.T) {
 }
 
 func TestLoadConfig_InvalidMaxIterations(t *testing.T) {
-	os.Setenv("PROMPT", "test prompt")
-	os.Setenv("MAX_ITERATIONS", "not a number")
+	_ = os.Setenv("PROMPT", "test prompt")
+	_ = os.Setenv("MAX_ITERATIONS", "not a number")
+
 	defer clearEnv()
 
 	_, err := LoadConfig()
@@ -72,8 +76,9 @@ func TestLoadConfig_InvalidMaxIterations(t *testing.T) {
 }
 
 func TestLoadConfig_ZeroMaxIterations(t *testing.T) {
-	os.Setenv("PROMPT", "test prompt")
-	os.Setenv("MAX_ITERATIONS", "0")
+	_ = os.Setenv("PROMPT", "test prompt")
+	_ = os.Setenv("MAX_ITERATIONS", "0")
+
 	defer clearEnv()
 
 	_, err := LoadConfig()
@@ -83,8 +88,9 @@ func TestLoadConfig_ZeroMaxIterations(t *testing.T) {
 }
 
 func TestLoadConfig_NegativeMaxIterations(t *testing.T) {
-	os.Setenv("PROMPT", "test prompt")
-	os.Setenv("MAX_ITERATIONS", "-5")
+	_ = os.Setenv("PROMPT", "test prompt")
+	_ = os.Setenv("MAX_ITERATIONS", "-5")
+
 	defer clearEnv()
 
 	_, err := LoadConfig()
@@ -94,8 +100,9 @@ func TestLoadConfig_NegativeMaxIterations(t *testing.T) {
 }
 
 func TestLoadConfig_OptionalFieldsMissing(t *testing.T) {
-	os.Setenv("PROMPT", "test prompt")
-	os.Setenv("MAX_ITERATIONS", "5")
+	_ = os.Setenv("PROMPT", "test prompt")
+	_ = os.Setenv("MAX_ITERATIONS", "5")
+
 	defer clearEnv()
 
 	config, err := LoadConfig()
@@ -118,9 +125,9 @@ func TestLoadConfig_OptionalFieldsMissing(t *testing.T) {
 }
 
 func clearEnv() {
-	os.Unsetenv("PROMPT")
-	os.Unsetenv("MAX_ITERATIONS")
-	os.Unsetenv("BRANCH")
-	os.Unsetenv("LOG_DIR")
-	os.Unsetenv("CONTAINER_NAME")
+	_ = os.Unsetenv("PROMPT")
+	_ = os.Unsetenv("MAX_ITERATIONS")
+	_ = os.Unsetenv("BRANCH")
+	_ = os.Unsetenv("LOG_DIR")
+	_ = os.Unsetenv("CONTAINER_NAME")
 }

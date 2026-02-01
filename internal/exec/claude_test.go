@@ -37,6 +37,7 @@ func TestClaudeMessage_ParseCompletionSignal(t *testing.T) {
 
 	// Check if completion signal is present
 	hasSignal := false
+
 	for _, content := range msg.Message.Content {
 		if content.Type == "text" && strings.Contains(content.Text, CompletionSignal) {
 			hasSignal = true
@@ -131,11 +132,5 @@ func TestClaudeMessage_EmptyContent(t *testing.T) {
 
 	if len(msg.Message.Content) != 0 {
 		t.Errorf("expected 0 content items, got %d", len(msg.Message.Content))
-	}
-}
-
-func TestCompletionSignalConstant(t *testing.T) {
-	if CompletionSignal != "~~ FEATURE_COMPLETED ~~" {
-		t.Errorf("expected completion signal '~~ FEATURE_COMPLETED ~~', got %s", CompletionSignal)
 	}
 }

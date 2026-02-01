@@ -34,11 +34,11 @@ type ClaudeMessage struct {
 
 // ClaudeResult represents the result of running Claude CLI.
 type ClaudeResult struct {
-	Completed      bool
-	RateLimited    bool
-	AuthError      bool
-	Error          error
-	ErrorMessage   string
+	Completed    bool
+	RateLimited  bool
+	AuthError    bool
+	Error        error
+	ErrorMessage string
 }
 
 // RunClaude executes the Claude CLI with the given prompt and logs output.
@@ -61,6 +61,7 @@ func RunClaude(ctx context.Context, prompt string, logPath string) (*ClaudeResul
 
 	// Create log file if path is provided
 	var logFile *os.File
+
 	if logPath != "" {
 		logDir := filepath.Dir(logPath)
 		if err := os.MkdirAll(logDir, 0755); err != nil {
@@ -71,7 +72,10 @@ func RunClaude(ctx context.Context, prompt string, logPath string) (*ClaudeResul
 		if err != nil {
 			return nil, fmt.Errorf("failed to create log file: %w", err)
 		}
-		defer logFile.Close()
+
+		defer func() {
+			_ = logFile.Close()
+		}()
 	}
 
 	result := &ClaudeResult{}
@@ -83,7 +87,7 @@ func RunClaude(ctx context.Context, prompt string, logPath string) (*ClaudeResul
 
 		// Write to log file
 		if logFile != nil {
-			fmt.Fprintln(logFile, line)
+			_, _ = fmt.Fprintln(logFile, line)
 		}
 
 		// Parse JSON message
@@ -122,7 +126,7 @@ func RunClaude(ctx context.Context, prompt string, logPath string) (*ClaudeResul
 	if logFile != nil {
 		stderrScanner := bufio.NewScanner(stderr)
 		for stderrScanner.Scan() {
-			fmt.Fprintln(logFile, stderrScanner.Text())
+			_, _ = fmt.Fprintln(logFile, stderrScanner.Text())
 		}
 	}
 

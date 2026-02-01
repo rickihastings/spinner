@@ -44,6 +44,7 @@ func LoadState(path string) (*State, error) {
 				LastUpdated: time.Now(),
 			}, nil
 		}
+
 		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
 
@@ -86,7 +87,7 @@ func SaveState(path string, state *State) error {
 	// Atomic rename
 	if err := os.Rename(tmpPath, path); err != nil {
 		// Clean up temp file on failure
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to rename temp state file: %w", err)
 	}
 
