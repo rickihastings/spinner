@@ -73,13 +73,13 @@
 
 ## 9.0 Integration testing
 
-- [ ] 9.1 Build test image with `spinner setup --name exec-test`
-- [ ] 9.2 Run `spinner spin` with test repo and verify state file creation
-- [ ] 9.3 Test iteration loop with mock prompt (1 iteration)
-- [ ] 9.4 Test state persistence across container restarts
-- [ ] 9.5 Test completion signal detection
-- [ ] 9.6 Test rate limit handling (mock rate limit error)
-- [ ] 9.7 Verify all edge cases work correctly
+- [x] 9.1 Build test image with `spinner setup --name exec-test`
+- [x] 9.2 Run `spinner spin` with test repo and verify state file creation
+- [x] 9.3 Test iteration loop with mock prompt (1 iteration)
+- [x] 9.4 Test state persistence across container restarts
+- [x] 9.5 Test completion signal detection
+- [x] 9.6 Test rate limit handling (mock rate limit error)
+- [x] 9.7 Verify all edge cases work correctly
 
 ## 10.0 Documentation updates
 
