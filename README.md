@@ -53,6 +53,16 @@ export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
 
 The agent will clone the repo, start working, and continue until it signals completion or hits the iteration limit.
 
+## Migration Notes
+
+**Breaking Change:** If you have existing Docker images built with older Spinner versions (before the `exec` command), you must rebuild them:
+
+```bash
+./dist/spinner setup --name <your-image-name>
+```
+
+The iteration loop has been rewritten from Bash to Go for better reliability, error handling, and state management. Old images using the Bash-based `ralph-loop.sh` will not work with current versions of Spinner.
+
 ## Writing Effective Prompts
 
 **Spec-driven development works best.** Point the agent at a specification file, design doc, or task list in your repo:
@@ -100,7 +110,7 @@ Configure your project with automated checks that run on each iteration:
 
 When these checks fail, the agent must fix issues before proceeding. This "back pressure" forces correctness and naturally segments work into smaller context windows.
 
-Spinner automatically pushes changes after each iteration, so progress is preserved even if the agent needs to restart with a fresh context.
+Spinner automatically pushes changes after each iteration, so progress is preserved even if the agent needs to restart with a fresh context. The iteration loop is implemented in Go, providing robust state management, JSON parsing, and error handling for long-running autonomous tasks.
 
 ### Example Task Structure
 
@@ -156,6 +166,29 @@ Launch a container and optionally start an agent:
 | `--branch` | Git branch to checkout |
 | `--max-iterations` | Stop after N iterations (default: 30) |
 | `--recreate` | Force fresh container, removing any existing one |
+
+### exec
+
+Execute the autonomous iteration loop inside a Docker container. This command is automatically invoked by containers created with `spinner spin` and manages the agent execution lifecycle.
+
+**Note:** This command is designed to run inside Docker containers and reads all configuration from environment variables. You typically won't need to call it manually.
+
+**Environment Variables:**
+
+- `PROMPT` - Task prompt for the iteration loop (required)
+- `MAX_ITERATIONS` - Maximum number of iterations (required)
+- `BRANCH` - Git branch name (optional)
+- `LOG_DIR` - Directory for log files (optional)
+- `STATE_DIR` - Directory for state file (optional, defaults to `/state`)
+
+**State Management:**
+
+The exec command persists iteration state to `${STATE_DIR}/state.json`, which is mounted from the host. This allows progress to survive container restarts and tracks:
+
+- Current iteration count
+- Branch name
+- Status (running/completed/rate_limited/error/auth_error)
+- Timestamps and metadata
 
 ### Container Access
 

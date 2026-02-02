@@ -83,7 +83,7 @@
 
 ## 10.0 Documentation updates
 
-- [ ] 10.1 Update README.md with exec command description
+- [x] 10.1 Update README.md with exec command description
 - [ ] 10.2 Update docs/usage.md with state file location and format
 - [ ] 10.3 Add migration notes for breaking change
 - [ ] 10.4 Update examples to mention new Go-based loop
