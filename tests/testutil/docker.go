@@ -1,7 +1,9 @@
 package testutil
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -81,4 +83,36 @@ func EnsureDockerRunning(t *testing.T) {
 	cmd := exec.Command("docker", "info")
 	err := cmd.Run()
 	require.NoError(t, err, "Docker daemon is not accessible. Please ensure Docker is running.")
+}
+
+// CleanupTestSpinnerDirs removes all test-related spinner data directories.
+// Matches directories containing "-test-" in the name (e.g., spinner-dockerfile-test-hello-world).
+// This is intended to be called from TestMain for global cleanup after all tests.
+func CleanupTestSpinnerDirs() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	spinnerDir := filepath.Join(homeDir, ".spinner")
+	if _, err := os.Stat(spinnerDir); os.IsNotExist(err) {
+		return nil
+	}
+
+	entries, err := os.ReadDir(spinnerDir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() && strings.Contains(entry.Name(), "-test-") {
+			dirPath := filepath.Join(spinnerDir, entry.Name())
+			if err := os.RemoveAll(dirPath); err != nil {
+				// Log but don't fail on cleanup errors
+				continue
+			}
+		}
+	}
+
+	return nil
 }
