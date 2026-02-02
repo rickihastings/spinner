@@ -84,7 +84,7 @@
 ## 10.0 Documentation updates
 
 - [x] 10.1 Update README.md with exec command description
-- [ ] 10.2 Update docs/usage.md with state file location and format
-- [ ] 10.3 Add migration notes for breaking change
-- [ ] 10.4 Update examples to mention new Go-based loop
-- [ ] 10.5 Verify documentation is complete and accurate
+- [x] 10.2 Update docs/usage.md with state file location and format
+- [x] 10.3 Add migration notes for breaking change
+- [x] 10.4 Update examples to mention new Go-based loop
+- [x] 10.5 Verify documentation is complete and accurate

@@ -127,3 +127,64 @@ These are tested, working examples for future reference:
 - Repository must be a valid git URL (https://, http://, or git@)
 - Either `--prompt` or `--branch` (or both) must be provided
 - Default `max-iterations` is 30 if not specified
+
+## State Management
+
+Spinner maintains persistent state for each running container to track iteration progress and status. This state survives container restarts and allows you to resume work after interruptions.
+
+### State File Location
+
+State is stored in `${STATE_DIR}/state.json` where `STATE_DIR` defaults to `/state` inside the container. This directory is mounted from the host at `~/.spinner/<container-name>/state/` to ensure persistence.
+
+### State File Format
+
+The state file is JSON with the following structure:
+
+```json
+{
+  "branch": "feature-branch",
+  "iteration": 5,
+  "status": "running",
+  "last_updated": "2026-02-02T10:35:00Z",
+  "started_at": "2026-02-02T10:30:00Z",
+  "completed_at": "2026-02-02T10:40:00Z",
+  "error_message": ""
+}
+```
+
+**Fields:**
+
+- `branch` - The git branch being worked on
+- `iteration` - Current iteration count (increments after each Claude execution)
+- `status` - Current execution status (values: `running`, `completed`, `rate_limited`, `error`, `auth_error`)
+- `last_updated` - ISO 8601 timestamp of last state update
+- `started_at` - ISO 8601 timestamp when execution started
+- `completed_at` - ISO 8601 timestamp when execution completed (omitted if not completed)
+- `error_message` - Error message if status is `error` or `auth_error` (omitted if no error)
+
+### Status Values
+
+- `running` - Agent is actively working through iterations
+- `completed` - Agent detected completion signal (`~~ FEATURE_COMPLETED ~~`) and finished successfully
+- `rate_limited` - Hit Claude API rate limit, waiting before retry
+- `error` - General execution error occurred
+- `auth_error` - Claude authentication failed (check `CLAUDE_CODE_OAUTH_TOKEN`)
+
+### Accessing State
+
+View state while container is running:
+
+```bash
+# From host
+cat ~/.spinner/<container-name>/state/state.json
+
+# Inside container
+docker exec -it <container-name> cat /state/state.json
+```
+
+### Resetting State
+
+To start fresh with a new state, either:
+
+1. Use `--recreate` flag which removes the container and its state directory
+2. Manually remove the state directory: `rm -rf ~/.spinner/<container-name>/state/`
