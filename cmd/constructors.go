@@ -11,7 +11,6 @@ import (
 	"github.com/rickihastings/spinner/internal/docker"
 	"github.com/rickihastings/spinner/internal/exec"
 	"github.com/rickihastings/spinner/internal/prerequisites"
-	"github.com/rickihastings/spinner/internal/setup"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -68,7 +67,7 @@ EXAMPLES:
 			}
 
 			// Perform setup using the provided client
-			return performSetupWithClient(context.Background(), client, setup.Config{
+			return performSetupWithClient(context.Background(), client, docker.BuildConfig{
 				Name:       setupName,
 				BaseImage:  setupBaseImage,
 				Dockerfile: setupDockerfile,
@@ -84,7 +83,7 @@ EXAMPLES:
 }
 
 // performSetupWithClient executes the setup workflow with a provided DockerClient.
-func performSetupWithClient(ctx context.Context, client docker.DockerClient, config setup.Config) error {
+func performSetupWithClient(ctx context.Context, client docker.DockerClient, config docker.BuildConfig) error {
 	// Check prerequisites
 	fmt.Println("Checking prerequisites...")
 
@@ -105,13 +104,7 @@ func performSetupWithClient(ctx context.Context, client docker.DockerClient, con
 	fmt.Printf("✓ Prerequisites checked\n")
 	fmt.Printf("Building Docker image: spinner:%s\n", config.Name)
 
-	buildConfig := docker.BuildConfig{
-		Name:       config.Name,
-		BaseImage:  config.BaseImage,
-		Dockerfile: config.Dockerfile,
-	}
-
-	if err := client.BuildImage(ctx, buildConfig); err != nil {
+	if err := client.BuildImage(ctx, config); err != nil {
 		fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 		return err
 	}
@@ -233,7 +226,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				}
 
 				// Perform setup using the provided client
-				if err := performSetupWithClient(ctx, client, setup.Config{
+				if err := performSetupWithClient(ctx, client, docker.BuildConfig{
 					Name:       setupName,
 					BaseImage:  spinBaseImage,
 					Dockerfile: spinDockerfile,
