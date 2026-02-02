@@ -14,6 +14,9 @@ import (
 	"github.com/rickihastings/spinner/internal/agent"
 )
 
+// CompletionSignal is the text that indicates task completion.
+const CompletionSignal = "~~ FEATURE_COMPLETED ~~"
+
 // ExecutorConfig contains configuration for creating a Claude executor.
 type ExecutorConfig struct {
 	// LogPath is the path to write raw log output (optional).
@@ -53,7 +56,7 @@ func NewExecutor(config *ExecutorConfig) *Executor {
 	return &Executor{
 		config:           config,
 		parser:           parser,
-		CompletionSignal: "~~ FEATURE_COMPLETED ~~",
+		CompletionSignal: CompletionSignal,
 		CommandArgs:      []string{},
 	}
 }
@@ -161,19 +164,17 @@ func (e *Executor) Execute(ctx context.Context, prompt string) (<-chan agent.Eve
 	return events, nil
 }
 
-// ExecuteAndCollect runs Claude CLI and collects results into an ExecutionResult.
-// This provides a simpler interface when you don't need to process events in real-time.
-func (e *Executor) ExecuteAndCollect(ctx context.Context, prompt string) (*ExecutionResult, error) {
+// ExecuteAndCollect runs Claude CLI and collects results into an agent.Result.
+// This implements the agent.Executor interface.
+func (e *Executor) ExecuteAndCollect(ctx context.Context, prompt string) (*agent.Result, error) {
 	events, err := e.Execute(ctx, prompt)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &ExecutionResult{}
+	result := &agent.Result{}
 
 	for event := range events {
-		result.TotalEvents++
-
 		switch event.Type {
 		case EventTypeError:
 			data, ok := event.Data.(ErrorData)

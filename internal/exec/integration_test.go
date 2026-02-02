@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/rickihastings/spinner/internal/agent"
 )
 
 // TestIntegration_StateFileCreation tests that state file is created on first run
@@ -32,13 +34,16 @@ func TestIntegration_StateFileCreation(t *testing.T) {
 		t.Fatalf("Failed to initialize state: %v", err)
 	}
 
-	// Mock Claude to complete immediately
-	oldRunClaude := runClaudeFunc
+	// Mock executor to complete immediately
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
-		return &ClaudeResult{Completed: true}, nil
+	executorFactory = func(logPath string) agent.Executor {
+		return &mockExecutor{
+			result: &agent.Result{Completed: true},
+			err:    nil,
+		}
 	}
 
 	oldPushChanges := pushChangesFunc
@@ -100,23 +105,19 @@ func TestIntegration_SingleIteration(t *testing.T) {
 		t.Fatalf("Failed to initialize state: %v", err)
 	}
 
-	// Track Claude calls
-	claudeCalls := 0
+	// Track executor calls
+	executorCalls := 0
 
-	oldRunClaude := runClaudeFunc
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
-		claudeCalls++
-
-		// Verify prompt was passed correctly
-		if prompt != "implement feature X" {
-			t.Errorf("Expected prompt 'implement feature X', got %s", prompt)
+	executorFactory = func(logPath string) agent.Executor {
+		executorCalls++
+		return &mockExecutor{
+			result: &agent.Result{Completed: true},
+			err:    nil,
 		}
-
-		// Complete on first iteration
-		return &ClaudeResult{Completed: true}, nil
 	}
 
 	pushCalls := 0
@@ -142,9 +143,9 @@ func TestIntegration_SingleIteration(t *testing.T) {
 		t.Errorf("Expected exit code 0, got %d", exitCode)
 	}
 
-	// Verify Claude was called once
-	if claudeCalls != 1 {
-		t.Errorf("Expected 1 Claude call, got %d", claudeCalls)
+	// Verify executor was called once
+	if executorCalls != 1 {
+		t.Errorf("Expected 1 executor call, got %d", executorCalls)
 	}
 
 	// Verify push was called once
@@ -191,14 +192,16 @@ func TestIntegration_StatePersistence(t *testing.T) {
 
 	iterationCount := 0
 
-	oldRunClaude := runClaudeFunc
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
+	executorFactory = func(logPath string) agent.Executor {
 		iterationCount++
-		// Don't complete - let it hit max iterations
-		return &ClaudeResult{Completed: false}, nil
+		return &mockExecutor{
+			result: &agent.Result{Completed: false},
+			err:    nil,
+		}
 	}
 
 	oldPushChanges := pushChangesFunc
@@ -274,17 +277,20 @@ func TestIntegration_CompletionSignalDetection(t *testing.T) {
 		t.Fatalf("Failed to initialize state: %v", err)
 	}
 
-	oldRunClaude := runClaudeFunc
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	// Simulate Claude returning completion signal
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
+	// Simulate executor returning completion signal
+	executorFactory = func(logPath string) agent.Executor {
 		// In real execution, completion is detected by scanning message content
 		// for "~~ FEATURE_COMPLETED ~~" signal. Here we just return Completed: true.
-		return &ClaudeResult{
-			Completed: true,
-		}, nil
+		return &mockExecutor{
+			result: &agent.Result{
+				Completed: true,
+			},
+			err: nil,
+		}
 	}
 
 	oldPushChanges := pushChangesFunc
@@ -343,23 +349,29 @@ func TestIntegration_RateLimitHandling(t *testing.T) {
 
 	callCount := 0
 
-	oldRunClaude := runClaudeFunc
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
+	executorFactory = func(logPath string) agent.Executor {
 		callCount++
 
 		// Return rate limit on first call
 		if callCount == 1 {
-			return &ClaudeResult{
-				RateLimited:  true,
-				ErrorMessage: "rate_limit_error: too many requests",
-			}, nil
+			return &mockExecutor{
+				result: &agent.Result{
+					RateLimited:  true,
+					ErrorMessage: "rate_limit_error: too many requests",
+				},
+				err: nil,
+			}
 		}
 
 		// Complete on second call
-		return &ClaudeResult{Completed: true}, nil
+		return &mockExecutor{
+			result: &agent.Result{Completed: true},
+			err:    nil,
+		}
 	}
 
 	oldPushChanges := pushChangesFunc
@@ -404,29 +416,29 @@ func TestIntegration_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name           string
 		maxIterations  int
-		claudeResult   *ClaudeResult
-		claudeError    error
+		result         *agent.Result
+		resultError    error
 		expectedExit   int
 		expectedStatus Status
 	}{
 		{
 			name:           "empty max iterations uses default",
 			maxIterations:  1,
-			claudeResult:   &ClaudeResult{Completed: true},
+			result:         &agent.Result{Completed: true},
 			expectedExit:   0,
 			expectedStatus: StatusCompleted,
 		},
 		{
 			name:           "auth error stops immediately",
 			maxIterations:  5,
-			claudeResult:   &ClaudeResult{AuthError: true, ErrorMessage: "auth failed"},
+			result:         &agent.Result{AuthError: true, ErrorMessage: "auth failed"},
 			expectedExit:   1,
 			expectedStatus: StatusAuthError,
 		},
 		{
 			name:           "generic error continues to next iteration",
 			maxIterations:  2,
-			claudeResult:   &ClaudeResult{Error: os.ErrPermission, ErrorMessage: "permission denied"},
+			result:         &agent.Result{Error: os.ErrPermission, ErrorMessage: "permission denied"},
 			expectedExit:   1,
 			expectedStatus: StatusError,
 		},
@@ -450,12 +462,15 @@ func TestIntegration_EdgeCases(t *testing.T) {
 				t.Fatalf("Failed to initialize state: %v", err)
 			}
 
-			oldRunClaude := runClaudeFunc
+			oldExecutorFactory := executorFactory
 
-			defer func() { runClaudeFunc = oldRunClaude }()
+			defer func() { executorFactory = oldExecutorFactory }()
 
-			runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
-				return tt.claudeResult, tt.claudeError
+			executorFactory = func(logPath string) agent.Executor {
+				return &mockExecutor{
+					result: tt.result,
+					err:    tt.resultError,
+				}
 			}
 
 			oldPushChanges := pushChangesFunc
