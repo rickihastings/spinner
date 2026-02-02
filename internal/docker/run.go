@@ -223,6 +223,9 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 
 		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("MAX_ITERATIONS=%s", maxIterations))
 
+		// Set LOG_DIR to match the mounted logs directory
+		dockerArgs = append(dockerArgs, "-e", "LOG_DIR=/logs")
+
 		// Add branch if specified
 		if config.Branch != "" {
 			dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("BRANCH=%s", escapeShellArg(config.Branch)))

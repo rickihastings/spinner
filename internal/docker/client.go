@@ -106,6 +106,14 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	spinnerBinaryPath := filepath.Join(buildContext, "spinner")
 	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", spinnerBinaryPath)
 
+	// Find project root to ensure go build runs from the correct directory
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		return fmt.Errorf("failed to find project root: %w", err)
+	}
+
+	buildCmd.Dir = projectRoot
+
 	buildCmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64")
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr

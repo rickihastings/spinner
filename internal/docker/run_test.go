@@ -288,6 +288,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			expectedArgs: []string{
 				"-e", "PROMPT='fix the bug'",
 				"-e", "MAX_ITERATIONS=100",
+				"-e", "LOG_DIR=/logs",
 			},
 			description: "should include prompt and default max iterations",
 		},
@@ -304,6 +305,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			expectedArgs: []string{
 				"-e", "PROMPT='add feature'",
 				"-e", "MAX_ITERATIONS=50",
+				"-e", "LOG_DIR=/logs",
 			},
 			description: "should use custom max iterations when provided",
 		},
@@ -320,6 +322,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			expectedArgs: []string{
 				"-e", "PROMPT='test task'",
 				"-e", "BRANCH='feature/new'",
+				"-e", "LOG_DIR=/logs",
 			},
 			description: "should include branch when provided with prompt",
 		},

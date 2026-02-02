@@ -1,136 +1,185 @@
 package exec
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/rickihastings/spinner/internal/agent/claude"
 )
 
-func TestClaudeMessage_ParseNormalMessage(t *testing.T) {
+func TestParser_ParseNormalMessage(t *testing.T) {
 	jsonStr := `{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Hello"}],"stop_reason":"end_turn"}}`
 
-	var msg ClaudeMessage
-	if err := json.Unmarshal([]byte(jsonStr), &msg); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+	parser := claude.NewParser()
+	event := parser.ParseLine(jsonStr)
+
+	if event == nil {
+		t.Fatal("expected event, got nil")
 	}
 
-	if msg.Type != "message" {
-		t.Errorf("expected type 'message', got %s", msg.Type)
+	if event.Type != claude.EventTypeAssistantMessage {
+		t.Errorf("expected type %s, got %s", claude.EventTypeAssistantMessage, event.Type)
 	}
 
-	if len(msg.Message.Content) != 1 {
-		t.Errorf("expected 1 content item, got %d", len(msg.Message.Content))
+	data, ok := event.Data.(claude.AssistantMessageData)
+	if !ok {
+		t.Fatal("expected AssistantMessageData")
 	}
 
-	if msg.Message.Content[0].Text != "Hello" {
-		t.Errorf("expected text 'Hello', got %s", msg.Message.Content[0].Text)
+	if len(data.Content) != 1 {
+		t.Errorf("expected 1 content item, got %d", len(data.Content))
+	}
+
+	if data.Content[0].Text != "Hello" {
+		t.Errorf("expected text 'Hello', got %s", data.Content[0].Text)
 	}
 }
 
-func TestClaudeMessage_ParseCompletionSignal(t *testing.T) {
+func TestParser_ParseCompletionSignal(t *testing.T) {
 	jsonStr := `{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Task completed\n\n~~ FEATURE_COMPLETED ~~\n"}],"stop_reason":"end_turn"}}`
 
-	var msg ClaudeMessage
-	if err := json.Unmarshal([]byte(jsonStr), &msg); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+	parser := claude.NewParser()
+	event := parser.ParseLine(jsonStr)
+
+	if event == nil {
+		t.Fatal("expected event, got nil")
 	}
 
-	// Check if completion signal is present
-	hasSignal := false
-
-	for _, content := range msg.Message.Content {
-		if content.Type == "text" && strings.Contains(content.Text, CompletionSignal) {
-			hasSignal = true
-			break
-		}
-	}
-
-	if !hasSignal {
+	// Check if completion signal is present using the helper function
+	if !claude.ContainsText(event, CompletionSignal) {
 		t.Error("expected completion signal to be present")
 	}
 }
 
-func TestClaudeMessage_ParseRateLimitError(t *testing.T) {
+func TestParser_ParseRateLimitError(t *testing.T) {
 	jsonStr := `{"type":"error","error":{"type":"rate_limit_error","message":"Rate limit exceeded"}}`
 
-	var msg ClaudeMessage
-	if err := json.Unmarshal([]byte(jsonStr), &msg); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+	parser := claude.NewParser()
+	event := parser.ParseLine(jsonStr)
+
+	if event == nil {
+		t.Fatal("expected event, got nil")
 	}
 
-	if msg.Error.Type != "rate_limit_error" {
-		t.Errorf("expected error type 'rate_limit_error', got %s", msg.Error.Type)
+	if event.Type != claude.EventTypeError {
+		t.Errorf("expected type %s, got %s", claude.EventTypeError, event.Type)
 	}
 
-	if !strings.Contains(msg.Error.Type, "rate_limit") {
-		t.Error("expected rate_limit in error type")
+	if !claude.IsRateLimitError(event) {
+		t.Error("expected IsRateLimitError to return true")
 	}
 }
 
-func TestClaudeMessage_ParseAuthError(t *testing.T) {
+func TestParser_ParseAuthError(t *testing.T) {
 	jsonStr := `{"type":"error","error":{"type":"authentication_error","message":"Invalid API key"}}`
 
-	var msg ClaudeMessage
-	if err := json.Unmarshal([]byte(jsonStr), &msg); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+	parser := claude.NewParser()
+	event := parser.ParseLine(jsonStr)
+
+	if event == nil {
+		t.Fatal("expected event, got nil")
 	}
 
-	if msg.Error.Type != "authentication_error" {
-		t.Errorf("expected error type 'authentication_error', got %s", msg.Error.Type)
+	if event.Type != claude.EventTypeError {
+		t.Errorf("expected type %s, got %s", claude.EventTypeError, event.Type)
 	}
 
-	if !strings.Contains(msg.Error.Type, "authentication") {
-		t.Error("expected authentication in error type")
+	if !claude.IsAuthError(event) {
+		t.Error("expected IsAuthError to return true")
 	}
 }
 
-func TestClaudeMessage_ParseGenericError(t *testing.T) {
+func TestParser_ParseGenericError(t *testing.T) {
 	jsonStr := `{"type":"error","error":{"type":"api_error","message":"Something went wrong"}}`
 
-	var msg ClaudeMessage
-	if err := json.Unmarshal([]byte(jsonStr), &msg); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+	parser := claude.NewParser()
+	event := parser.ParseLine(jsonStr)
+
+	if event == nil {
+		t.Fatal("expected event, got nil")
 	}
 
-	if msg.Error.Type != "api_error" {
-		t.Errorf("expected error type 'api_error', got %s", msg.Error.Type)
+	data, ok := event.Data.(claude.ErrorData)
+	if !ok {
+		t.Fatal("expected ErrorData")
 	}
 
-	if msg.Error.Message != "Something went wrong" {
-		t.Errorf("expected error message 'Something went wrong', got %s", msg.Error.Message)
+	if data.Type != "api_error" {
+		t.Errorf("expected error type 'api_error', got %s", data.Type)
+	}
+
+	if data.Message != "Something went wrong" {
+		t.Errorf("expected error message 'Something went wrong', got %s", data.Message)
 	}
 }
 
-func TestClaudeMessage_MultipleContentBlocks(t *testing.T) {
+func TestParser_MultipleContentBlocks(t *testing.T) {
 	jsonStr := `{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"First part"},{"type":"text","text":"Second part"}],"stop_reason":"end_turn"}}`
 
-	var msg ClaudeMessage
-	if err := json.Unmarshal([]byte(jsonStr), &msg); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+	parser := claude.NewParser()
+	event := parser.ParseLine(jsonStr)
+
+	if event == nil {
+		t.Fatal("expected event, got nil")
 	}
 
-	if len(msg.Message.Content) != 2 {
-		t.Errorf("expected 2 content items, got %d", len(msg.Message.Content))
+	data, ok := event.Data.(claude.AssistantMessageData)
+	if !ok {
+		t.Fatal("expected AssistantMessageData")
 	}
 
-	if msg.Message.Content[0].Text != "First part" {
-		t.Errorf("expected first text 'First part', got %s", msg.Message.Content[0].Text)
+	if len(data.Content) != 2 {
+		t.Errorf("expected 2 content items, got %d", len(data.Content))
 	}
 
-	if msg.Message.Content[1].Text != "Second part" {
-		t.Errorf("expected second text 'Second part', got %s", msg.Message.Content[1].Text)
+	if data.Content[0].Text != "First part" {
+		t.Errorf("expected first text 'First part', got %s", data.Content[0].Text)
+	}
+
+	if data.Content[1].Text != "Second part" {
+		t.Errorf("expected second text 'Second part', got %s", data.Content[1].Text)
 	}
 }
 
-func TestClaudeMessage_EmptyContent(t *testing.T) {
+func TestParser_EmptyContent(t *testing.T) {
 	jsonStr := `{"type":"message","message":{"role":"assistant","content":[],"stop_reason":"end_turn"}}`
 
-	var msg ClaudeMessage
-	if err := json.Unmarshal([]byte(jsonStr), &msg); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+	parser := claude.NewParser()
+	event := parser.ParseLine(jsonStr)
+
+	if event == nil {
+		t.Fatal("expected event, got nil")
 	}
 
-	if len(msg.Message.Content) != 0 {
-		t.Errorf("expected 0 content items, got %d", len(msg.Message.Content))
+	data, ok := event.Data.(claude.AssistantMessageData)
+	if !ok {
+		t.Fatal("expected AssistantMessageData")
+	}
+
+	if len(data.Content) != 0 {
+		t.Errorf("expected 0 content items, got %d", len(data.Content))
+	}
+}
+
+func TestExtractText(t *testing.T) {
+	jsonStr := `{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"First part"},{"type":"text","text":"Second part"}],"stop_reason":"end_turn"}}`
+
+	parser := claude.NewParser()
+	event := parser.ParseLine(jsonStr)
+
+	text := claude.ExtractText(event)
+
+	if !strings.Contains(text, "First part") {
+		t.Error("expected text to contain 'First part'")
+	}
+
+	if !strings.Contains(text, "Second part") {
+		t.Error("expected text to contain 'Second part'")
+	}
+}
+
+func TestCompletionSignal(t *testing.T) {
+	if CompletionSignal != "~~ FEATURE_COMPLETED ~~" {
+		t.Errorf("unexpected completion signal: %s", CompletionSignal)
 	}
 }
