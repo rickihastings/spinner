@@ -326,6 +326,21 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			},
 			description: "should include branch when provided with prompt",
 		},
+		{
+			name: "run with branch but no prompt",
+			config: SpinConfig{
+				Image:  "spinner:test",
+				Repo:   "https://github.com/user/repo.git",
+				Branch: "develop",
+			},
+			containerName: "spinner-test-repo-develop",
+			hasNpmrc:      false,
+			expectedArgs: []string{
+				"-e", "BRANCH='develop'",
+			},
+			unexpectedArgs: []string{"PROMPT=", "MAX_ITERATIONS=", "LOG_DIR="},
+			description:    "should include branch even without prompt",
+		},
 	}
 
 	for _, tt := range tests {

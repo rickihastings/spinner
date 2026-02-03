@@ -16,9 +16,21 @@ type Event struct {
 	Data      interface{} `json:"data,omitempty"`
 }
 
+// Result represents the final result of agent execution.
+type Result struct {
+	Completed    bool
+	RateLimited  bool
+	AuthError    bool
+	Error        error
+	ErrorMessage string
+}
+
 // Executor defines the interface for running AI agent commands.
 type Executor interface {
 	// Execute runs the agent with the given prompt and returns a channel of events.
 	// The channel is closed when execution completes or the context is cancelled.
 	Execute(ctx context.Context, prompt string) (<-chan Event, error)
+
+	// ExecuteAndCollect runs the agent and collects all events into a final result.
+	ExecuteAndCollect(ctx context.Context, prompt string) (*Result, error)
 }

@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/rickihastings/spinner/internal/agent"
+	"github.com/rickihastings/spinner/internal/agent/claude"
 )
 
 const (
@@ -15,7 +18,11 @@ const (
 
 // Function variables for testing
 var (
-	runClaudeFunc   = RunClaude
+	executorFactory = func(logPath string) agent.Executor {
+		return claude.NewExecutor(&claude.ExecutorConfig{
+			LogPath: logPath,
+		})
+	}
 	pushChangesFunc = PushChanges
 )
 
@@ -77,7 +84,9 @@ func (r *Runner) Run(ctx context.Context) int {
 		}
 
 		// Run Claude
-		result, err := runClaudeFunc(ctx, r.config.Prompt, logPath)
+		executor := executorFactory(logPath)
+
+		result, err := executor.ExecuteAndCollect(ctx, r.config.Prompt)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error running Claude: %v\n", err)
 

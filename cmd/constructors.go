@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
 
 	"github.com/rickihastings/spinner/internal/docker"
+	"github.com/rickihastings/spinner/internal/exec"
 	"github.com/rickihastings/spinner/internal/prerequisites"
-	"github.com/rickihastings/spinner/internal/setup"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -64,7 +67,7 @@ EXAMPLES:
 			}
 
 			// Perform setup using the provided client
-			return performSetupWithClient(context.Background(), client, setup.Config{
+			return performSetupWithClient(context.Background(), client, docker.BuildConfig{
 				Name:       setupName,
 				BaseImage:  setupBaseImage,
 				Dockerfile: setupDockerfile,
@@ -80,7 +83,7 @@ EXAMPLES:
 }
 
 // performSetupWithClient executes the setup workflow with a provided DockerClient.
-func performSetupWithClient(ctx context.Context, client docker.DockerClient, config setup.Config) error {
+func performSetupWithClient(ctx context.Context, client docker.DockerClient, config docker.BuildConfig) error {
 	// Check prerequisites
 	fmt.Println("Checking prerequisites...")
 
@@ -101,13 +104,7 @@ func performSetupWithClient(ctx context.Context, client docker.DockerClient, con
 	fmt.Printf("✓ Prerequisites checked\n")
 	fmt.Printf("Building Docker image: spinner:%s\n", config.Name)
 
-	buildConfig := docker.BuildConfig{
-		Name:       config.Name,
-		BaseImage:  config.BaseImage,
-		Dockerfile: config.Dockerfile,
-	}
-
-	if err := client.BuildImage(ctx, buildConfig); err != nil {
+	if err := client.BuildImage(ctx, config); err != nil {
 		fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 		return err
 	}
@@ -229,7 +226,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				}
 
 				// Perform setup using the provided client
-				if err := performSetupWithClient(ctx, client, setup.Config{
+				if err := performSetupWithClient(ctx, client, docker.BuildConfig{
 					Name:       setupName,
 					BaseImage:  spinBaseImage,
 					Dockerfile: spinDockerfile,
@@ -366,6 +363,81 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 	cmd.Flags().BoolVar(&spinSetup, "setup", false, "Build/rebuild the Docker image before spinning (optional)")
 	cmd.Flags().StringVar(&spinBaseImage, "base-image", "", "Base Docker image (optional, default: ubuntu:22.04, requires --setup)")
 	cmd.Flags().StringVar(&spinDockerfile, "dockerfile", "", "Path to custom Dockerfile (optional, requires --setup)")
+
+	return cmd
+}
+
+// NewExecCommand creates a new exec command.
+// This command runs inside Docker containers and executes the iteration loop.
+func NewExecCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "exec",
+		Short: "Execute the autonomous iteration loop (runs inside containers)",
+		Long: `Execute the autonomous iteration loop inside a Docker container.
+
+This command is designed to run inside Docker containers created by 'spinner spin'.
+It reads configuration from environment variables and manages an iteration loop
+that interacts with Claude CLI to complete tasks.
+
+ENVIRONMENT VARIABLES:
+  PROMPT             Task prompt for the iteration loop (required)
+  MAX_ITERATIONS     Maximum number of iterations (required)
+  BRANCH             Git branch name (optional)
+  LOG_DIR            Directory for log files (optional)
+  STATE_DIR          Directory for state file (optional, defaults to /state)
+
+STATE MANAGEMENT:
+  State is persisted to ${STATE_DIR}/state.json (mounted from host)
+  This allows iteration progress to survive container restarts.
+
+EXAMPLES:
+  # Typically called automatically by container startup script
+  spinner exec
+
+  # Can be called manually with environment variables
+  PROMPT="Fix bug" MAX_ITERATIONS=10 spinner exec`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load configuration from environment variables
+			config, err := exec.LoadConfig()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+				return err
+			}
+
+			// Build state file path from STATE_DIR (defaults to /state)
+			statePath := filepath.Join(config.StateDir, "state.json")
+
+			// Load or initialize state
+			state, err := exec.LoadState(statePath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error loading state: %v\n", err)
+				return err
+			}
+
+			// Create context with signal handling for Ctrl+C
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Set up signal handling
+			sigChan := make(chan os.Signal, 1)
+			signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+			go func() {
+				<-sigChan
+				fmt.Println("\nReceived interrupt signal...")
+				cancel()
+			}()
+
+			// Create runner and execute loop
+			runner := exec.NewRunner(config, state, statePath)
+			exitCode := runner.Run(ctx)
+
+			// Exit with the appropriate code
+			os.Exit(exitCode)
+
+			return nil
+		},
+	}
 
 	return cmd
 }

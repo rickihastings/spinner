@@ -5,7 +5,24 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/rickihastings/spinner/internal/agent"
 )
+
+// mockExecutor is a test helper that implements agent.Executor interface
+type mockExecutor struct {
+	result *agent.Result
+	err    error
+}
+
+func (m *mockExecutor) Execute(ctx context.Context, prompt string) (<-chan agent.Event, error) {
+	// Not used in loop tests
+	return nil, nil
+}
+
+func (m *mockExecutor) ExecuteAndCollect(ctx context.Context, prompt string) (*agent.Result, error) {
+	return m.result, m.err
+}
 
 func TestNewRunner(t *testing.T) {
 	config := &Config{
@@ -55,17 +72,20 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
-	// Mock RunClaude to return no completion
-	oldRunClaude := runClaudeFunc
+	// Mock executor factory to return no completion
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
-		return &ClaudeResult{
-			Completed:   false,
-			RateLimited: false,
-			AuthError:   false,
-		}, nil
+	executorFactory = func(logPath string) agent.Executor {
+		return &mockExecutor{
+			result: &agent.Result{
+				Completed:   false,
+				RateLimited: false,
+				AuthError:   false,
+			},
+			err: nil,
+		}
 	}
 
 	// Mock PushChanges to always succeed
@@ -123,15 +143,18 @@ func TestRunner_Run_Completion(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
-	// Mock RunClaude to return completion on first iteration
-	oldRunClaude := runClaudeFunc
+	// Mock executor factory to return completion on first iteration
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
-		return &ClaudeResult{
-			Completed: true,
-		}, nil
+	executorFactory = func(logPath string) agent.Executor {
+		return &mockExecutor{
+			result: &agent.Result{
+				Completed: true,
+			},
+			err: nil,
+		}
 	}
 
 	oldPushChanges := pushChangesFunc
@@ -176,15 +199,18 @@ func TestRunner_Run_AuthError(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
-	oldRunClaude := runClaudeFunc
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
-		return &ClaudeResult{
-			AuthError:    true,
-			ErrorMessage: "authentication failed",
-		}, nil
+	executorFactory = func(logPath string) agent.Executor {
+		return &mockExecutor{
+			result: &agent.Result{
+				AuthError:    true,
+				ErrorMessage: "authentication failed",
+			},
+			err: nil,
+		}
 	}
 
 	oldPushChanges := pushChangesFunc
@@ -233,24 +259,30 @@ func TestRunner_Run_RateLimit(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
-	// Mock RunClaude to return rate limit on first call, then completion
+	// Mock executor factory to return rate limit on first call, then completion
 	callCount := 0
-	oldRunClaude := runClaudeFunc
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
+	executorFactory = func(logPath string) agent.Executor {
 		callCount++
 		if callCount == 1 {
-			return &ClaudeResult{
-				RateLimited:  true,
-				ErrorMessage: "rate limited",
-			}, nil
+			return &mockExecutor{
+				result: &agent.Result{
+					RateLimited:  true,
+					ErrorMessage: "rate limited",
+				},
+				err: nil,
+			}
 		}
 
-		return &ClaudeResult{
-			Completed: true,
-		}, nil
+		return &mockExecutor{
+			result: &agent.Result{
+				Completed: true,
+			},
+			err: nil,
+		}
 	}
 
 	oldPushChanges := pushChangesFunc
@@ -291,14 +323,15 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
-	oldRunClaude := runClaudeFunc
+	oldExecutorFactory := executorFactory
 
-	defer func() { runClaudeFunc = oldRunClaude }()
+	defer func() { executorFactory = oldExecutorFactory }()
 
-	runClaudeFunc = func(ctx context.Context, prompt string, logPath string) (*ClaudeResult, error) {
-		// Simulate some work
-		time.Sleep(100 * time.Millisecond)
-		return &ClaudeResult{}, nil
+	executorFactory = func(logPath string) agent.Executor {
+		return &mockExecutor{
+			result: &agent.Result{},
+			err:    nil,
+		}
 	}
 
 	oldPushChanges := pushChangesFunc

@@ -116,3 +116,77 @@ func CleanupTestSpinnerDirs() error {
 
 	return nil
 }
+
+// SetupTestImage builds the CLI, creates a test image with the given setup args, and sets up cleanup
+func SetupTestImage(t *testing.T, setupArgs ...string) (imageTag string, imageName string) {
+	t.Helper()
+
+	SkipIfDockerNotAvailable(t)
+	BuildCLI(t)
+
+	imageTag = GenerateTestImageTag(t)
+	imageName = "spinner:" + imageTag
+
+	t.Cleanup(func() {
+		RemoveDockerImage(t, imageName)
+	})
+
+	// Run setup command with provided args plus the name flag
+	args := append([]string{"setup", "--name", imageTag}, setupArgs...)
+	RunCommandExpectSuccess(t, args...)
+
+	return imageTag, imageName
+}
+
+// RunContainerWithImage starts a container with the given image and returns the container name
+func RunContainerWithImage(t *testing.T, imageName string) string {
+	t.Helper()
+
+	containerName := GenerateTestContainerName(t)
+
+	t.Cleanup(func() {
+		RemoveDockerContainer(t, containerName)
+	})
+
+	cmd := exec.Command("docker", "run", "-d", "--name", containerName, imageName, "tail", "-f", "/dev/null")
+	err := cmd.Run()
+	require.NoError(t, err, "should start container")
+
+	return containerName
+}
+
+// ExecInContainer runs a command in a container and returns the output
+func ExecInContainer(t *testing.T, containerName string, command ...string) string {
+	t.Helper()
+
+	args := append([]string{"exec", containerName}, command...)
+	cmd := exec.Command("docker", args...)
+	output, err := cmd.Output()
+	require.NoError(t, err, "command should succeed in container")
+
+	return string(output)
+}
+
+// RunSpinCommand executes the spin command and returns the container name from output
+func RunSpinCommand(t *testing.T, args ...string) (containerName string, stdout string, stderr string) {
+	t.Helper()
+
+	stdout, stderr = RunCommandExpectSuccess(t, args...)
+	output := stdout + stderr
+
+	// Extract container name from output
+	// Expected format: "Container created successfully: <container-name>"
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "Container created successfully:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 4 {
+				containerName = parts[len(parts)-1]
+				break
+			}
+		}
+	}
+
+	require.NotEmpty(t, containerName, "should extract container name from output: %s", output)
+
+	return containerName, stdout, stderr
+}

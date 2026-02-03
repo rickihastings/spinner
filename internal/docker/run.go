@@ -212,6 +212,11 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 		fmt.Sprintf("%s/.spinner/%s/state:/state", homeDir, containerName),
 	}
 
+	// Add branch if specified
+	if config.Branch != "" {
+		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("BRANCH=%s", escapeShellArg(config.Branch)))
+	}
+
 	// Add Ralph loop environment variables if prompt is provided
 	if config.Prompt != "" {
 		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("PROMPT=%s", escapeShellArg(config.Prompt)))
@@ -225,11 +230,6 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 
 		// Set LOG_DIR to match the mounted logs directory
 		dockerArgs = append(dockerArgs, "-e", "LOG_DIR=/logs")
-
-		// Add branch if specified
-		if config.Branch != "" {
-			dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("BRANCH=%s", escapeShellArg(config.Branch)))
-		}
 	}
 
 	// Add .npmrc mount if it exists

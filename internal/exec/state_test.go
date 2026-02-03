@@ -124,15 +124,26 @@ func TestSaveState(t *testing.T) {
 	statePath := filepath.Join(tmpDir, "subdir", "state.json")
 
 	state := &State{
-		Branch:      "main",
-		Iteration:   3,
-		Status:      StatusRunning,
-		StartedAt:   time.Now(),
-		LastUpdated: time.Now(),
+		Branch:       "main",
+		Iteration:    3,
+		Status:       StatusRunning,
+		ErrorMessage: "test error",
+		StartedAt:    time.Now().Add(-1 * time.Hour),
+		LastUpdated:  time.Now().Add(-30 * time.Minute),
 	}
+
+	oldTimestamp := state.LastUpdated
+
+	// Wait a bit to ensure timestamp changes
+	time.Sleep(10 * time.Millisecond)
 
 	if err := SaveState(statePath, state); err != nil {
 		t.Fatalf("SaveState failed: %v", err)
+	}
+
+	// Verify LastUpdated was updated
+	if !state.LastUpdated.After(oldTimestamp) {
+		t.Error("expected LastUpdated to be updated")
 	}
 
 	// Verify file exists
@@ -140,7 +151,13 @@ func TestSaveState(t *testing.T) {
 		t.Error("state file was not created")
 	}
 
-	// Load and verify
+	// Verify temp file is cleaned up (atomic write)
+	tmpPath := statePath + ".tmp"
+	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
+		t.Error("temp file was not cleaned up")
+	}
+
+	// Load and verify all fields are preserved
 	loaded, err := LoadState(statePath)
 	if err != nil {
 		t.Fatalf("failed to load saved state: %v", err)
@@ -157,54 +174,9 @@ func TestSaveState(t *testing.T) {
 	if loaded.Status != state.Status {
 		t.Errorf("expected status %s, got %s", state.Status, loaded.Status)
 	}
-}
 
-func TestSaveState_UpdatesTimestamp(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.json")
-
-	state := &State{
-		Branch:      "main",
-		Iteration:   1,
-		Status:      StatusRunning,
-		StartedAt:   time.Now(),
-		LastUpdated: time.Now().Add(-1 * time.Hour),
-	}
-
-	oldTimestamp := state.LastUpdated
-
-	// Wait a bit to ensure timestamp changes
-	time.Sleep(10 * time.Millisecond)
-
-	if err := SaveState(statePath, state); err != nil {
-		t.Fatalf("SaveState failed: %v", err)
-	}
-
-	if !state.LastUpdated.After(oldTimestamp) {
-		t.Error("expected LastUpdated to be updated")
-	}
-}
-
-func TestSaveState_AtomicWrite(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.json")
-
-	state := &State{
-		Branch:      "main",
-		Iteration:   1,
-		Status:      StatusRunning,
-		StartedAt:   time.Now(),
-		LastUpdated: time.Now(),
-	}
-
-	if err := SaveState(statePath, state); err != nil {
-		t.Fatalf("SaveState failed: %v", err)
-	}
-
-	// Verify temp file is cleaned up
-	tmpPath := statePath + ".tmp"
-	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
-		t.Error("temp file was not cleaned up")
+	if loaded.ErrorMessage != state.ErrorMessage {
+		t.Errorf("expected error message %s, got %s", state.ErrorMessage, loaded.ErrorMessage)
 	}
 }
 
