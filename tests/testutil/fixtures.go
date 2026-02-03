@@ -2,28 +2,10 @@ package testutil
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"testing"
 	"time"
 )
-
-// GenerateTestID creates a unique identifier for test resources
-func GenerateTestID(t *testing.T) string {
-	t.Helper()
-
-	timestamp := time.Now().Unix()
-	random := rand.Intn(10000)
-
-	return fmt.Sprintf("test-%d-%d", timestamp, random)
-}
-
-// GenerateTestImageName creates a unique Docker image name for testing
-// Returns the full image name (repository:tag format)
-func GenerateTestImageName(t *testing.T) string {
-	t.Helper()
-	return fmt.Sprintf("spinner:test-%d", time.Now().Unix())
-}
 
 // GenerateTestImageTag creates a unique Docker image tag for testing
 // Returns just the tag part (without the "spinner:" prefix)
