@@ -85,6 +85,7 @@ func (r *Runner) Run(ctx context.Context) int {
 
 		// Run Claude
 		executor := executorFactory(logPath)
+
 		result, err := executor.ExecuteAndCollect(ctx, r.config.Prompt)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error running Claude: %v\n", err)
