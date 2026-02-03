@@ -19,47 +19,17 @@ const (
 	workspacePath = "/home/spinner/workspace"
 )
 
-// setupSpinTestEnvironment sets up a test image for spin tests
-func setupSpinTestEnvironment(t *testing.T) (imageTag string, imageName string) {
-	t.Helper()
-	return setupTestImage(t)
-}
-
-// runSpinCommand executes the spin command and returns the container name from output
-func runSpinCommand(t *testing.T, args ...string) (containerName string, stdout string, stderr string) {
-	t.Helper()
-
-	stdout, stderr = testutil.RunCommandExpectSuccess(t, args...)
-	output := stdout + stderr
-
-	// Extract container name from output
-	// Expected format: "Container created successfully: <container-name>"
-	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "Container created successfully:") {
-			parts := strings.Fields(line)
-			if len(parts) >= 4 {
-				containerName = parts[len(parts)-1]
-				break
-			}
-		}
-	}
-
-	require.NotEmpty(t, containerName, "should extract container name from output: %s", output)
-
-	return containerName, stdout, stderr
-}
-
 // TestSpin_SuccessfulContainerCreation tests successful container creation with valid flags
 func TestSpin_SuccessfulContainerCreation(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 	testutil.BuildCLI(t)
 
 	// Setup test image
-	_, imageName := setupSpinTestEnvironment(t)
+	_, imageName := testutil.SetupTestImage(t)
 
 	// Run spin command
 	args := []string{"spin", "--image", imageName, "--repo", testRepo}
-	containerName, stdout, stderr := runSpinCommand(t, args...)
+	containerName, stdout, stderr := testutil.RunSpinCommand(t, args...)
 	output := stdout + stderr
 
 	// Register cleanup
@@ -95,7 +65,7 @@ func TestSpin_ContainerNaming(t *testing.T) {
 
 	// Run spin command
 	args := []string{"spin", "--image", imageName, "--repo", testRepo}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -115,11 +85,11 @@ func TestSpin_ContainerRunning(t *testing.T) {
 	testutil.BuildCLI(t)
 
 	// Setup test image
-	_, imageName := setupSpinTestEnvironment(t)
+	_, imageName := testutil.SetupTestImage(t)
 
 	// Run spin command
 	args := []string{"spin", "--image", imageName, "--repo", testRepo}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -144,11 +114,11 @@ func TestSpin_RepositoryCloned(t *testing.T) {
 	testutil.BuildCLI(t)
 
 	// Setup test image
-	_, imageName := setupSpinTestEnvironment(t)
+	_, imageName := testutil.SetupTestImage(t)
 
 	// Run spin command
 	args := []string{"spin", "--image", imageName, "--repo", testRepo}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -175,11 +145,11 @@ func TestSpin_ContainerExec(t *testing.T) {
 	testutil.BuildCLI(t)
 
 	// Setup test image
-	_, imageName := setupSpinTestEnvironment(t)
+	_, imageName := testutil.SetupTestImage(t)
 
 	// Run spin command
 	args := []string{"spin", "--image", imageName, "--repo", testRepo}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -222,11 +192,11 @@ func TestSpin_PromptWithoutBranch(t *testing.T) {
 	testutil.BuildCLI(t)
 
 	// Setup test image
-	_, imageName := setupSpinTestEnvironment(t)
+	_, imageName := testutil.SetupTestImage(t)
 
 	// Run spin command with --prompt but without --branch
 	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--prompt", "echo test"}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -263,11 +233,11 @@ func TestSpin_BranchWithoutPrompt(t *testing.T) {
 	testutil.BuildCLI(t)
 
 	// Setup test image
-	_, imageName := setupSpinTestEnvironment(t)
+	_, imageName := testutil.SetupTestImage(t)
 
 	// Run spin command with --branch but without --prompt
 	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--branch", "test"}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -315,7 +285,7 @@ func TestSpin_ReuseRunningContainer(t *testing.T) {
 
 	// First run: create container
 	args := []string{"spin", "--image", imageName, "--repo", testRepo}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -353,7 +323,7 @@ func TestSpin_RestartStoppedContainer(t *testing.T) {
 
 	// First run: create container
 	args := []string{"spin", "--image", imageName, "--repo", testRepo}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -385,14 +355,14 @@ func TestSpin_PrivateRepoClone(t *testing.T) {
 	testutil.BuildCLI(t)
 
 	// Setup test image
-	_, imageName := setupSpinTestEnvironment(t)
+	_, imageName := testutil.SetupTestImage(t)
 
 	// Use a private repository (assumes GITHUB_TOKEN is set)
 	privateRepo := "https://github.com/rickihastings/spinner.git"
 
 	// Run spin command with private repo
 	args := []string{"spin", "--image", imageName, "--repo", privateRepo}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -429,7 +399,7 @@ func TestSpin_DeterministicNamingWithBranch(t *testing.T) {
 
 	// Run spin command with branch
 	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--prompt", "test", "--branch", testBranch}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -467,7 +437,7 @@ func TestSpin_NameSanitization(t *testing.T) {
 
 	// Run spin command
 	args := []string{"spin", "--image", imageName, "--repo", sshRepo, "--prompt", "test", "--branch", testBranch}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
@@ -504,7 +474,7 @@ func TestSpin_RecreateFlag(t *testing.T) {
 
 	// First run: create container
 	args := []string{"spin", "--image", imageName, "--repo", testRepo}
-	containerName, _, _ := runSpinCommand(t, args...)
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
 
 	// Register cleanup
 	t.Cleanup(func() {
