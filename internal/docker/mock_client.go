@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockDockerClient is a mock implementation of DockerClient for testing.
+// MockDockerClient is a mock implementation of Client for testing.
 type MockDockerClient struct {
 	mock.Mock
 }
@@ -41,10 +41,26 @@ func (m *MockDockerClient) RemoveContainer(ctx context.Context, name string) (Co
 	return args.Get(0).(ContainerResult), args.Error(1)
 }
 
-// RestartContainer mocks the RestartContainer method.
-func (m *MockDockerClient) RestartContainer(ctx context.Context, name string) (ContainerResult, error) {
+// StartContainer mocks the StartContainer method.
+func (m *MockDockerClient) StartContainer(ctx context.Context, name string) (ContainerResult, error) {
 	args := m.Called(ctx, name)
 	return args.Get(0).(ContainerResult), args.Error(1)
+}
+
+// StopContainer mocks the StopContainer method.
+func (m *MockDockerClient) StopContainer(ctx context.Context, name string) error {
+	args := m.Called(ctx, name)
+	return args.Error(0)
+}
+
+// LogsContainer mocks the LogsContainer method.
+func (m *MockDockerClient) LogsContainer(ctx context.Context, name string) ([]byte, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).([]byte), args.Error(1)
 }
 
 // VerifyContainerStatus mocks the VerifyContainerStatus method.

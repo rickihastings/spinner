@@ -15,12 +15,12 @@ type mockExecutor struct {
 	err    error
 }
 
-func (m *mockExecutor) Execute(ctx context.Context, prompt string) (<-chan agent.Event, error) {
+func (m *mockExecutor) Execute(_ context.Context, _ string) (<-chan agent.Event, error) {
 	// Not used in loop tests
 	return nil, nil
 }
 
-func (m *mockExecutor) ExecuteAndCollect(ctx context.Context, prompt string) (*agent.Result, error) {
+func (m *mockExecutor) ExecuteAndCollect(_ context.Context, _ string) (*agent.Result, error) {
 	return m.result, m.err
 }
 

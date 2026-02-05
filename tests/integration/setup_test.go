@@ -19,12 +19,12 @@ func TestSetup_BasicBuild(t *testing.T) {
 		{
 			name:       "default base image",
 			setupArgs:  []string{},
-			wantOutput: "Docker image built successfully",
+			wantOutput: "Environment provisioned",
 		},
 		{
 			name:       "custom base image",
 			setupArgs:  []string{"--base-image", "ubuntu:22.04"},
-			wantOutput: "Docker image built successfully",
+			wantOutput: "Environment provisioned",
 		},
 	}
 

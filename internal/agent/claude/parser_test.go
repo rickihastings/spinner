@@ -40,10 +40,6 @@ func TestParser_ParseSystemInit(t *testing.T) {
 	if data.CWD != "/home/test" {
 		t.Errorf("expected cwd /home/test, got %s", data.CWD)
 	}
-
-	if data.MaxTurns != 10 {
-		t.Errorf("expected max_turns 10, got %d", data.MaxTurns)
-	}
 }
 
 func TestParser_ParseAssistantMessage(t *testing.T) {
@@ -228,20 +224,12 @@ func TestParser_ParseResultMessage(t *testing.T) {
 		t.Errorf("expected subtype success, got %s", data.Subtype)
 	}
 
-	if data.CostUSD != 0.05 {
-		t.Errorf("expected cost_usd 0.05, got %f", data.CostUSD)
-	}
-
 	if data.InputTokens != 1000 {
 		t.Errorf("expected input_tokens 1000, got %d", data.InputTokens)
 	}
 
 	if data.OutputTokens != 500 {
 		t.Errorf("expected output_tokens 500, got %d", data.OutputTokens)
-	}
-
-	if data.NumTurns != 3 {
-		t.Errorf("expected num_turns 3, got %d", data.NumTurns)
 	}
 }
 

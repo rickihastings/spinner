@@ -581,7 +581,7 @@ func TestContainerReuse_MockClient(t *testing.T) {
 			}
 
 			if tt.shouldCallRestart {
-				mockClient.On("RestartContainer", ctx, containerName).Return(
+				mockClient.On("StartContainer", ctx, containerName).Return(
 					ContainerResult{Success: true, ContainerName: containerName}, nil,
 				)
 			}
@@ -602,7 +602,7 @@ func TestContainerReuse_MockClient(t *testing.T) {
 					assert.NoError(t, err)
 				}
 			} else if status == StatusStopped {
-				_, err := mockClient.RestartContainer(ctx, containerName)
+				_, err := mockClient.StartContainer(ctx, containerName)
 				assert.NoError(t, err)
 			}
 

@@ -38,7 +38,7 @@ func TestSpin_SuccessfulContainerCreation(t *testing.T) {
 	})
 
 	// Verify success message in output
-	assert.Contains(t, output, "Container created successfully", "should show success message")
+	assert.Contains(t, output, "Instance created successfully", "should show success message")
 
 	// Verify container was created
 	assert.True(t, testutil.DockerContainerExists(t, containerName), "container should exist")
@@ -52,10 +52,6 @@ func TestSpin_ContainerNaming(t *testing.T) {
 	// Setup test image with a specific tag
 	imageTag := "test-env"
 	imageName := "spinner:" + imageTag
-
-	// Build the test image first
-	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	t.Cleanup(func() {
 		testutil.RemoveDockerImage(t, imageName)
@@ -180,7 +176,7 @@ func TestSpin_NonExistentImage(t *testing.T) {
 	output := stdout + stderr
 
 	// Verify error message
-	assert.Contains(t, output, "Docker image '"+nonExistentImage+"' not found", "should show image not found error")
+	assert.Contains(t, output, "image '"+nonExistentImage+"' not found", "should show image not found error")
 
 	// Verify exit code is 1
 	assert.Equal(t, 1, exitCode, "should exit with code 1")
@@ -274,9 +270,6 @@ func TestSpin_ReuseRunningContainer(t *testing.T) {
 	imageTag := "test-env"
 	imageName := "spinner:" + imageTag
 
-	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
-
 	t.Cleanup(func() {
 		testutil.RemoveDockerImage(t, imageName)
 	})
@@ -300,7 +293,7 @@ func TestSpin_ReuseRunningContainer(t *testing.T) {
 	output := stdout + stderr
 
 	// Verify output indicates reuse
-	assert.Contains(t, output, "Reusing running container: "+containerName, "should reuse running container")
+	assert.Contains(t, output, "Reusing running instance: "+containerName, "should reuse running container")
 }
 
 // TestSpin_RestartStoppedContainer tests that stopped container is restarted
@@ -311,9 +304,6 @@ func TestSpin_RestartStoppedContainer(t *testing.T) {
 	// Setup test image with a specific tag
 	imageTag := "test-env"
 	imageName := "spinner:" + imageTag
-
-	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	t.Cleanup(func() {
 		testutil.RemoveDockerImage(t, imageName)
@@ -343,7 +333,7 @@ func TestSpin_RestartStoppedContainer(t *testing.T) {
 	output := stdout + stderr
 
 	// Verify output indicates restart
-	assert.Contains(t, output, "Container restarted: "+containerName, "should restart stopped container")
+	assert.Contains(t, output, "Instance restarted: "+containerName, "should restart stopped container")
 
 	// Verify container is running again
 	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running after restart")
@@ -388,9 +378,6 @@ func TestSpin_DeterministicNamingWithBranch(t *testing.T) {
 	imageName := "spinner:" + imageTag
 	testBranch := "master"
 
-	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
-
 	t.Cleanup(func() {
 		testutil.RemoveDockerImage(t, imageName)
 	})
@@ -421,9 +408,6 @@ func TestSpin_NameSanitization(t *testing.T) {
 	// Setup test image with a specific tag
 	imageTag := "test-env"
 	imageName := "spinner:" + imageTag
-
-	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	t.Cleanup(func() {
 		testutil.RemoveDockerImage(t, imageName)
@@ -463,9 +447,6 @@ func TestSpin_RecreateFlag(t *testing.T) {
 	imageTag := "test-env"
 	imageName := "spinner:" + imageTag
 
-	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
-
 	t.Cleanup(func() {
 		testutil.RemoveDockerImage(t, imageName)
 	})
@@ -504,7 +485,7 @@ func TestSpin_RecreateFlag(t *testing.T) {
 	assert.NotEqual(t, containerIDBefore, containerIDAfter, "container should have different ID after recreate")
 
 	// Verify output indicates creation (not reuse)
-	assert.Contains(t, recreateOutput, "Container created successfully: "+containerName, "should show container creation message")
+	assert.Contains(t, recreateOutput, "Instance created successfully: "+containerName, "should show container creation message")
 }
 
 // TestSpin_SetupWithBaseImage tests that --setup with --base-image builds and creates container
@@ -529,10 +510,10 @@ func TestSpin_SetupWithBaseImage(t *testing.T) {
 	output := stdout + stderr
 
 	// Verify image build was successful
-	assert.Contains(t, output, "Docker image built successfully", "should show image build success message")
+	assert.Contains(t, output, "Environment provisioned", "should show image build success message")
 
 	// Verify container creation was successful
-	assert.Contains(t, output, "Container created successfully", "should show container creation message")
+	assert.Contains(t, output, "Instance created successfully", "should show container creation message")
 
 	// Verify the image was created
 	assert.True(t, testutil.DockerImageExists(t, imageName), "image should exist after setup")
@@ -541,7 +522,7 @@ func TestSpin_SetupWithBaseImage(t *testing.T) {
 	var containerName string
 
 	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "Container created successfully:") {
+		if strings.Contains(line, "Instance created successfully:") {
 			parts := strings.Fields(line)
 			if len(parts) >= 4 {
 				containerName = parts[len(parts)-1]
@@ -592,10 +573,10 @@ WORKDIR /workspace
 	output := stdout + stderr
 
 	// Verify image build was successful
-	assert.Contains(t, output, "Docker image built successfully", "should show image build success message")
+	assert.Contains(t, output, "Environment provisioned", "should show image build success message")
 
 	// Verify container creation was successful
-	assert.Contains(t, output, "Container created successfully", "should show container creation message")
+	assert.Contains(t, output, "Instance created successfully", "should show container creation message")
 
 	// Verify the image was created
 	assert.True(t, testutil.DockerImageExists(t, imageName), "image should exist after setup")
@@ -604,7 +585,7 @@ WORKDIR /workspace
 	var containerName string
 
 	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "Container created successfully:") {
+		if strings.Contains(line, "Instance created successfully:") {
 			parts := strings.Fields(line)
 			if len(parts) >= 4 {
 				containerName = parts[len(parts)-1]
@@ -644,10 +625,10 @@ func TestSpin_SetupRebuildsExistingImage(t *testing.T) {
 	output := stdout + stderr
 
 	// Verify image build was successful (this proves --setup triggered the build process)
-	assert.Contains(t, output, "Docker image built successfully", "should rebuild image even if it exists")
+	assert.Contains(t, output, "Environment provisioned", "should rebuild image even if it exists")
 
 	// Verify container creation was successful
-	assert.Contains(t, output, "Container created successfully", "should show container creation message")
+	assert.Contains(t, output, "Instance created successfully", "should show container creation message")
 
 	// Verify the image still exists
 	assert.True(t, testutil.DockerImageExists(t, imageName), "image should exist after rebuild")
@@ -656,7 +637,7 @@ func TestSpin_SetupRebuildsExistingImage(t *testing.T) {
 	var containerName string
 
 	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "Container created successfully:") {
+		if strings.Contains(line, "Instance created successfully:") {
 			parts := strings.Fields(line)
 			if len(parts) >= 4 {
 				containerName = parts[len(parts)-1]

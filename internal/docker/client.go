@@ -8,11 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/rickihastings/spinner/internal/util"
 )
 
-// DockerClient defines the interface for Docker operations.
+// Client defines the interface for Docker operations.
 // This interface enables dependency injection and mocking for testability.
-type DockerClient interface {
+type Client interface {
 	// BuildImage builds a Docker image with the given configuration
 	BuildImage(ctx context.Context, config BuildConfig) error
 
@@ -28,14 +30,20 @@ type DockerClient interface {
 	// RemoveContainer removes a container, forcing removal if it's running
 	RemoveContainer(ctx context.Context, name string) (ContainerResult, error)
 
-	// RestartContainer restarts a stopped container
-	RestartContainer(ctx context.Context, name string) (ContainerResult, error)
+	// StartContainer starts a stopped container
+	StartContainer(ctx context.Context, name string) (ContainerResult, error)
+
+	// StopContainer stops a running container
+	StopContainer(ctx context.Context, name string) error
+
+	// LogsContainer returns the logs from a container
+	LogsContainer(ctx context.Context, name string) ([]byte, error)
 
 	// VerifyContainerStatus verifies that a container is running
 	VerifyContainerStatus(ctx context.Context, name string) (ContainerResult, error)
 }
 
-// RealDockerClient implements DockerClient using actual Docker CLI commands.
+// RealDockerClient implements Client using actual Docker CLI commands.
 type RealDockerClient struct{}
 
 // NewRealDockerClient creates a new RealDockerClient instance.
@@ -87,7 +95,7 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	// Copy build files to build context
 	templatesDir := filepath.Join(buildContext, "templates")
 	for _, bf := range buildFiles {
-		srcPath, err := resolveTemplatePath(filepath.Join("templates", bf.src))
+		srcPath, err := util.ResolveTemplatePath(filepath.Join("templates", bf.src))
 		if err != nil {
 			return fmt.Errorf("failed to find %s: %w", bf.src, err)
 		}
@@ -107,7 +115,7 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", spinnerBinaryPath)
 
 	// Find project root to ensure go build runs from the correct directory
-	projectRoot, err := findProjectRoot()
+	projectRoot, err := util.FindProjectRoot()
 	if err != nil {
 		return fmt.Errorf("failed to find project root: %w", err)
 	}
@@ -231,8 +239,8 @@ func (c *RealDockerClient) RemoveContainer(ctx context.Context, name string) (Co
 	}, nil
 }
 
-// RestartContainer restarts a stopped container.
-func (c *RealDockerClient) RestartContainer(ctx context.Context, name string) (ContainerResult, error) {
+// StartContainer starts a stopped container.
+func (c *RealDockerClient) StartContainer(ctx context.Context, name string) (ContainerResult, error) {
 	cmd := exec.CommandContext(ctx, "docker", "start", name)
 
 	output, err := cmd.CombinedOutput()
@@ -248,6 +256,30 @@ func (c *RealDockerClient) RestartContainer(ctx context.Context, name string) (C
 		Success:       true,
 		ContainerName: name,
 	}, nil
+}
+
+// StopContainer stops a running container.
+func (c *RealDockerClient) StopContainer(ctx context.Context, name string) error {
+	cmd := exec.CommandContext(ctx, "docker", "stop", name)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to stop container: %s", strings.TrimSpace(string(output)))
+	}
+
+	return nil
+}
+
+// LogsContainer returns the logs from a container.
+func (c *RealDockerClient) LogsContainer(ctx context.Context, name string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "docker", "logs", name)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container logs: %s", strings.TrimSpace(string(output)))
+	}
+
+	return output, nil
 }
 
 // VerifyContainerStatus verifies that a container is running.

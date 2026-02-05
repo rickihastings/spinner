@@ -175,9 +175,9 @@ func RunSpinCommand(t *testing.T, args ...string) (containerName string, stdout 
 	output := stdout + stderr
 
 	// Extract container name from output
-	// Expected format: "Container created successfully: <container-name>"
+	// Expected format: "Instance created successfully: <container-name>"
 	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "Container created successfully:") {
+		if strings.Contains(line, "Instance created successfully:") {
 			parts := strings.Fields(line)
 			if len(parts) >= 4 {
 				containerName = parts[len(parts)-1]

@@ -153,7 +153,7 @@ func (e *Executor) Execute(ctx context.Context, prompt string) (<-chan agent.Eve
 				events <- agent.Event{
 					Type: EventTypeError,
 					Data: ErrorData{
-						Type:    "command_error",
+						Type:    ErrorTypeCommand,
 						Message: err.Error(),
 					},
 				}
@@ -188,7 +188,7 @@ func (e *Executor) ExecuteAndCollect(ctx context.Context, prompt string) (*agent
 				result.RateLimited = true
 			} else if IsAuthError(&event) {
 				result.AuthError = true
-			} else if data.Type != "command_error" {
+			} else if data.Type != ErrorTypeCommand {
 				result.Error = fmt.Errorf("claude error: %s", data.Message)
 			}
 

@@ -2,74 +2,32 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
-	"github.com/rickihastings/spinner/internal/docker"
+	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockDockerClient is a mock implementation of docker.DockerClient for testing
-type MockDockerClient struct {
-	mock.Mock
-}
+func setupSpinCommandWithMocks(t *testing.T) *cobra.Command {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
 
-func (m *MockDockerClient) BuildImage(ctx context.Context, config docker.BuildConfig) error {
-	args := m.Called(ctx, config)
-	return args.Error(0)
-}
+	mockProvider := new(provider.MockProvider)
+	mockProvider.On("InstanceName", mock.Anything).Return("test-container")
+	mockProvider.On("Status", mock.Anything, "test-container").Return(provider.InstanceStatusNone, nil)
+	mockProvider.On("Create", mock.Anything, mock.Anything).Return(
+		&provider.Instance{Name: "test-container", Status: provider.InstanceStatusRunning}, nil,
+	)
 
-func (m *MockDockerClient) ImageExists(ctx context.Context, image string) (bool, error) {
-	args := m.Called(ctx, image)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockDockerClient) ContainerExists(ctx context.Context, name string) (docker.ContainerStatus, error) {
-	args := m.Called(ctx, name)
-	return args.Get(0).(docker.ContainerStatus), args.Error(1)
-}
-
-func (m *MockDockerClient) RunContainer(ctx context.Context, dockerArgs []string, containerName string) (docker.ContainerResult, error) {
-	args := m.Called(ctx, dockerArgs, containerName)
-	return args.Get(0).(docker.ContainerResult), args.Error(1)
-}
-
-func (m *MockDockerClient) VerifyContainerStatus(ctx context.Context, containerName string) (docker.ContainerResult, error) {
-	args := m.Called(ctx, containerName)
-	return args.Get(0).(docker.ContainerResult), args.Error(1)
-}
-
-func (m *MockDockerClient) RemoveContainer(ctx context.Context, containerName string) (docker.ContainerResult, error) {
-	args := m.Called(ctx, containerName)
-	return args.Get(0).(docker.ContainerResult), args.Error(1)
-}
-
-func (m *MockDockerClient) RestartContainer(ctx context.Context, containerName string) (docker.ContainerResult, error) {
-	args := m.Called(ctx, containerName)
-	return args.Get(0).(docker.ContainerResult), args.Error(1)
-}
-
-func setupSpinCommandWithMocks() *cobra.Command {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
-
-	// Mock the prerequisites validation to pass
-	mockClient.On("ImageExists", mock.Anything, "spinner:test").Return(true, nil)
-
-	// Mock container operations
-	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusNone, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-
-	return cmd
+	return NewSpinCommand(mockProvider)
 }
 
 // TestSpinCommand_MissingImageFlag tests that spin command fails when --image flag is missing
 func TestSpinCommand_MissingImageFlag(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(mockProvider)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -84,8 +42,8 @@ func TestSpinCommand_MissingImageFlag(t *testing.T) {
 
 // TestSpinCommand_MissingRepoFlag tests that spin command fails when --repo flag is missing
 func TestSpinCommand_MissingRepoFlag(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(mockProvider)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -100,7 +58,7 @@ func TestSpinCommand_MissingRepoFlag(t *testing.T) {
 
 // TestSpinCommand_PromptFlagParsing tests that --prompt flag is correctly parsed
 func TestSpinCommand_PromptFlagParsing(t *testing.T) {
-	cmd := setupSpinCommandWithMocks()
+	cmd := setupSpinCommandWithMocks(t)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -109,13 +67,12 @@ func TestSpinCommand_PromptFlagParsing(t *testing.T) {
 
 	err := cmd.Execute()
 
-	// The command should succeed (the prompt is optional and doesn't cause errors)
 	assert.NoError(t, err)
 }
 
 // TestSpinCommand_BranchFlagParsing tests that --branch flag is correctly parsed
 func TestSpinCommand_BranchFlagParsing(t *testing.T) {
-	cmd := setupSpinCommandWithMocks()
+	cmd := setupSpinCommandWithMocks(t)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -129,7 +86,7 @@ func TestSpinCommand_BranchFlagParsing(t *testing.T) {
 
 // TestSpinCommand_MaxIterationsFlagParsing tests that --max-iterations flag is correctly parsed
 func TestSpinCommand_MaxIterationsFlagParsing(t *testing.T) {
-	cmd := setupSpinCommandWithMocks()
+	cmd := setupSpinCommandWithMocks(t)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -141,19 +98,20 @@ func TestSpinCommand_MaxIterationsFlagParsing(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestSpinCommand_RecreateFlagParsing tests that --recreate flag is correctly parsed
+// TestSpinCommand_RecreateFlagParsing tests that --recreate flag triggers Remove then Create
 func TestSpinCommand_RecreateFlagParsing(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
 
-	// Mock the prerequisites validation to pass
-	mockClient.On("ImageExists", mock.Anything, "spinner:test").Return(true, nil)
+	mockProvider := new(provider.MockProvider)
+	mockProvider.On("InstanceName", mock.Anything).Return("test-container")
+	mockProvider.On("Status", mock.Anything, "test-container").Return(provider.InstanceStatusRunning, nil)
+	mockProvider.On("Remove", mock.Anything, "test-container").Return(nil)
+	mockProvider.On("Create", mock.Anything, mock.Anything).Return(
+		&provider.Instance{Name: "test-container", Status: provider.InstanceStatusRunning}, nil,
+	)
 
-	// Mock container operations - container exists and should be removed
-	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusRunning, nil)
-	mockClient.On("RemoveContainer", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	cmd := NewSpinCommand(mockProvider)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -163,24 +121,23 @@ func TestSpinCommand_RecreateFlagParsing(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
-	mockClient.AssertCalled(t, "RemoveContainer", mock.Anything, mock.Anything)
+	mockProvider.AssertCalled(t, "Remove", mock.Anything, "test-container")
 }
 
 // TestSpinCommand_SetupFlagParsing tests that --setup flag is correctly parsed
 func TestSpinCommand_SetupFlagParsing(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
 
-	// Mock setup operations
-	mockClient.On("BuildImage", mock.Anything, mock.Anything).Return(nil)
+	mockProvider := new(provider.MockProvider)
+	mockProvider.On("Setup", mock.Anything, mock.Anything).Return(nil)
+	mockProvider.On("InstanceName", mock.Anything).Return("test-container")
+	mockProvider.On("Status", mock.Anything, "test-container").Return(provider.InstanceStatusNone, nil)
+	mockProvider.On("Create", mock.Anything, mock.Anything).Return(
+		&provider.Instance{Name: "test-container", Status: provider.InstanceStatusRunning}, nil,
+	)
 
-	// Mock the prerequisites validation to pass
-	mockClient.On("ImageExists", mock.Anything, "spinner:test").Return(true, nil)
-
-	// Mock container operations
-	mockClient.On("ContainerExists", mock.Anything, mock.Anything).Return(docker.StatusNone, nil)
-	mockClient.On("RunContainer", mock.Anything, mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
-	mockClient.On("VerifyContainerStatus", mock.Anything, mock.Anything).Return(docker.ContainerResult{Success: true}, nil)
+	cmd := NewSpinCommand(mockProvider)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -190,13 +147,13 @@ func TestSpinCommand_SetupFlagParsing(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
-	mockClient.AssertCalled(t, "BuildImage", mock.Anything, mock.Anything)
+	mockProvider.AssertCalled(t, "Setup", mock.Anything, mock.Anything)
 }
 
 // TestSpinCommand_SetupWithBaseImageValidation tests that --base-image requires --setup flag
 func TestSpinCommand_SetupWithBaseImageValidation(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(mockProvider)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -211,8 +168,8 @@ func TestSpinCommand_SetupWithBaseImageValidation(t *testing.T) {
 
 // TestSpinCommand_SetupMutuallyExclusiveFlags tests that --base-image and --dockerfile are mutually exclusive with --setup
 func TestSpinCommand_SetupMutuallyExclusiveFlags(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	cmd := NewSpinCommand(mockClient)
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(mockProvider)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -229,6 +186,25 @@ func TestSpinCommand_SetupMutuallyExclusiveFlags(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+// TestSpinCommand_InvalidRepoURL tests that an invalid repo URL is rejected
+func TestSpinCommand_InvalidRepoURL(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(mockProvider)
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{"--image", "spinner:test", "--repo", "not-a-valid-url"})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "repository must be a valid git URL")
 }
 
 // TestSpinCommand_FlagCombinations is a table-driven test for various flag combinations
@@ -279,8 +255,8 @@ func TestSpinCommand_FlagCombinations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := new(MockDockerClient)
-			cmd := NewSpinCommand(mockClient)
+			mockProvider := new(provider.MockProvider)
+			cmd := NewSpinCommand(mockProvider)
 
 			b := new(bytes.Buffer)
 			cmd.SetOut(b)

@@ -1,13 +1,13 @@
-package docker
+package util
 
 import (
 	"os"
 	"path/filepath"
 )
 
-// findProjectRoot walks up the directory tree to find the project root
+// FindProjectRoot walks up the directory tree to find the project root
 // (indicated by the presence of go.mod file)
-func findProjectRoot() (string, error) {
+func FindProjectRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -30,15 +30,15 @@ func findProjectRoot() (string, error) {
 	}
 }
 
-// resolveTemplatePath resolves a template path relative to the project root
-func resolveTemplatePath(relativePath string) (string, error) {
+// ResolveTemplatePath resolves a template path relative to the project root
+func ResolveTemplatePath(relativePath string) (string, error) {
 	// First try relative to current directory
 	if _, err := os.Stat(relativePath); err == nil {
 		return relativePath, nil
 	}
 
 	// Try relative to project root
-	projectRoot, err := findProjectRoot()
+	projectRoot, err := FindProjectRoot()
 	if err != nil {
 		return "", err
 	}

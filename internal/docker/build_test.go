@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rickihastings/spinner/internal/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -84,7 +85,7 @@ func TestResolveTemplatePath_RelativeToCurrentDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resolvedPath, err := resolveTemplatePath("test-template.txt")
+	resolvedPath, err := util.ResolveTemplatePath("test-template.txt")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "test-template.txt", resolvedPath)
@@ -94,7 +95,7 @@ func TestResolveTemplatePath_RelativeToCurrentDir(t *testing.T) {
 func TestFindProjectRoot_Success(t *testing.T) {
 	// This test assumes we're running from within the project
 	// which should have a go.mod file at the root
-	projectRoot, err := findProjectRoot()
+	projectRoot, err := util.FindProjectRoot()
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, projectRoot)
@@ -120,7 +121,7 @@ func TestFindProjectRoot_NotFound(t *testing.T) {
 		t.Skip("Cannot change to root directory")
 	}
 
-	_, err = findProjectRoot()
+	_, err = util.FindProjectRoot()
 
 	assert.Error(t, err)
 	assert.Equal(t, os.ErrNotExist, err)

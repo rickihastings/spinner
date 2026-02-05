@@ -219,32 +219,6 @@ func TestEventCollector_GetAllToolUses(t *testing.T) {
 	}
 }
 
-func TestExecutionResult_Fields(t *testing.T) {
-	result := &ExecutionResult{
-		Completed:    true,
-		RateLimited:  false,
-		AuthError:    false,
-		TotalEvents:  10,
-		ErrorMessage: "test message",
-	}
-
-	if !result.Completed {
-		t.Error("expected Completed to be true")
-	}
-
-	if result.RateLimited {
-		t.Error("expected RateLimited to be false")
-	}
-
-	if result.TotalEvents != 10 {
-		t.Errorf("expected TotalEvents 10, got %d", result.TotalEvents)
-	}
-
-	if result.ErrorMessage != "test message" {
-		t.Errorf("expected ErrorMessage 'test message', got %s", result.ErrorMessage)
-	}
-}
-
 func TestExecutorConfig_Defaults(t *testing.T) {
 	config := &ExecutorConfig{}
 

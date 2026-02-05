@@ -34,3 +34,20 @@ type Executor interface {
 	// ExecuteAndCollect runs the agent and collects all events into a final result.
 	ExecuteAndCollect(ctx context.Context, prompt string) (*Result, error)
 }
+
+// LineParser converts a single raw log line into a structured Event.
+// Each agent implementation (claude, etc.) provides its own LineParser.
+// The docker package must not import any agent implementation directly;
+// it receives a LineParser at construction time. This keeps docker reusable
+// when a second agent type is added.
+type LineParser interface {
+	ParseLine(line string) *Event
+}
+
+// EventFormatter converts a structured Event into a human-readable display
+// string. Each agent implementation provides its own EventFormatter.
+// The tui package must not import any agent implementation directly;
+// it receives an EventFormatter at construction time.
+type EventFormatter interface {
+	FormatEvent(event *Event) (string, bool)
+}

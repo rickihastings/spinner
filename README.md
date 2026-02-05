@@ -155,7 +155,8 @@ Launch a container and optionally start an agent:
   [--prompt "task description"] \
   [--branch feature-branch] \
   [--max-iterations 50] \
-  [--recreate]
+  [--recreate] \
+  [--watch]
 ```
 
 | Flag | Description |
@@ -166,6 +167,31 @@ Launch a container and optionally start an agent:
 | `--branch` | Git branch to checkout |
 | `--max-iterations` | Stop after N iterations (default: 30) |
 | `--recreate` | Force fresh container, removing any existing one |
+| `--watch` | Enter watch mode after container is ready |
+
+### watch
+
+Monitor a running container in real-time:
+
+```bash
+./dist/spinner watch <container-name>
+```
+
+Watch mode provides a terminal UI with:
+- Container status (running/stopped/exited)
+- CPU and memory usage metrics
+- Streaming container logs with structured formatting
+
+Use `q` or `Ctrl+C` to exit watch mode.
+
+**Example:**
+```bash
+# Start a container and watch it
+./dist/spinner spin --image default --repo https://github.com/user/repo --watch
+
+# Or watch an existing container
+./dist/spinner watch spinner-default-<hash>
+```
 
 ### exec
 

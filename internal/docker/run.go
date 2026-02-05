@@ -1,14 +1,11 @@
 package docker
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/rickihastings/spinner/internal/prerequisites"
 )
 
 // SpinConfig contains configuration for spinning up a container.
@@ -18,15 +15,6 @@ type SpinConfig struct {
 	Prompt        string
 	Branch        string
 	MaxIterations string
-	Recreate      bool
-}
-
-// ValidationResult contains the result of prerequisite validation.
-type ValidationResult struct {
-	Valid    bool
-	Error    string
-	Warnings []string
-	HasNpmrc bool
 }
 
 // ContainerResult contains the result of a container operation.
@@ -45,23 +33,8 @@ const (
 	StatusNone    ContainerStatus = "none"
 )
 
-// ReuseAction represents the action taken when handling an existing container.
-type ReuseAction string
-
-const (
-	ActionCreated   ReuseAction = "created"
-	ActionReused    ReuseAction = "reused"
-	ActionRestarted ReuseAction = "restarted"
-)
-
 // DefaultMaxIterations is the default maximum number of iterations for the exec loop.
 const DefaultMaxIterations = "100"
-
-// ReuseResult contains the status and action taken for container reuse.
-type ReuseResult struct {
-	Status ContainerStatus
-	Action ReuseAction
-}
 
 // escapeShellArg escapes a string for safe use as a shell argument.
 // Wraps the string in single quotes and escapes any single quotes within.
@@ -77,64 +50,6 @@ func convertSshToHttps(repoURL string) string {
 	}
 
 	return repoURL
-}
-
-// ValidatePrerequisitesWithClient validates prerequisites using a provided DockerClient.
-func ValidatePrerequisitesWithClient(ctx context.Context, client DockerClient, config SpinConfig) ValidationResult {
-	warnings := []string{}
-
-	// Check if repo is a valid git URL
-	isValidGitUrl := strings.HasPrefix(config.Repo, "http://") ||
-		strings.HasPrefix(config.Repo, "https://") ||
-		strings.HasPrefix(config.Repo, "git@")
-	if !isValidGitUrl {
-		return ValidationResult{
-			Valid:    false,
-			Error:    "Repository must be a valid git URL (https://, http://, or git@)",
-			Warnings: warnings,
-			HasNpmrc: false,
-		}
-	}
-
-	// Check if Docker image exists
-	exists, err := client.ImageExists(ctx, config.Image)
-	if err != nil || !exists {
-		return ValidationResult{
-			Valid:    false,
-			Error:    fmt.Sprintf("Docker image '%s' not found", config.Image),
-			Warnings: warnings,
-			HasNpmrc: false,
-		}
-	}
-
-	// Check environment variables (GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN)
-	if err := prerequisites.CheckEnvironmentVariables(); err != nil {
-		return ValidationResult{
-			Valid:    false,
-			Error:    err.Error(),
-			Warnings: warnings,
-			HasNpmrc: false,
-		}
-	}
-
-	// Check ~/.npmrc
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = ""
-	}
-
-	npmrcPath := filepath.Join(homeDir, ".npmrc")
-
-	hasNpmrc := false
-	if _, err := os.Stat(npmrcPath); err == nil {
-		hasNpmrc = true
-	}
-
-	return ValidationResult{
-		Valid:    true,
-		Warnings: warnings,
-		HasNpmrc: hasNpmrc,
-	}
 }
 
 // sanitizeComponent sanitizes a component for use in a Docker container name.

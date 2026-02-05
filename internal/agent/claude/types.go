@@ -14,26 +14,34 @@ const (
 	EventTypeError            = "error"
 )
 
-// ExecutionResult contains the final result of a Claude execution.
-type ExecutionResult struct {
-	// Completed indicates the task was completed successfully.
-	Completed bool
+// Raw message type constants (JSON "type" field values).
+const (
+	RawMessageTypeSystem    = "system"
+	RawMessageTypeAssistant = "assistant"
+	RawMessageTypeMessage   = "message" // Alias for assistant
+	RawMessageTypeUser      = "user"
+	RawMessageTypeResult    = "result"
+	RawMessageTypeError     = "error"
+)
 
-	// RateLimited indicates a rate limit error was encountered.
-	RateLimited bool
+// SubtypeInit Message subtype constants.
+const (
+	SubtypeInit = "init"
+)
 
-	// AuthError indicates an authentication error was encountered.
-	AuthError bool
+// Content block type constants.
+const (
+	ContentBlockTypeText    = "text"
+	ContentBlockTypeToolUse = "tool_use"
+)
 
-	// Error contains any execution error.
-	Error error
-
-	// ErrorMessage contains the error message from Claude.
-	ErrorMessage string
-
-	// TotalEvents is the count of events emitted.
-	TotalEvents int
-}
+// Error type constants.
+const (
+	ErrorTypeRateLimit      = "rate_limit"
+	ErrorTypeAuthentication = "authentication"
+	ErrorTypeCommand        = "command_error"
+	ErrorTypeScanner        = "scanner_error"
+)
 
 // ErrorData contains data from a Claude error event.
 type ErrorData struct {
@@ -48,13 +56,7 @@ type SystemInitData struct {
 	CWD         string `json:"cwd,omitempty"`
 	ClaudeEnv   string `json:"claude_env,omitempty"`
 	ModelID     string `json:"model_id,omitempty"`
-	MaxTurns    int    `json:"max_turns,omitempty"`
 	ProjectPath string `json:"project_path,omitempty"`
-}
-
-// TextData contains data from a text content block.
-type TextData struct {
-	Text string `json:"text"`
 }
 
 // ToolUseData contains data from a tool use content block.
@@ -64,20 +66,12 @@ type ToolUseData struct {
 	Input json.RawMessage `json:"input"`
 }
 
-// ToolResultData contains data from a tool result content block.
-type ToolResultData struct {
-	ToolUseID string `json:"tool_use_id"`
-	Content   string `json:"content"`
-	IsError   bool   `json:"is_error"`
-}
-
 // AssistantMessageData contains data from a Claude assistant message.
 type AssistantMessageData struct {
-	Role         string         `json:"role"`
-	Content      []ContentBlock `json:"content"`
-	StopReason   string         `json:"stop_reason,omitempty"`
-	StopSequence string         `json:"stop_sequence,omitempty"`
-	Model        string         `json:"model,omitempty"`
+	Role       string         `json:"role"`
+	Content    []ContentBlock `json:"content"`
+	StopReason string         `json:"stop_reason,omitempty"`
+	Model      string         `json:"model,omitempty"`
 }
 
 // UserMessageData contains data from a user message (tool results).
@@ -100,15 +94,13 @@ type ContentBlock struct {
 
 // ResultData contains data from a Claude result event.
 type ResultData struct {
-	Subtype      string  `json:"subtype"` // "success" or "error"
-	CostUSD      float64 `json:"cost_usd,omitempty"`
-	InputTokens  int     `json:"input_tokens,omitempty"`
-	OutputTokens int     `json:"output_tokens,omitempty"`
-	Duration     string  `json:"duration,omitempty"`
-	NumTurns     int     `json:"num_turns,omitempty"`
-	SessionID    string  `json:"session_id,omitempty"`
-	Result       string  `json:"result,omitempty"`
-	IsError      bool    `json:"is_error"`
+	Subtype      string `json:"subtype"` // "success" or "error"
+	InputTokens  int    `json:"input_tokens,omitempty"`
+	OutputTokens int    `json:"output_tokens,omitempty"`
+	Duration     string `json:"duration,omitempty"`
+	SessionID    string `json:"session_id,omitempty"`
+	Result       string `json:"result,omitempty"`
+	IsError      bool   `json:"is_error"`
 }
 
 // RawMessage represents a raw JSON message from the Claude CLI stream.
@@ -126,16 +118,13 @@ type RawMessage struct {
 	CWD         string `json:"cwd,omitempty"`
 	ClaudeEnv   string `json:"claude_env,omitempty"`
 	ModelID     string `json:"model_id,omitempty"`
-	MaxTurns    int    `json:"max_turns,omitempty"`
 	ProjectPath string `json:"project_path,omitempty"`
 
 	// Result fields
-	CostUSD      float64 `json:"cost_usd,omitempty"`
-	InputTokens  int     `json:"input_tokens,omitempty"`
-	OutputTokens int     `json:"output_tokens,omitempty"`
-	Duration     string  `json:"duration,omitempty"`
-	NumTurns     int     `json:"num_turns,omitempty"`
-	IsError      bool    `json:"is_error,omitempty"`
+	InputTokens  int    `json:"input_tokens,omitempty"`
+	OutputTokens int    `json:"output_tokens,omitempty"`
+	Duration     string `json:"duration,omitempty"`
+	IsError      bool   `json:"is_error,omitempty"`
 }
 
 // MessageContent represents the content field in Claude assistant/user messages.

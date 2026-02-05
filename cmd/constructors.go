@@ -6,18 +6,41 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
-	"github.com/rickihastings/spinner/internal/docker"
 	"github.com/rickihastings/spinner/internal/exec"
 	"github.com/rickihastings/spinner/internal/prerequisites"
+	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// NewSetupCommand creates a new setup command with the given DockerClient.
+// performSetup runs the shared setup workflow: environment provisioning.
+// Called by both the setup and spin --setup paths.
+func performSetup(ctx context.Context, p provider.Provider, config provider.SetupConfig) error {
+	fmt.Printf("Provisioning environment: %s\n", config.Name)
+
+	if err := p.Setup(ctx, config); err != nil {
+		fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+		return err
+	}
+
+	fmt.Printf("✓ Environment provisioned: %s\n", config.Name)
+
+	return nil
+}
+
+// isValidGitURL checks whether the given string is a valid git URL.
+func isValidGitURL(url string) bool {
+	return strings.HasPrefix(url, "http://") ||
+		strings.HasPrefix(url, "https://") ||
+		strings.HasPrefix(url, "git@")
+}
+
+// NewSetupCommand creates a new setup command with the given Provider.
 // This constructor enables dependency injection for testing.
-func NewSetupCommand(client docker.DockerClient) *cobra.Command {
+func NewSetupCommand(p provider.Provider) *cobra.Command {
 	var (
 		setupName       string
 		setupBaseImage  string
@@ -40,17 +63,14 @@ EXAMPLES:
   spinner setup --name node-env --base-image node:20-bullseye
   spinner setup --name custom-env --dockerfile ./Dockerfile.custom`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Bind flags to viper - this allows environment variables to override flag values
 			_ = viper.BindPFlag("name", cmd.Flags().Lookup("name"))
 			_ = viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
 			_ = viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
 
-			// Get values from viper (respects env vars and flags)
 			setupName = viper.GetString("name")
 			setupBaseImage = viper.GetString("base-image")
 			setupDockerfile = viper.GetString("dockerfile")
 
-			// Validate required flag
 			if setupName == "" {
 				fmt.Fprintln(os.Stderr, "Error: Missing required flag: --name")
 				fmt.Fprintln(os.Stderr, "Usage: spinner setup --name <name> [--base-image <image> | --dockerfile <path>]")
@@ -58,7 +78,6 @@ EXAMPLES:
 				return fmt.Errorf("missing required flag: --name")
 			}
 
-			// Validate mutually exclusive flags
 			if setupBaseImage != "" && setupDockerfile != "" {
 				fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
 				fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
@@ -66,11 +85,9 @@ EXAMPLES:
 				return fmt.Errorf("mutually exclusive flags provided")
 			}
 
-			// Perform setup using the provided client
-			return performSetupWithClient(context.Background(), client, docker.BuildConfig{
-				Name:       setupName,
-				BaseImage:  setupBaseImage,
-				Dockerfile: setupDockerfile,
+			return performSetup(context.Background(), p, provider.SetupConfig{
+				Name:    setupName,
+				Options: map[string]string{"base-image": setupBaseImage, "dockerfile": setupDockerfile},
 			})
 		},
 	}
@@ -82,41 +99,9 @@ EXAMPLES:
 	return cmd
 }
 
-// performSetupWithClient executes the setup workflow with a provided DockerClient.
-func performSetupWithClient(ctx context.Context, client docker.DockerClient, config docker.BuildConfig) error {
-	// Check prerequisites
-	fmt.Println("Checking prerequisites...")
-
-	if err := prerequisites.CheckPrerequisites(); err != nil {
-		fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
-		return err
-	}
-
-	// Validate Dockerfile path if provided
-	if config.Dockerfile != "" {
-		if _, err := os.Stat(config.Dockerfile); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "✗ Error: Dockerfile not found at path: %s\n", config.Dockerfile)
-			return fmt.Errorf("dockerfile not found at path: %s", config.Dockerfile)
-		}
-	}
-
-	// Build the image
-	fmt.Printf("✓ Prerequisites checked\n")
-	fmt.Printf("Building Docker image: spinner:%s\n", config.Name)
-
-	if err := client.BuildImage(ctx, config); err != nil {
-		fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
-		return err
-	}
-
-	fmt.Printf("✓ Docker image built successfully: spinner:%s\n", config.Name)
-
-	return nil
-}
-
-// NewSpinCommand creates a new spin command with the given DockerClient.
+// NewSpinCommand creates a new spin command with the given Provider.
 // This constructor enables dependency injection for testing.
-func NewSpinCommand(client docker.DockerClient) *cobra.Command {
+func NewSpinCommand(p provider.Provider) *cobra.Command {
 	var (
 		spinImage         string
 		spinRepo          string
@@ -127,6 +112,7 @@ func NewSpinCommand(client docker.DockerClient) *cobra.Command {
 		spinSetup         bool
 		spinBaseImage     string
 		spinDockerfile    string
+		spinWatch         bool
 	)
 
 	cmd := &cobra.Command{
@@ -141,6 +127,7 @@ SPIN OPTIONS:
   --branch <branch>          Git branch to checkout (optional)
   --max-iterations <num>     Maximum iterations for autonomous execution (optional, default: 100)
   --recreate                 Force recreation of existing container (optional)
+  --watch                    Enter watch mode after container is ready (optional)
 
 SETUP OPTIONS (use with --setup flag):
   --setup                    Build/rebuild the Docker image before spinning (optional)
@@ -164,9 +151,11 @@ EXAMPLES:
   spinner spin --setup --image my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X"
   spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --recreate
 
+  # Watch mode after spinning
+  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --watch
+
 Note: When --setup is used, the image is always rebuilt (no caching). The --image value becomes the setup name.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Bind flags to viper - this allows environment variables to override flag values
 			_ = viper.BindPFlag("image", cmd.Flags().Lookup("image"))
 			_ = viper.BindPFlag("repo", cmd.Flags().Lookup("repo"))
 			_ = viper.BindPFlag("prompt", cmd.Flags().Lookup("prompt"))
@@ -176,8 +165,8 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 			_ = viper.BindPFlag("setup", cmd.Flags().Lookup("setup"))
 			_ = viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
 			_ = viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
+			_ = viper.BindPFlag("watch", cmd.Flags().Lookup("watch"))
 
-			// Get values from viper (respects env vars and flags)
 			spinImage = viper.GetString("image")
 			spinRepo = viper.GetString("repo")
 			spinPrompt = viper.GetString("prompt")
@@ -187,8 +176,8 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 			spinSetup = viper.GetBool("setup")
 			spinBaseImage = viper.GetString("base-image")
 			spinDockerfile = viper.GetString("dockerfile")
+			spinWatch = viper.GetBool("watch")
 
-			// Validate required flags
 			if spinImage == "" {
 				return fmt.Errorf("--image flag is required")
 			}
@@ -197,7 +186,6 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				return fmt.Errorf("--repo flag is required")
 			}
 
-			// Validate setup-related flags
 			if !spinSetup && spinBaseImage != "" {
 				fmt.Fprintln(os.Stderr, "Error: --base-image requires --setup flag")
 				return fmt.Errorf("--base-image requires --setup flag")
@@ -217,138 +205,107 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 
 			ctx := context.Background()
 
-			// If --setup is provided, build the image first
+			// If --setup is provided, provision the environment first
 			if spinSetup {
-				// Remove "spinner:" prefix from image if present for setup name
-				setupName := spinImage
-				if len(setupName) > 8 && setupName[:8] == "spinner:" {
-					setupName = setupName[8:]
-				}
+				setupName := strings.TrimPrefix(spinImage, "spinner:")
 
-				// Perform setup using the provided client
-				if err := performSetupWithClient(ctx, client, docker.BuildConfig{
-					Name:       setupName,
-					BaseImage:  spinBaseImage,
-					Dockerfile: spinDockerfile,
+				if err := performSetup(ctx, p, provider.SetupConfig{
+					Name:    setupName,
+					Options: map[string]string{"base-image": spinBaseImage, "dockerfile": spinDockerfile},
 				}); err != nil {
 					return err
 				}
 
-				// Update spinImage to use the built image tag
 				spinImage = "spinner:" + setupName
 			}
 
 			// Validate prerequisites
 			fmt.Println("Validating prerequisites...")
 
-			config := docker.SpinConfig{
-				Image:         spinImage,
+			if !isValidGitURL(spinRepo) {
+				fmt.Fprintln(os.Stderr, "✗ Error: Repository must be a valid git URL (https://, http://, or git@)")
+				return fmt.Errorf("repository must be a valid git URL (https://, http://, or git@)")
+			}
+
+			if err := prerequisites.CheckEnvironmentVariables(); err != nil {
+				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+				return err
+			}
+
+			fmt.Println("✓ Prerequisites validated")
+
+			createConfig := provider.CreateConfig{
 				Repo:          spinRepo,
 				Prompt:        spinPrompt,
 				Branch:        spinBranch,
 				MaxIterations: spinMaxIterations,
-				Recreate:      spinRecreate,
+				Options:       map[string]string{"image": spinImage},
 			}
 
-			validationResult := docker.ValidatePrerequisitesWithClient(ctx, client, config)
-			if !validationResult.Valid {
-				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", validationResult.Error)
-				return fmt.Errorf("validation failed: %s", validationResult.Error)
+			name := p.InstanceName(createConfig)
+
+			// Query current instance state
+			status, err := p.Status(ctx, name)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+				return err
 			}
 
-			// Generate container name
-			containerName := docker.GenerateContainerName(config)
-
-			fmt.Println("✓ Prerequisites validated")
-
-			for _, warning := range validationResult.Warnings {
-				fmt.Printf("⚠ Warning: %s\n", warning)
-			}
-
-			// Check if container already exists
-			containerStatus, _ := client.ContainerExists(ctx, containerName)
-
-			// Handle --recreate flag: remove existing container and create fresh
-			if spinRecreate && containerStatus != docker.StatusNone {
-				removeResult, _ := client.RemoveContainer(ctx, containerName)
-				if !removeResult.Success {
-					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", removeResult.Error)
-					return fmt.Errorf("failed to remove container: %s", removeResult.Error)
+			// --recreate: destroy the existing instance so we fall through to create
+			if spinRecreate && status != provider.InstanceStatusNone {
+				if err := p.Remove(ctx, name); err != nil {
+					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+					return err
 				}
-				// After removal, container doesn't exist
-				containerStatus = docker.StatusNone
+
+				status = provider.InstanceStatusNone
 			}
 
-			var action docker.ReuseAction
+			var instance *provider.Instance
 
-			switch containerStatus {
-			case docker.StatusNone:
-				// Create new container
-				fmt.Printf("Creating container: %s\n", containerName)
+			switch status {
+			case provider.InstanceStatusNone:
+				fmt.Printf("Creating instance: %s\n", name)
 				fmt.Println("Cloning repository...")
 
-				dockerArgs, err := docker.BuildDockerRunCommand(config, containerName, validationResult.HasNpmrc)
+				instance, err = p.Create(ctx, createConfig)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 					return err
 				}
 
-				runResult, _ := client.RunContainer(ctx, dockerArgs, containerName)
-				if !runResult.Success {
-					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", runResult.Error)
-					return fmt.Errorf("failed to run container: %s", runResult.Error)
-				}
+				fmt.Printf("✓ Instance created successfully: %s\n", instance.Name)
+			case provider.InstanceStatusRunning:
+				instance = &provider.Instance{Name: name, Status: provider.InstanceStatusRunning}
 
-				// Verify container is running
-				statusResult, _ := client.VerifyContainerStatus(ctx, containerName)
-				if !statusResult.Success {
-					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", statusResult.Error)
-					return fmt.Errorf("container verification failed: %s", statusResult.Error)
-				}
-
-				action = docker.ActionCreated
-			case docker.StatusRunning:
-				// Reuse running container
-				action = docker.ActionReused
-			case docker.StatusStopped:
-				// Restart stopped container
-				restartResult, _ := client.RestartContainer(ctx, containerName)
-				if !restartResult.Success {
-					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", restartResult.Error)
-					return fmt.Errorf("failed to restart container: %s", restartResult.Error)
-				}
-
-				// Verify container is running after restart
-				statusResult, _ := client.VerifyContainerStatus(ctx, containerName)
-				if !statusResult.Success {
-					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", statusResult.Error)
-					return fmt.Errorf("container verification failed: %s", statusResult.Error)
-				}
-
-				action = docker.ActionRestarted
-			}
-
-			// Display success message based on action
-			switch action {
-			case docker.ActionCreated:
-				fmt.Printf("✓ Container created successfully: %s\n", containerName)
-			case docker.ActionRestarted:
-				fmt.Printf("✓ Container restarted: %s\n", containerName)
-			case docker.ActionReused:
-				fmt.Printf("✓ Reusing running container: %s\n", containerName)
-			}
-
-			// Display management note for reuse cases
-			if action != docker.ActionCreated {
+				fmt.Printf("✓ Reusing running instance: %s\n", name)
 				fmt.Println()
-				fmt.Println("Note: Reusing existing container. Use --recreate flag to force recreation.")
+				fmt.Println("Note: Reusing existing instance. Use --recreate flag to force recreation.")
+			case provider.InstanceStatusStopped:
+				instance, err = p.Start(ctx, name)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+					return err
+				}
+
+				fmt.Printf("✓ Instance restarted: %s\n", instance.Name)
+				fmt.Println()
+				fmt.Println("Note: Reusing existing instance. Use --recreate flag to force recreation.")
 			}
 
-			// Display container management commands
+			// Display instance management commands
 			fmt.Println()
-			fmt.Printf("To access: docker exec -it %s bash\n", containerName)
-			fmt.Printf("To stop: docker stop %s\n", containerName)
-			fmt.Printf("To remove: docker rm %s\n", containerName)
+			fmt.Printf("To access: docker exec -it %s bash\n", instance.Name)
+			fmt.Printf("To stop: docker stop %s\n", instance.Name)
+			fmt.Printf("To remove: docker rm %s\n", instance.Name)
+
+			// Enter watch mode if --watch flag is set
+			if spinWatch {
+				fmt.Println()
+				fmt.Println("Entering watch mode...")
+
+				return PerformWatch(ctx, p, instance.Name)
+			}
 
 			return nil
 		},
@@ -363,6 +320,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 	cmd.Flags().BoolVar(&spinSetup, "setup", false, "Build/rebuild the Docker image before spinning (optional)")
 	cmd.Flags().StringVar(&spinBaseImage, "base-image", "", "Base Docker image (optional, default: ubuntu:22.04, requires --setup)")
 	cmd.Flags().StringVar(&spinDockerfile, "dockerfile", "", "Path to custom Dockerfile (optional, requires --setup)")
+	cmd.Flags().BoolVar(&spinWatch, "watch", false, "Enter watch mode after container is ready (optional)")
 
 	return cmd
 }

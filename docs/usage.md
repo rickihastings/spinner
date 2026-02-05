@@ -25,6 +25,7 @@ Spinner uses Viper to support environment variable configuration. All command-li
 - `SPINNER_BRANCH` - Override `--branch` flag
 - `SPINNER_MAX_ITERATIONS` - Override `--max-iterations` flag
 - `SPINNER_RECREATE` - Override `--recreate` flag (set to `true` or `false`)
+- `SPINNER_WATCH` - Override `--watch` flag (set to `true` or `false`)
 
 ### Usage Examples
 
@@ -119,6 +120,27 @@ These are tested, working examples for future reference:
   --image spinner:default \
   --repo https://github.com/user/repo \
   --branch feature/new-feature
+
+# Spin and immediately enter watch mode
+./dist/spinner spin \
+  --image spinner:default \
+  --repo https://github.com/user/repo \
+  --prompt "implement feature X" \
+  --watch
+```
+
+### Watch Command Examples
+
+```bash
+# Watch a running container
+./dist/spinner watch spinner-default-abc123
+
+# Watch mode displays:
+# - Container status (running/stopped/exited)
+# - CPU and memory usage
+# - Real-time streaming logs
+#
+# Press 'q' or Ctrl+C to exit
 ```
 
 ### Important Notes
@@ -127,6 +149,7 @@ These are tested, working examples for future reference:
 - Repository must be a valid git URL (https://, http://, or git@)
 - Either `--prompt` or `--branch` (or both) must be provided
 - Default `max-iterations` is 30 if not specified
+- The `--watch` flag can be combined with any spin flags
 
 ## State Management
 

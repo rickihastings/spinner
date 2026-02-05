@@ -65,7 +65,7 @@ func (p *Parser) Parse(ctx context.Context, reader io.Reader) <-chan agent.Event
 				Type:      EventTypeError,
 				Timestamp: time.Now(),
 				Data: ErrorData{
-					Type:    "scanner_error",
+					Type:    ErrorTypeScanner,
 					Message: err.Error(),
 				},
 			}
@@ -102,15 +102,15 @@ func (p *Parser) parseLine(line string) *agent.Event {
 	}
 
 	switch raw.Type {
-	case "system":
+	case RawMessageTypeSystem:
 		return p.parseSystemMessage(event, &raw)
-	case "assistant", "message":
+	case RawMessageTypeAssistant, RawMessageTypeMessage:
 		return p.parseAssistantMessage(event, &raw)
-	case "user":
+	case RawMessageTypeUser:
 		return p.parseUserMessage(event, &raw)
-	case "result":
+	case RawMessageTypeResult:
 		return p.parseResultMessage(event, &raw)
-	case "error":
+	case RawMessageTypeError:
 		return p.parseErrorMessage(event, &raw)
 	default:
 		// Unknown or streaming message types, skip
@@ -119,7 +119,7 @@ func (p *Parser) parseLine(line string) *agent.Event {
 }
 
 func (p *Parser) parseSystemMessage(event *agent.Event, raw *RawMessage) *agent.Event {
-	if raw.Subtype == "init" {
+	if raw.Subtype == SubtypeInit {
 		event.Type = EventTypeSystemInit
 		event.Data = SystemInitData{
 			Model:       raw.Model,
@@ -127,7 +127,6 @@ func (p *Parser) parseSystemMessage(event *agent.Event, raw *RawMessage) *agent.
 			CWD:         raw.CWD,
 			ClaudeEnv:   raw.ClaudeEnv,
 			ModelID:     raw.ModelID,
-			MaxTurns:    raw.MaxTurns,
 			ProjectPath: raw.ProjectPath,
 		}
 
@@ -148,12 +147,7 @@ func (p *Parser) parseAssistantMessage(event *agent.Event, raw *RawMessage) *age
 	}
 
 	event.Type = EventTypeAssistantMessage
-	event.Data = AssistantMessageData{
-		Role:       msg.Role,
-		Content:    msg.Content,
-		StopReason: msg.StopReason,
-		Model:      msg.Model,
-	}
+	event.Data = AssistantMessageData(msg)
 
 	return event
 }
@@ -181,11 +175,9 @@ func (p *Parser) parseResultMessage(event *agent.Event, raw *RawMessage) *agent.
 	event.Type = EventTypeResult
 	event.Data = ResultData{
 		Subtype:      raw.Subtype,
-		CostUSD:      raw.CostUSD,
 		InputTokens:  raw.InputTokens,
 		OutputTokens: raw.OutputTokens,
 		Duration:     raw.Duration,
-		NumTurns:     raw.NumTurns,
 		SessionID:    raw.SessionID,
 		Result:       raw.Result,
 		IsError:      raw.IsError,
@@ -224,7 +216,7 @@ func ExtractText(event *agent.Event) string {
 	var texts []string
 
 	for _, block := range data.Content {
-		if block.Type == "text" && block.Text != "" {
+		if block.Type == ContentBlockTypeText && block.Text != "" {
 			texts = append(texts, block.Text)
 		}
 	}
@@ -246,7 +238,7 @@ func ExtractToolUses(event *agent.Event) []ToolUseData {
 	var tools []ToolUseData
 
 	for _, block := range data.Content {
-		if block.Type == "tool_use" {
+		if block.Type == ContentBlockTypeToolUse {
 			tools = append(tools, ToolUseData{
 				ID:    block.ID,
 				Name:  block.Name,
@@ -269,7 +261,7 @@ func IsRateLimitError(event *agent.Event) bool {
 		return false
 	}
 
-	return strings.Contains(data.Type, "rate_limit")
+	return strings.Contains(data.Type, ErrorTypeRateLimit)
 }
 
 // IsAuthError checks if an event is an authentication error.
@@ -283,7 +275,7 @@ func IsAuthError(event *agent.Event) bool {
 		return false
 	}
 
-	return strings.Contains(data.Type, "authentication")
+	return strings.Contains(data.Type, ErrorTypeAuthentication)
 }
 
 // ContainsText checks if a Claude assistant message contains the specified text.

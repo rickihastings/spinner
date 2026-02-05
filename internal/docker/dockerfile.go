@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rickihastings/spinner/internal/util"
 )
 
 // DockerfileConfig contains configuration for generating a Dockerfile.
@@ -13,7 +15,7 @@ type DockerfileConfig struct {
 
 // GenerateDockerfile generates a Dockerfile from a template with the given configuration.
 func GenerateDockerfile(config DockerfileConfig) (string, error) {
-	templatePath, err := resolveTemplatePath(filepath.Join("templates", "docker", "extending.template"))
+	templatePath, err := util.ResolveTemplatePath(filepath.Join("templates", "docker", "extending.template"))
 	if err != nil {
 		return "", err
 	}

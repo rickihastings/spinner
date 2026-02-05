@@ -2,199 +2,205 @@
 
 Instructions for AI coding assistants using OpenSpec for spec-driven development.
 
-## What Stage Are You In?
+## ⚠️ CRITICAL RULES - FOLLOW EXACTLY ⚠️
 
-Choose the appropriate guide based on your current task:
+### Stage 2 Implementation Protocol - NON-NEGOTIABLE
 
-- **Creating or planning a change** → Read `agents/propose.md`
-- **Implementing an approved change** → Read `agents/implement.md`
-- **Archiving a deployed change** → Read `agents/archive.md`
+**STOP AFTER ONE SLICE:**
 
-Each guide provides focused instructions for that stage of the workflow.
+- Implement ONLY ONE vertical slice (X.0) per session
+- Complete ALL sub-tasks (X.1, X.2, X.3...) for that slice
+- DO NOT proceed to (X+1).0 under any circumstances
+- After completing X.0: output `~~ FEATURE_COMPLETED ~~` if no more slices exist then STOP, else STOP IMMEDIATELY
+
+**EACH SLICE MUST INCLUDE:**
+
+- Implementation code
+- Tests for that implementation
+- Documentation updates
+- Verification (build + tests pass)
+
+**MANDATORY AFTER EACH VERTICAL SLICE:**
+
+- Mark task `[x]` in tasks.md immediately
+- Commit with meaningful message
+- Leave codebase in valid, tested state
+
+## Quick Reference
+
+**Essential Commands:**
+
+```bash
+openspec list                    # Active changes
+openspec list --specs            # Existing specs
+openspec show [item]             # View details (--json for filters)
+openspec validate [item] --strict --no-interactive  # Validate
+openspec archive <change-id> --yes  # Archive after deployment
+```
+
+**Before Any Task:**
+
+- Read `specs/[capability]/spec.md` for relevant capabilities
+- Check `changes/` for conflicts via `openspec list`
+- Review `openspec/project.md` for conventions
+
+**Search:**
+
+- Specs: `openspec spec list --long` or `openspec show <spec-id> --type spec`
+- Changes: `openspec list` or `openspec show <change-id> --json --deltas-only`
+- Full-text: `rg -n "Requirement:|Scenario:" openspec/specs`
+
+**Proposal Checklist:**
+
+1. Choose unique verb-led `change-id` (kebab-case: `add-`, `update-`, `remove-`, `refactor-`)
+2. Scaffold: `proposal.md`, `tasks.md`, `design.md`, delta specs
+3. Write deltas: `## ADDED|MODIFIED|REMOVED|RENAMED Requirements` with `#### Scenario:` per requirement
+4. Validate: `openspec validate [change-id] --strict --no-interactive`
+5. Request approval before implementation
+
+## Three-Stage Workflow
+
+### Stage 1: Creating Changes
+
+**Create proposal for:** new features, breaking changes, architecture changes, performance optimizations, security
+updates
+
+**Skip proposal for:** bug fixes (restoring spec behavior), typos/formatting, non-breaking dependency updates, config
+changes, tests for existing behavior
+
+**Workflow:**
+
+1. Review context: `openspec/project.md`, `openspec list`, `openspec list --specs`
+2. Choose unique verb-led `change-id` and scaffold files in `openspec/changes/<id>/`
+3. Draft spec deltas with `## ADDED|MODIFIED|REMOVED Requirements` + `#### Scenario:` per requirement
+4. Validate: `openspec validate <id> --strict --no-interactive` before requesting approval
+
+### Stage 2: Implementing Changes
+
+**Implementation Scope:** ONE vertical slice (X.0) per session. Complete all sub-tasks (X.1, X.2, X.3...) then STOP.
+
+**Per-Task Cycle:** Select → Investigate patterns → Implement → Verify (build/tests) → Update tasks.md → Commit → Repeat
+
+**Rules:**
+
+- Complete entire slice before stopping; each commit = valid, tested state
+- Never defer tests; they're part of the slice (unless task list specifies otherwise)
+- Update spec immediately if implementation diverges
+- On completion: output `~~ FEATURE_COMPLETED ~~` if no more slices, else HALT
+
+### Stage 3: Archiving Changes
+
+After deployment: `openspec archive <change-id> --yes` (use `--skip-specs` for tooling-only changes). Validate with
+`openspec validate --strict --no-interactive`.
 
 ## Directory Structure
 
 ```
 openspec/
 ├── project.md              # Project conventions
-├── specs/                  # Current truth - what IS built
-│   └── [capability]/       # Single focused capability
+├── specs/                  # Current truth (what IS built)
+│   └── [capability]/
 │       ├── spec.md         # Requirements and scenarios
 │       └── design.md       # Technical patterns
-├── changes/                # Proposals - what SHOULD change
-│   ├── [change-name]/
-│   │   ├── proposal.md     # Why, what, impact
-│   │   ├── tasks.md        # Implementation checklist
-│   │   ├── design.md       # Technical implementation plan and decisions
-│   │   └── specs/          # Delta changes
-│   │       └── [capability]/
-│   │           └── spec.md # ADDED/MODIFIED/REMOVED
-│   └── archive/            # Completed changes
+└── changes/                # Proposals (what SHOULD change)
+    ├── [change-name]/
+    │   ├── proposal.md     # Why, what, impact
+    │   ├── tasks.md        # Implementation checklist (vertical slices)
+    │   ├── design.md       # Technical implementation plan
+    │   └── specs/[capability]/spec.md  # Delta changes
+    └── archive/            # Completed changes
 ```
 
-## CLI Commands
+## Creating Change Proposals
 
-```bash
-# Essential commands
-openspec list                  # List active changes
-openspec list --specs          # List specifications
-openspec show [item]           # Display change or spec
-openspec validate [item]       # Validate changes or specs
-openspec archive <change-id> [--yes|-y]   # Archive after deployment (add --yes for non-interactive runs)
+### Required Files
 
-# Project management
-openspec init [path]           # Initialize OpenSpec
-openspec update [path]         # Update instruction files
+**1. proposal.md** - Why, what changes (list with **BREAKING** marks), impact (affected specs/code)
 
-# Interactive mode
-openspec show                  # Prompts for selection
-openspec validate              # Bulk validation mode
+**2. spec deltas** - `specs/[capability]/spec.md` with operations:
 
-# Debugging
-openspec show [change] --json --deltas-only
-openspec validate [change] --strict --no-interactive
+```markdown
+## ADDED Requirements
+
+### Requirement: Feature Name
+
+System SHALL... [requirement text]
+
+#### Scenario: Success case
+
+- **WHEN** condition
+- **THEN** outcome
+
+## MODIFIED Requirements
+
+[Full requirement with all scenarios - replaces existing]
+
+## REMOVED Requirements
+
+**Reason**: [why] | **Migration**: [how]
 ```
 
-### Command Flags
+**3. tasks.md** - Vertical feature slices (NOT horizontal layers):
 
-- `--json` - Machine-readable output
-- `--type change|spec` - Disambiguate items
-- `--strict` - Comprehensive validation
-- `--no-interactive` - Disable prompts
-- `--skip-specs` - Archive without spec updates
-- `--yes`/`-y` - Skip confirmation prompts (non-interactive archive)
+```markdown
+## X.0 Feature Name (complete, testable, committable)
 
-## Search Guidance
+- [ ] X.1 Implementation
+- [ ] X.2 Tests
+- [ ] X.3 Documentation
+- [ ] X.4 Verification
+```
 
-- Enumerate specs: `openspec spec list --long` (or `--json` for scripts)
-- Enumerate changes: `openspec list` (or `openspec change list --json` - deprecated but available)
-- Show details:
-  - Spec: `openspec show <spec-id> --type spec` (use `--json` for filters)
-  - Change: `openspec show <change-id> --json --deltas-only`
-- Full-text search (use ripgrep): `rg -n "Requirement:|Scenario:" openspec/specs`
+Each X.0 = independently committable feature. Complete ALL sub-tasks before next slice.
+
+**4. design.md** - REQUIRED. Must include Technical Implementation Plan:
+
+- **Component Map**: Files to change (create|modify|delete)
+- **Approach**: Implementation order and patterns to follow
+- **Key Decisions**: Rationale for choices
+- Goals/Non-Goals, Risks/Trade-offs (optional)
+
+## Spec File Format
+
+**Scenario Format (REQUIRED):**
+
+```markdown
+#### Scenario: Name
+
+- **WHEN** condition
+- **THEN** outcome
+```
+
+Use `####` heading (NOT bullets, bold, or `###`). Every requirement needs ≥1 scenario.
+
+**Requirement Wording:** Use SHALL/MUST (not should/may)
+
+**Delta Operations:**
+
+- **ADDED**: New orthogonal capability (preferred for new requirements)
+- **MODIFIED**: Changed behavior—copy FULL existing requirement from `specs/[capability]/spec.md`, paste under
+  `## MODIFIED`, edit
+- **REMOVED**: Include **Reason** and **Migration** path
+- **RENAMED**: `FROM: ### Requirement: Old` → `TO: ### Requirement: New`
+
+**Critical:** MODIFIED must include complete requirement text (header + scenarios). Partial deltas lose details at
+archive.
 
 ## Troubleshooting
 
-### Common Errors
+**Common Errors:**
 
-**"Change must have at least one delta"**
+- "No delta": Check `changes/[name]/specs/*.md` exists with `## ADDED|MODIFIED|REMOVED` headers
+- "No scenario": Ensure `#### Scenario:` format (4 hashtags, not bullets/bold)
+- Silent parsing: Debug with `openspec show [change] --json --deltas-only`
 
-- Check `changes/[name]/specs/` exists with .md files
-- Verify files have operation prefixes (## ADDED Requirements)
-
-**"Requirement must have at least one scenario"**
-
-- Check scenarios use `#### Scenario:` format (4 hashtags)
-- Don't use bullet points or bold for scenario headers
-
-**Silent scenario parsing failures**
-
-- Exact format required: `#### Scenario: Name`
-- Debug with: `openspec show [change] --json --deltas-only`
-
-### Validation Tips
-
-```bash
-# Always use strict mode for comprehensive checks
-openspec validate [change] --strict --no-interactive
-
-# Debug delta parsing
-openspec show [change] --json | jq '.deltas'
-
-# Check specific requirement
-openspec show [spec] --json -r 1
-```
+**Debug:** `openspec validate [change] --strict --no-interactive`
 
 ## Best Practices
 
-### Simplicity First
+- **Simplicity**: Default <100 lines, single-file until proven insufficient, boring patterns
+- **Complexity**: Only with data (perf, scale >1000 users, multiple use cases)
+- **References**: Use `file.ts:42` format for code, `specs/auth/spec.md` for specs
+- **Naming**: Capabilities = verb-noun (`user-auth`), Changes = kebab-case verb-led (`add-2fa`)
 
-- Default to <100 lines of new code
-- Single-file implementations until proven insufficient
-- Avoid frameworks without clear justification
-- Choose boring, proven patterns
-
-### Complexity Triggers
-
-Only add complexity with:
-
-- Performance data showing current solution too slow
-- Concrete scale requirements (>1000 users, >100MB data)
-- Multiple proven use cases requiring abstraction
-
-### Clear References
-
-- Use `file.ts:42` format for code locations
-- Reference specs as `specs/auth/spec.md`
-- Link related changes and PRs
-
-### Capability Naming
-
-- Use verb-noun: `user-auth`, `payment-capture`
-- Single purpose per capability
-- 10-minute understandability rule
-- Split if description needs "AND"
-
-### Change ID Naming
-
-- Use kebab-case, short and descriptive: `add-two-factor-auth`
-- Prefer verb-led prefixes: `add-`, `update-`, `remove-`, `refactor-`
-- Ensure uniqueness; if taken, append `-2`, `-3`, etc.
-
-## Tool Selection Guide
-
-| Task                  | Tool | Why                      |
-|-----------------------|------|--------------------------|
-| Find files by pattern | Glob | Fast pattern matching    |
-| Search code content   | Grep | Optimized regex search   |
-| Read specific files   | Read | Direct file access       |
-| Explore unknown scope | Task | Multi-step investigation |
-
-## Error Recovery
-
-### Change Conflicts
-
-1. Run `openspec list` to see active changes
-2. Check for overlapping specs
-3. Coordinate with change owners
-4. Consider combining proposals
-
-### Validation Failures
-
-1. Run with `--strict` flag
-2. Check JSON output for details
-3. Verify spec file format
-4. Ensure scenarios properly formatted
-
-### Missing Context
-
-1. Read project.md first
-2. Check related specs
-3. Review recent archives
-4. Ask for clarification
-
-## Quick Reference
-
-### Stage Indicators
-
-- `changes/` - Proposed, not yet built
-- `specs/` - Built and deployed
-- `archive/` - Completed changes
-
-### File Purposes
-
-- `proposal.md` - Why and what
-- `design.md` - Technical implementation plan (how to approach)
-- `tasks.md` - Implementation checklist (what to do)
-- `spec.md` - Requirements and behavior
-
-### CLI Essentials
-
-```bash
-openspec list              # What's in progress?
-openspec show [item]       # View details
-openspec validate --strict --no-interactive  # Is it correct?
-openspec archive <change-id> [--yes|-y]  # Mark complete (add --yes for automation)
-```
-
-Remember: Specs are truth. Changes are proposals. Keep them in sync.
+**Remember:** Specs = truth (what IS). Changes = proposals (what SHOULD change). Keep in sync.

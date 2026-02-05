@@ -4,8 +4,8 @@ import (
 	"github.com/rickihastings/spinner/internal/docker"
 )
 
-// setupCmd is the production setup command using RealDockerClient
-var setupCmd = NewSetupCommand(docker.NewRealDockerClient())
+// setupCmd is the production setup command using Provider
+var setupCmd = NewSetupCommand(docker.NewDockerProvider(docker.NewRealDockerClient()))
 
 func init() {
 	rootCmd.AddCommand(setupCmd)
