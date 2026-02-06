@@ -11,6 +11,33 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Flag name constants shared across commands.
+const (
+	flagBackend       = "backend"
+	flagName          = "name"
+	flagImage         = "image"
+	flagRepo          = "repo"
+	flagPrompt        = "prompt"
+	flagBranch        = "branch"
+	flagMaxIterations = "max-iterations"
+	flagRecreate      = "recreate"
+	flagSetup         = "setup"
+	flagWatch         = "watch"
+	flagBaseImage     = "base-image"
+	flagDockerfile    = "dockerfile"
+	flagProject       = "project"
+	flagZone          = "zone"
+	flagMachineType   = "machine-type"
+	flagDiskSize      = "disk-size"
+	flagStateBucket   = "state-bucket"
+)
+
+// GCP default values.
+const (
+	defaultMachineType = "e2-standard-2"
+	defaultDiskSize    = 30
+)
+
 // performSetup runs the shared setup workflow: environment provisioning.
 // Called by both the setup and spin --setup paths.
 func performSetup(ctx context.Context, p provider.Provider, config provider.SetupConfig) error {
@@ -35,11 +62,11 @@ func isValidGitURL(url string) bool {
 
 // resolveBackend reads the --backend value from Viper (CLI > env > config > default).
 func resolveBackend(cmd *cobra.Command) string {
-	_ = viper.BindPFlag("backend", cmd.Flags().Lookup("backend"))
+	_ = viper.BindPFlag(flagBackend, cmd.Flags().Lookup(flagBackend))
 
-	backend := viper.GetString("backend")
+	backend := viper.GetString(flagBackend)
 	if backend == "" {
-		backend = "docker"
+		backend = provider.BackendDocker
 	}
 
 	return backend
@@ -49,21 +76,21 @@ func resolveBackend(cmd *cobra.Command) string {
 // the wrong backend. Only explicitly-set CLI flags trigger errors; values
 // from .spinner.json or env vars are silently ignored.
 func validateBackendFlags(cmd *cobra.Command, backend string) error {
-	gcpOnlyFlags := []string{"project", "zone", "machine-type", "disk-size", "state-bucket"}
-	dockerOnlyFlags := []string{"base-image", "dockerfile"}
+	gcpOnlyFlags := []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket}
+	dockerOnlyFlags := []string{flagBaseImage, flagDockerfile}
 
-	if backend != "gcp" {
+	if backend != provider.BackendGCP {
 		for _, f := range gcpOnlyFlags {
 			if cmd.Flags().Lookup(f) != nil && cmd.Flags().Changed(f) {
-				return fmt.Errorf("--%s requires --backend gcp", f)
+				return fmt.Errorf("--%s requires --backend %s", f, provider.BackendGCP)
 			}
 		}
 	}
 
-	if backend != "docker" {
+	if backend != provider.BackendDocker {
 		for _, f := range dockerOnlyFlags {
 			if cmd.Flags().Lookup(f) != nil && cmd.Flags().Changed(f) {
-				return fmt.Errorf("--%s requires --backend docker (or omit --backend)", f)
+				return fmt.Errorf("--%s requires --backend %s (or omit --backend)", f, provider.BackendDocker)
 			}
 		}
 	}
@@ -74,22 +101,22 @@ func validateBackendFlags(cmd *cobra.Command, backend string) error {
 // validateRequiredGCPFlags checks that required GCP flags are set (from any
 // source: CLI, env, or config file) when backend is "gcp".
 func validateRequiredGCPFlags(cmd *cobra.Command) error {
-	for _, flag := range []string{"project", "zone", "state-bucket"} {
+	for _, flag := range []string{flagProject, flagZone, flagStateBucket} {
 		if cmd.Flags().Lookup(flag) != nil {
 			_ = viper.BindPFlag(flag, cmd.Flags().Lookup(flag))
 		}
 	}
 
-	if viper.GetString("project") == "" {
-		return fmt.Errorf("--project is required for GCP backend")
+	if viper.GetString(flagProject) == "" {
+		return fmt.Errorf("--%s is required for GCP backend", flagProject)
 	}
 
-	if viper.GetString("zone") == "" {
-		return fmt.Errorf("--zone is required for GCP backend")
+	if viper.GetString(flagZone) == "" {
+		return fmt.Errorf("--%s is required for GCP backend", flagZone)
 	}
 
-	if viper.GetString("state-bucket") == "" {
-		return fmt.Errorf("--state-bucket is required for GCP backend (GCS bucket names are globally unique and must be pre-created)")
+	if viper.GetString(flagStateBucket) == "" {
+		return fmt.Errorf("--%s is required for GCP backend (GCS bucket names are globally unique and must be pre-created)", flagStateBucket)
 	}
 
 	return nil

@@ -11,7 +11,7 @@ var defaultFactory = newDefaultFactory()
 func newDefaultFactory() *provider.Factory {
 	f := provider.NewFactory()
 
-	f.Register("docker", func() (provider.Provider, error) {
+	f.Register(provider.BackendDocker, func() (provider.Provider, error) {
 		return docker.NewDockerProvider(docker.NewRealDockerClient()), nil
 	})
 

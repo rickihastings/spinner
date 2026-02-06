@@ -14,7 +14,7 @@ import (
 func testFactory(mockProv *provider.MockProvider) *provider.Factory {
 	f := provider.NewFactory()
 
-	f.Register("docker", func() (provider.Provider, error) {
+	f.Register(provider.BackendDocker, func() (provider.Provider, error) {
 		return mockProv, nil
 	})
 

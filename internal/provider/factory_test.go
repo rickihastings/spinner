@@ -18,25 +18,25 @@ func TestFactory_RegisterAndCreate(t *testing.T) {
 	f := NewFactory()
 	mock := &MockProvider{}
 
-	f.Register("docker", func() (Provider, error) {
+	f.Register(BackendDocker, func() (Provider, error) {
 		return mock, nil
 	})
 
-	p, err := f.Create("docker")
+	p, err := f.Create(BackendDocker)
 	require.NoError(t, err)
 	assert.Equal(t, mock, p)
 }
 
 func TestFactory_CreateUnknownBackend(t *testing.T) {
 	f := NewFactory()
-	f.Register("docker", func() (Provider, error) {
+	f.Register(BackendDocker, func() (Provider, error) {
 		return &MockProvider{}, nil
 	})
 
-	_, err := f.Create("gcp")
+	_, err := f.Create(BackendGCP)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `unknown backend: "gcp"`)
-	assert.Contains(t, err.Error(), "docker")
+	assert.Contains(t, err.Error(), BackendDocker)
 }
 
 func TestFactory_CreateConstructorError(t *testing.T) {
@@ -52,12 +52,12 @@ func TestFactory_CreateConstructorError(t *testing.T) {
 
 func TestFactory_Available(t *testing.T) {
 	f := NewFactory()
-	f.Register("gcp", func() (Provider, error) { return nil, nil })
-	f.Register("docker", func() (Provider, error) { return nil, nil })
+	f.Register(BackendGCP, func() (Provider, error) { return nil, nil })
+	f.Register(BackendDocker, func() (Provider, error) { return nil, nil })
 	f.Register("aws", func() (Provider, error) { return nil, nil })
 
 	available := f.Available()
-	assert.Equal(t, []string{"aws", "docker", "gcp"}, available)
+	assert.Equal(t, []string{"aws", BackendDocker, BackendGCP}, available)
 }
 
 func TestFactory_AvailableEmpty(t *testing.T) {
@@ -70,10 +70,10 @@ func TestFactory_RegisterOverwrite(t *testing.T) {
 	mock1 := &MockProvider{}
 	mock2 := &MockProvider{}
 
-	f.Register("docker", func() (Provider, error) { return mock1, nil })
-	f.Register("docker", func() (Provider, error) { return mock2, nil })
+	f.Register(BackendDocker, func() (Provider, error) { return mock1, nil })
+	f.Register(BackendDocker, func() (Provider, error) { return mock2, nil })
 
-	p, err := f.Create("docker")
+	p, err := f.Create(BackendDocker)
 	require.NoError(t, err)
 	assert.Equal(t, mock2, p)
 }

@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+// Backend name constants.
+const (
+	BackendDocker = "docker"
+	BackendGCP    = "gcp"
+)
+
 // BackendConstructor creates a Provider for a specific backend.
 type BackendConstructor func() (Provider, error)
 

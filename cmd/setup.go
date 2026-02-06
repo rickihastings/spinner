@@ -62,16 +62,16 @@ EXAMPLES:
   spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind general flags to Viper
-			_ = viper.BindPFlag("name", cmd.Flags().Lookup("name"))
-			_ = viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
-			_ = viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
+			_ = viper.BindPFlag(flagName, cmd.Flags().Lookup(flagName))
+			_ = viper.BindPFlag(flagBaseImage, cmd.Flags().Lookup(flagBaseImage))
+			_ = viper.BindPFlag(flagDockerfile, cmd.Flags().Lookup(flagDockerfile))
 
 			// Bind GCP flags to Viper
-			_ = viper.BindPFlag("project", cmd.Flags().Lookup("project"))
-			_ = viper.BindPFlag("zone", cmd.Flags().Lookup("zone"))
-			_ = viper.BindPFlag("machine-type", cmd.Flags().Lookup("machine-type"))
-			_ = viper.BindPFlag("disk-size", cmd.Flags().Lookup("disk-size"))
-			_ = viper.BindPFlag("state-bucket", cmd.Flags().Lookup("state-bucket"))
+			_ = viper.BindPFlag(flagProject, cmd.Flags().Lookup(flagProject))
+			_ = viper.BindPFlag(flagZone, cmd.Flags().Lookup(flagZone))
+			_ = viper.BindPFlag(flagMachineType, cmd.Flags().Lookup(flagMachineType))
+			_ = viper.BindPFlag(flagDiskSize, cmd.Flags().Lookup(flagDiskSize))
+			_ = viper.BindPFlag(flagStateBucket, cmd.Flags().Lookup(flagStateBucket))
 
 			// Resolve backend (CLI > env > config > default "docker")
 			backend = resolveBackend(cmd)
@@ -82,9 +82,9 @@ EXAMPLES:
 			}
 
 			// Read values from Viper
-			setupName = viper.GetString("name")
-			setupBaseImage = viper.GetString("base-image")
-			setupDockerfile = viper.GetString("dockerfile")
+			setupName = viper.GetString(flagName)
+			setupBaseImage = viper.GetString(flagBaseImage)
+			setupDockerfile = viper.GetString(flagDockerfile)
 
 			if setupName == "" {
 				fmt.Fprintln(os.Stderr, "Error: Missing required flag: --name")
@@ -94,7 +94,7 @@ EXAMPLES:
 			}
 
 			// Docker-specific validation
-			if backend == "docker" {
+			if backend == provider.BackendDocker {
 				if setupBaseImage != "" && setupDockerfile != "" {
 					fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
 					fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
@@ -104,7 +104,7 @@ EXAMPLES:
 			}
 
 			// GCP-specific validation
-			if backend == "gcp" {
+			if backend == provider.BackendGCP {
 				if err := validateRequiredGCPFlags(cmd); err != nil {
 					return err
 				}
@@ -112,28 +112,28 @@ EXAMPLES:
 
 			// Build options map with all values; the provider picks what it needs
 			options := map[string]string{
-				"base-image": setupBaseImage,
-				"dockerfile": setupDockerfile,
+				flagBaseImage:  setupBaseImage,
+				flagDockerfile: setupDockerfile,
 			}
 
-			if backend == "gcp" {
-				options["project"] = viper.GetString("project")
-				options["zone"] = viper.GetString("zone")
-				options["state-bucket"] = viper.GetString("state-bucket")
+			if backend == provider.BackendGCP {
+				options[flagProject] = viper.GetString(flagProject)
+				options[flagZone] = viper.GetString(flagZone)
+				options[flagStateBucket] = viper.GetString(flagStateBucket)
 
-				mt := viper.GetString("machine-type")
+				mt := viper.GetString(flagMachineType)
 				if mt == "" {
-					mt = "e2-standard-2"
+					mt = defaultMachineType
 				}
 
-				options["machine-type"] = mt
+				options[flagMachineType] = mt
 
-				ds := viper.GetInt("disk-size")
+				ds := viper.GetInt(flagDiskSize)
 				if ds == 0 {
-					ds = 30
+					ds = defaultDiskSize
 				}
 
-				options["disk-size"] = strconv.Itoa(ds)
+				options[flagDiskSize] = strconv.Itoa(ds)
 			}
 
 			// Create provider from factory
@@ -150,19 +150,19 @@ EXAMPLES:
 	}
 
 	// General flags
-	cmd.Flags().StringVar(&setupName, "name", "", "Name for the environment (required)")
-	cmd.Flags().StringVar(&backend, "backend", "", "Backend provider: docker, gcp (default: docker)")
+	cmd.Flags().StringVar(&setupName, flagName, "", "Name for the environment (required)")
+	cmd.Flags().StringVar(&backend, flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 
 	// Docker backend flags
-	cmd.Flags().StringVar(&setupBaseImage, "base-image", "", "Base Docker image (optional, default: ubuntu:22.04)")
-	cmd.Flags().StringVar(&setupDockerfile, "dockerfile", "", "Path to custom Dockerfile (optional)")
+	cmd.Flags().StringVar(&setupBaseImage, flagBaseImage, "", "Base Docker image (optional, default: ubuntu:22.04)")
+	cmd.Flags().StringVar(&setupDockerfile, flagDockerfile, "", "Path to custom Dockerfile (optional)")
 
 	// GCP backend flags
-	cmd.Flags().StringVar(&project, "project", "", "GCP project ID (GCP backend)")
-	cmd.Flags().StringVar(&zone, "zone", "", "GCP zone (GCP backend)")
-	cmd.Flags().StringVar(&machineType, "machine-type", "", "VM machine type (GCP backend, default: e2-standard-2)")
-	cmd.Flags().IntVar(&diskSize, "disk-size", 0, "Boot disk size in GB (GCP backend, default: 30)")
-	cmd.Flags().StringVar(&stateBucket, "state-bucket", "", "GCS bucket for state persistence (GCP backend)")
+	cmd.Flags().StringVar(&project, flagProject, "", "GCP project ID (GCP backend)")
+	cmd.Flags().StringVar(&zone, flagZone, "", "GCP zone (GCP backend)")
+	cmd.Flags().StringVar(&machineType, flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
+	cmd.Flags().IntVar(&diskSize, flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
+	cmd.Flags().StringVar(&stateBucket, flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
 
 	return cmd
 }

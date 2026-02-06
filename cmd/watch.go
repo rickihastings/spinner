@@ -62,9 +62,9 @@ EXAMPLES:
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind GCP flags to Viper
-			_ = viper.BindPFlag("project", cmd.Flags().Lookup("project"))
-			_ = viper.BindPFlag("zone", cmd.Flags().Lookup("zone"))
-			_ = viper.BindPFlag("state-bucket", cmd.Flags().Lookup("state-bucket"))
+			_ = viper.BindPFlag(flagProject, cmd.Flags().Lookup(flagProject))
+			_ = viper.BindPFlag(flagZone, cmd.Flags().Lookup(flagZone))
+			_ = viper.BindPFlag(flagStateBucket, cmd.Flags().Lookup(flagStateBucket))
 
 			// Resolve backend (CLI > env > config > default "docker")
 			backend = resolveBackend(cmd)
@@ -75,7 +75,7 @@ EXAMPLES:
 			}
 
 			// GCP-specific validation
-			if backend == "gcp" {
+			if backend == provider.BackendGCP {
 				if err := validateRequiredGCPFlags(cmd); err != nil {
 					return err
 				}
@@ -93,12 +93,12 @@ EXAMPLES:
 	}
 
 	// General flags
-	cmd.Flags().StringVar(&backend, "backend", "", "Backend provider: docker, gcp (default: docker)")
+	cmd.Flags().StringVar(&backend, flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 
 	// GCP backend flags
-	cmd.Flags().StringVar(&project, "project", "", "GCP project ID (GCP backend)")
-	cmd.Flags().StringVar(&zone, "zone", "", "GCP zone (GCP backend)")
-	cmd.Flags().StringVar(&stateBucket, "state-bucket", "", "GCS bucket for state persistence (GCP backend)")
+	cmd.Flags().StringVar(&project, flagProject, "", "GCP project ID (GCP backend)")
+	cmd.Flags().StringVar(&zone, flagZone, "", "GCP zone (GCP backend)")
+	cmd.Flags().StringVar(&stateBucket, flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
 
 	return cmd
 }
