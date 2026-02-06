@@ -76,6 +76,12 @@ func RemoveDockerContainer(t *testing.T, name string) {
 	}
 }
 
+// IsDockerAvailable returns true if the Docker daemon is accessible.
+func IsDockerAvailable() bool {
+	cmd := exec.Command("docker", "info")
+	return cmd.Run() == nil
+}
+
 // EnsureDockerRunning checks that Docker daemon is accessible
 func EnsureDockerRunning(t *testing.T) {
 	t.Helper()

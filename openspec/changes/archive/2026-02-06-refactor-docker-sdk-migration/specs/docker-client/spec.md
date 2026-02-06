@@ -84,8 +84,6 @@ The Docker client SHALL support real-time container log streaming.
 - **THEN** the log stream is cleanly terminated
 - **AND** the channel is closed
 
-## MODIFIED Requirements
-
 ### Requirement: Error Handling
 
 The Docker client SHALL provide consistent error messages regardless of implementation.
@@ -94,7 +92,7 @@ The Docker client SHALL provide consistent error messages regardless of implemen
 
 - **WHEN** a Docker operation fails
 - **THEN** the error message includes operation context
-- **AND** the error format is consistent with previous CLI-based errors
+- **AND** the error format is consistent with expected error handling
 
 #### Scenario: Connection failure
 

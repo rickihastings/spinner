@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/moby/term"
 	"github.com/rickihastings/spinner/internal/agent"
 	"github.com/rickihastings/spinner/internal/agent/claude"
 	"github.com/rickihastings/spinner/internal/provider"
@@ -156,6 +157,12 @@ func PerformWatch(ctx context.Context, p provider.Provider, containerName string
 
 	// Create TUI with the formatter and context
 	ui := tui.NewWatchUI(containerName, formatter, uiContext)
+
+	// Enable test mode if not running in a terminal (e.g., during tests or in CI)
+	// This prevents TUI from attempting to start in headless environments
+	if !term.IsTerminal(os.Stdout.Fd()) {
+		ui.SetTestMode(true)
+	}
 
 	// Create context for coordinated shutdown
 	watchCtx, cancel := context.WithCancel(ctx)

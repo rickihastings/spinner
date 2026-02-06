@@ -29,7 +29,9 @@ func SkipIfDockerNotAvailable(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	EnsureDockerRunning(t)
+	if !IsDockerAvailable() {
+		t.Skip("skipping: Docker daemon is not available")
+	}
 }
 
 // WriteFile writes content to a file at the given path

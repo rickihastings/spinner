@@ -68,3 +68,13 @@ func (m *MockDockerClient) VerifyContainerStatus(ctx context.Context, name strin
 	args := m.Called(ctx, name)
 	return args.Get(0).(ContainerResult), args.Error(1)
 }
+
+// StreamContainerLogs mocks the StreamContainerLogs method.
+func (m *MockDockerClient) StreamContainerLogs(ctx context.Context, name string, opts LogStreamOptions) (<-chan LogEvent, error) {
+	args := m.Called(ctx, name, opts)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(<-chan LogEvent), args.Error(1)
+}
