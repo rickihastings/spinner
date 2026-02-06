@@ -78,11 +78,18 @@ required tooling, and creating an image from the resulting disk.
 - **WHEN** the image baking process fails at any step
 - **THEN** the provider SHALL clean up all temporary resources (VM, disk) before returning the error
 
-#### Scenario: Spinner binary upload
+#### Scenario: Spinner binary from GitHub Releases
 
-- **WHEN** the bake process starts
-- **THEN** the provider SHALL cross-compile the spinner binary for linux/amd64
-- **AND** upload it to a GCS bucket for the bake VM to download
+- **WHEN** the bake VM's startup script installs tooling
+- **THEN** it SHALL download the spinner binary from the latest GitHub Release
+- **AND** use the GitHub Releases API to resolve the latest version tag
+- **AND** download the `spinner_linux_amd64` asset to `/usr/local/bin/spinner`
+
+#### Scenario: GitHub Release not available
+
+- **WHEN** no GitHub Release exists or the download fails
+- **THEN** the bake script SHALL exit with a non-zero status
+- **AND** the bake VM SHALL report the error via serial port output before shutting down
 
 #### Scenario: Bake completion detection
 

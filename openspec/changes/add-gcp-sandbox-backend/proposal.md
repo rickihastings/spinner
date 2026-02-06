@@ -114,6 +114,8 @@ Backend-specific flags are organized into groups and validated at runtime:
 | `cmd/watch.go` | Wire factory for standalone watch mode |
 | `cmd/root.go` | Add `.spinner.json` config file loading via Viper |
 | `templates/scripts/` | New GCP-specific startup scripts (bake + runtime) |
+| `.goreleaser.yaml` | **New** — multi-platform binary release config (prerequisite) |
+| `.github/workflows/release.yml` | **New** — GitHub Actions release pipeline (prerequisite) |
 | `go.mod` | New dependencies: `cloud.google.com/go/*` packages |
 
 ### Not Affected

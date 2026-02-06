@@ -1,5 +1,12 @@
 # Tasks: Add GCP Sandbox Backend
 
+## 0.0 Prerequisite: GitHub Release Pipeline
+
+- [ ] 0.1 Create `.goreleaser.yaml` — configure multi-platform builds (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64)
+- [ ] 0.2 Create `.github/workflows/release.yml` — GitHub Actions workflow that triggers GoReleaser on `v*` tag push
+- [ ] 0.3 Tag and publish initial release (`v0.1.0`) to verify the pipeline
+- [ ] 0.4 Verify `spinner_linux_amd64` binary is downloadable from GitHub Releases
+
 ## 1.0 Provider Factory, Config File & Backend Selection
 
 - [ ] 1.1 Create `internal/provider/factory.go` with `Factory` struct, `Register()`, `Create()`, `Available()` methods
@@ -24,9 +31,9 @@
 
 ## 3.0 GCP Setup — Image Baking
 
-- [ ] 3.1 Create `templates/scripts/gcp_bake.sh` — startup script that installs git, gh, claude-code, spinner binary, then shuts down
+- [ ] 3.1 Create `templates/scripts/gcp_bake.sh` — startup script that installs git, gh, claude-code, downloads spinner from GitHub Releases, then shuts down
 - [ ] 3.2 Create `internal/gcp/startup.go` — Go template rendering for bake and runtime startup scripts
-- [ ] 3.3 Create `internal/gcp/image.go` — image baking logic: upload binary to GCS, create temp VM, wait for shutdown, create image, cleanup
+- [ ] 3.3 Create `internal/gcp/image.go` — image baking logic: create temp VM, wait for shutdown, create image, cleanup
 - [ ] 3.4 Implement `Provider.Setup()` — orchestrate image baking flow using client interface
 - [ ] 3.5 Create `internal/gcp/image_test.go` — unit tests with mock client for full bake flow
 - [ ] 3.6 Create `internal/gcp/startup_test.go` — test startup script template rendering

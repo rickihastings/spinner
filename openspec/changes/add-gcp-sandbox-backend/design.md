@@ -217,9 +217,10 @@ type Client interface {
     // Logs
     GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*SerialPortOutput, error)
 
-    // Storage (for state persistence)
+    // Storage (for state persistence — GCS)
     WriteObject(ctx context.Context, bucket, object string, data []byte) error
     ReadObject(ctx context.Context, bucket, object string) ([]byte, error)
+    ObjectExists(ctx context.Context, bucket, object string) (bool, error)
 
     // Monitoring
     QueryTimeSeries(ctx context.Context, project string, query MetricsQuery) ([]MetricPoint, error)
@@ -250,19 +251,37 @@ type Provider struct {
 
 ##### Setup Flow (Image Baking)
 
+**Spinner binary acquisition:** The bake script downloads the spinner binary from GitHub Releases.
+Currently there is no release process — the Docker backend works around this by running `go build`
+locally and `COPY`ing the binary into the image. For GCP, this won't work (can't COPY into a VM),
+so a lightweight release pipeline is a prerequisite:
+
+- **GoReleaser** (`.goreleaser.yaml`) — builds multi-platform binaries on tag push
+- **GitHub Actions** (`.github/workflows/release.yml`) — triggers GoReleaser on `v*` tags
+- Produces: `spinner_linux_amd64` (and others) attached to GitHub Releases
+- This also benefits Docker: `setup` could download the release binary instead of requiring Go on the host
+
+The bake script then does:
+```bash
+SPINNER_VERSION=$(curl -sf https://api.github.com/repos/rickihastings/spinner/releases/latest | grep tag_name | cut -d'"' -f4)
+curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_linux_amd64" \
+    -o /usr/local/bin/spinner
+chmod +x /usr/local/bin/spinner
+```
+
+**Full bake flow:**
+
 1. Generate a bake startup script from `templates/scripts/gcp_bake.sh`:
    - Install git, curl, sudo, ca-certificates
    - Install GitHub CLI (gh)
    - Install Claude Code CLI
-   - Download spinner binary from GCS (uploaded during setup)
+   - Download spinner binary from GitHub Releases (latest)
    - Write completion marker to serial port
    - Shut down the VM
-2. Upload spinner binary to GCS (cross-compiled for linux/amd64)
-3. Create a temporary VM with the bake script as `metadata.startup-script`
-4. Wait for VM to reach `TERMINATED` state (script shuts down after install)
-5. Create a custom image from the VM's boot disk
-6. Delete the temporary VM
-7. Clean up the GCS upload
+2. Create a temporary VM with the bake script as `metadata.startup-script`
+3. Wait for VM to reach `TERMINATED` state (script shuts down after install)
+4. Create a custom image from the VM's boot disk
+5. Delete the temporary VM
 
 ##### Create Flow (Launch Instance)
 
@@ -344,6 +363,7 @@ flag is planned as a follow-up to give users explicit control.
 | **Image baking for setup** | Matches Docker's "build image once, run many" model; fast VM boot |
 | **Metadata for secrets** | Same security model as Docker env vars; simple; single-tenant VMs |
 | **Serial port for logs** | Always available; no agent needed; simple offset-based polling |
+| **GitHub Releases for binary** | No GCS needed for binary distribution; works without Go on setup machine; benefits Docker too |
 | **GCS for state** | Durable; accessible from control plane and VM; strong consistency |
 | **Factory pattern for backend selection** | Clean DI; no changes to Provider interface; supports future backends |
 | **Default VPC with external IP** | Simplest networking; outbound access for GitHub and Claude API |
@@ -438,7 +458,7 @@ All operations use context for cancellation and timeouts. Specific error codes a
 set -e
 
 # Install system dependencies
-apt-get update && apt-get install -y git curl sudo ca-certificates
+apt-get update && apt-get install -y git curl sudo ca-certificates jq
 
 # Install GitHub CLI
 # ... (same as Docker template)
@@ -450,11 +470,21 @@ echo "spinner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 # Install Claude Code
 su - spinner -c 'curl -fsSL https://claude.ai/install.sh | bash'
 
-# Download spinner binary from GCS
-SPINNER_BINARY_URL=$(curl -sf -H "Metadata-Flavor: Google" \
-    http://metadata.google.internal/computeMetadata/v1/instance/attributes/spinner-binary-url)
-gsutil cp "$SPINNER_BINARY_URL" /usr/local/bin/spinner
+# Download spinner binary from latest GitHub Release
+SPINNER_VERSION=$(curl -sf https://api.github.com/repos/rickihastings/spinner/releases/latest \
+    | jq -r '.tag_name')
+curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_linux_amd64" \
+    -o /usr/local/bin/spinner
 chmod +x /usr/local/bin/spinner
+
+# Copy startup script (passed via metadata)
+curl -sf -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script-runtime" \
+    > /usr/local/bin/startup.sh
+chmod +x /usr/local/bin/startup.sh
+
+# Set up workspace directory
+mkdir -p /home/spinner/workspace && chown spinner:spinner /home/spinner/workspace
 
 # Signal completion and shut down
 echo "SPINNER_BAKE_COMPLETE" > /dev/ttyS0
