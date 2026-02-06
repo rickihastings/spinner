@@ -32,7 +32,7 @@ A complete GCP Compute Engine provider implementing the `provider.Provider` inte
   then creating a machine image from the disk
 - **Create** — Launches a VM instance from the baked image with runtime metadata (repo, prompt, branch, tokens)
 - **Start/Stop/Restart/Remove** — Full VM lifecycle management via Compute Engine Instances API
-- **Logs** — Serial port output for boot/runtime logs; Cloud Logging integration for structured log streaming
+- **Logs** — GCS-based log streaming; exec syncs `raw.log` to GCS via reused `LogWatcher`; control plane polls GCS
 - **Metrics** — Cloud Monitoring API for CPU utilization; Ops Agent for memory metrics
 - **State** — Cloud Storage (GCS) bucket for state persistence across VM stop/start cycles
 - **Secrets** — Passed via instance metadata (matches Docker's env-var security model); Secret Manager noted as
@@ -107,6 +107,7 @@ Backend-specific flags are organized into groups and validated at runtime:
 | Area | Change Type |
 |---|---|
 | `internal/provider/` | New `factory.go` for provider registry |
+| `internal/logs/` | **New package** — extracted `LogWatcher` from docker + GCS log sink |
 | `internal/gcp/` | **New package** — GCP provider, client, types, templates |
 | `cmd/constructors.go` | Modify command constructors to accept factory instead of single provider |
 | `cmd/setup.go` | Wire factory; add GCP-specific flags with conditional validation |
@@ -116,11 +117,14 @@ Backend-specific flags are organized into groups and validated at runtime:
 | `templates/scripts/` | New GCP-specific startup scripts (bake + runtime) |
 | `go.mod` | New dependencies: `cloud.google.com/go/*` packages |
 
+### Also Affected (refactor only, no behavior change)
+
+- `internal/docker/logs.go` — `LogWatcher` extracted to `internal/logs/`; Docker provider imports from shared package
+- `internal/exec/loop.go` — Spawns GCS log sync goroutine when `SPINNER_LOG_BUCKET` env var is set (GCP VMs only)
+
 ### Not Affected
 
-- `internal/docker/` — No changes to existing Docker backend
 - `internal/agent/` — Agent abstraction is provider-agnostic
-- `internal/exec/` — Execution loop is provider-agnostic (runs inside VM the same as inside container)
 - Provider interface definition — No changes to `provider.Provider`
 
 ## Risks & Mitigations

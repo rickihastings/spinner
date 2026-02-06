@@ -56,16 +56,24 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 - [ ] 4.9 Create `internal/gcp/gcp_provider_test.go` — provider-level tests
 - [ ] 4.10 Verify build and tests pass
 
-## 5.0 GCP Logs & Metrics
+## 5.0 LogWatcher Extraction & GCS Log Streaming
 
-- [ ] 5.1 Create `internal/gcp/logs.go` — serial port output reading with byte-offset tracking
-- [ ] 5.2 Implement `Provider.Logs()` — return full serial port output as `io.ReadCloser`
-- [ ] 5.3 Implement `Provider.WatchLogs()` — poll serial port at 1s interval, send new lines to channel
-- [ ] 5.4 Create `internal/gcp/metrics.go` — Cloud Monitoring query for CPU utilization
-- [ ] 5.5 Implement `Provider.WatchMetrics()` — poll Cloud Monitoring, map to `ContainerMetrics`, send to channel
-- [ ] 5.6 Create `internal/gcp/logs_test.go` — unit tests for log streaming with mock client
-- [ ] 5.7 Create `internal/gcp/metrics_test.go` — unit tests for metrics with mock client
-- [ ] 5.8 Verify build and tests pass
+- [ ] 5.1 Extract `LogWatcher` from `internal/docker/logs.go` → `internal/logs/watcher.go` (move, not copy)
+- [ ] 5.2 Extract tests → `internal/logs/watcher_test.go`
+- [ ] 5.3 Update `internal/docker/logs.go` to import from `internal/logs/` — verify no behavior change, all existing tests pass
+- [ ] 5.4 Create `internal/logs/gcs_sink.go` — `GCSSink` that consumes lines from LogWatcher channel and uploads to GCS (buffered, every 2s)
+- [ ] 5.5 Create `internal/logs/gcs_sink_test.go` — unit tests for GCS sink
+- [ ] 5.6 Modify `internal/exec/loop.go` — detect `SPINNER_LOG_BUCKET` env var, spawn LogWatcher + GCSSink goroutine before iteration loop
+- [ ] 5.7 Create `internal/gcp/logs.go` — GCS-based log reader: `Logs()` downloads full object, `WatchLogs()` polls with byte offset + Range reads
+- [ ] 5.8 Create `internal/gcp/logs_test.go` — unit tests for GCS log reader with mock client
+- [ ] 5.9 Verify build and all tests pass (Docker + new GCS paths)
+
+## 5.5 GCP Metrics
+
+- [ ] 5.51 Create `internal/gcp/metrics.go` — Cloud Monitoring query for CPU utilization
+- [ ] 5.52 Implement `Provider.WatchMetrics()` — poll Cloud Monitoring at 60s interval, map to `ContainerMetrics`, send to channel
+- [ ] 5.53 Create `internal/gcp/metrics_test.go` — unit tests for metrics with mock client
+- [ ] 5.54 Verify build and tests pass
 
 ## 6.0 GCP State Persistence & Integration
 

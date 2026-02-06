@@ -201,26 +201,52 @@ The GCP provider SHALL map Compute Engine VM statuses to `provider.InstanceStatu
 - **WHEN** the VM status is `STAGING`, `PROVISIONING`, `STOPPING`, or `SUSPENDING`
 - **THEN** `Provider.Status()` SHALL return the closest mapped status with no error
 
-### Requirement: GCP Log Streaming
+### Requirement: GCP Log Streaming via GCS
 
-The GCP provider SHALL support log retrieval and real-time streaming via serial port output.
+The GCP provider SHALL support log retrieval and real-time streaming via GCS, reusing the extracted `LogWatcher`
+for file-watching on the VM side.
+
+#### Scenario: LogWatcher extraction
+
+- **WHEN** the GCP log streaming feature is implemented
+- **THEN** the existing `LogWatcher` from `internal/docker/logs.go` SHALL be extracted to `internal/logs/watcher.go`
+- **AND** the Docker provider SHALL import from the shared package (no behavior change)
+- **AND** the GCP log sync goroutine SHALL reuse the same `LogWatcher` on the VM
+
+#### Scenario: VM-side log sync via exec
+
+- **WHEN** `spinner exec` runs inside a GCP VM
+- **AND** the `SPINNER_LOG_BUCKET` environment variable is set
+- **THEN** exec SHALL spawn a background goroutine that watches `/logs/raw.log` using `LogWatcher`
+- **AND** uploads new content to GCS at `{bucket}/{instance-name}/logs/raw.log` every 2 seconds
+- **AND** the sync goroutine SHALL be cleaned up when exec completes
+
+#### Scenario: VM-side log sync not on GCP
+
+- **WHEN** `spinner exec` runs inside a Docker container (no `SPINNER_LOG_BUCKET` set)
+- **THEN** exec SHALL NOT spawn any log sync goroutine (no behavior change)
 
 #### Scenario: Full log retrieval
 
-- **WHEN** `Provider.Logs()` is called
-- **THEN** the provider SHALL return the full serial port output as an `io.ReadCloser`
+- **WHEN** `Provider.Logs()` is called on the control plane
+- **THEN** the GCP provider SHALL download the full GCS log object and return as `io.ReadCloser`
 
 #### Scenario: Real-time log streaming
 
-- **WHEN** `Provider.WatchLogs()` is called
-- **THEN** the provider SHALL poll serial port output at 1-second intervals
-- **AND** track byte offset to only return new output
-- **AND** send new lines to the provided channel
+- **WHEN** `Provider.WatchLogs()` is called on the control plane
+- **THEN** the GCP provider SHALL poll the GCS log object every 2 seconds
+- **AND** track byte offset to only read new content (GCS Range reads)
+- **AND** split new bytes into lines and send to the provided channel
 
 #### Scenario: Log stream cancellation
 
 - **WHEN** the context is cancelled during log streaming
-- **THEN** the provider SHALL stop polling and close the channel
+- **THEN** the provider SHALL stop polling and return
+
+#### Scenario: Log object not yet created
+
+- **WHEN** `WatchLogs()` is called before the VM has written any logs
+- **THEN** the provider SHALL poll until the GCS object appears (with timeout)
 
 #### Scenario: VM not running
 

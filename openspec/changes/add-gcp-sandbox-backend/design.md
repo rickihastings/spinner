@@ -18,8 +18,13 @@
 | `internal/gcp/image_test.go` | **create** | Image baking tests |
 | `internal/gcp/instance.go` | **create** | VM instance lifecycle operations |
 | `internal/gcp/instance_test.go` | **create** | Instance lifecycle tests |
-| `internal/gcp/logs.go` | **create** | Serial port + Cloud Logging integration |
-| `internal/gcp/logs_test.go` | **create** | Log streaming tests |
+| `internal/logs/watcher.go` | **extract** | LogWatcher moved from `internal/docker/logs.go` — fsnotify-based file tailing |
+| `internal/logs/watcher_test.go` | **extract** | LogWatcher tests (moved from docker package) |
+| `internal/logs/gcs_sink.go` | **create** | GCS log sink — receives lines from LogWatcher, uploads to GCS |
+| `internal/logs/gcs_sink_test.go` | **create** | GCS sink tests |
+| `internal/docker/logs.go` | **modify** | Import LogWatcher from `internal/logs/` instead of defining locally |
+| `internal/gcp/logs.go` | **create** | GCS-based log reader for control plane `WatchLogs` / `Logs` |
+| `internal/gcp/logs_test.go` | **create** | GCS log reader tests |
 | `internal/gcp/metrics.go` | **create** | Cloud Monitoring integration |
 | `internal/gcp/metrics_test.go` | **create** | Metrics tests |
 | `internal/gcp/state.go` | **create** | GCS-based state persistence |
@@ -27,6 +32,7 @@
 | `internal/gcp/startup.go` | **create** | Startup script generation for GCP VMs |
 | `templates/scripts/gcp_bake.sh` | **create** | Image baking startup script (installs tooling) |
 | `templates/scripts/gcp_runtime.sh` | **create** | Runtime startup script (clones repo, runs exec) |
+| `internal/exec/loop.go` | **modify** | Spawn GCS log sync goroutine when `SPINNER_LOG_BUCKET` env var is set |
 | `cmd/constructors.go` | **modify** | Accept provider factory; add `--backend` flag; conditional flag validation |
 | `cmd/setup.go` | **modify** | Wire factory; register grouped GCP-specific flags |
 | `cmd/spin.go` | **modify** | Wire factory; register grouped GCP-specific flags |
@@ -214,12 +220,14 @@ type Client interface {
     WaitZoneOperation(ctx context.Context, project, zone, op string) error
     WaitGlobalOperation(ctx context.Context, project, op string) error
 
-    // Logs
+    // Serial port (for boot/bake diagnostics only)
     GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*SerialPortOutput, error)
 
-    // Storage (for state persistence — GCS)
+    // Storage (for state persistence + log streaming — GCS)
     WriteObject(ctx context.Context, bucket, object string, data []byte) error
     ReadObject(ctx context.Context, bucket, object string) ([]byte, error)
+    ReadObjectRange(ctx context.Context, bucket, object string, offset int64) ([]byte, error)
+    ObjectSize(ctx context.Context, bucket, object string) (int64, error)
     ObjectExists(ctx context.Context, bucket, object string) (bool, error)
 
     // Monitoring
@@ -297,7 +305,8 @@ rm /tmp/spinner.tar.gz
    - Custom image (from setup)
    - Machine type from config (default: `e2-standard-2`)
    - Boot disk (default: 30 GB pd-balanced)
-   - Metadata: `GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `REPO_URL`, `PROMPT`, `MAX_ITERATIONS`, `BRANCH`
+   - Metadata: `GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `REPO_URL`, `PROMPT`, `MAX_ITERATIONS`, `BRANCH`,
+     `SPINNER_LOG_BUCKET`, `SPINNER_INSTANCE_NAME`
    - Labels: `spinner-image={name}`, `spinner-repo={repo}`, `spinner-managed=true`
    - Service account with minimal scopes
    - External IP for outbound internet (GitHub, Claude API)
@@ -313,19 +322,78 @@ spinner-{image}-{repo}[-{branch}]
 ```
 GCP instance names: lowercase, max 63 chars, `[a-z]([-a-z0-9]*[a-z0-9])?`.
 
-##### Logs Implementation
+##### Logs Implementation — GCS Streaming
 
-Two approaches layered:
+In Docker, `WatchLogs` reads `raw.log` directly from the host filesystem via a volume mount + fsnotify. For GCP,
+the file lives on a remote VM, so we use GCS as the transport layer.
 
-1. **Serial port output** (always available):
-   - `GetSerialPortOutput` with byte offset tracking
-   - Poll-based for `WatchLogs` (1-second interval)
-   - No agent installation required
+**Shared Component: LogWatcher Extraction**
 
-2. **Cloud Logging** (when available):
-   - Read from `compute.googleapis.com/activity_log` and custom logs
-   - Provides structured, filterable log entries
-   - Preferred when ops agent is installed in the baked image
+The existing `internal/docker/logs.go` (`LogWatcher`, ~250 LOC) is extracted to `internal/logs/watcher.go`. It
+provides fsnotify-based local file watching:
+
+- `TailExistingLines(ctx, n)` — ring buffer over existing content
+- `WatchLines(ctx, ch)` — stream new lines to channel via fsnotify
+
+Both backends reuse this. Docker uses it on the control plane (host filesystem via volume mount). GCP uses it on
+the VM (where `raw.log` is a local file). `internal/docker/logs.go` becomes a thin wrapper that imports from
+`internal/logs/`.
+
+**VM Side: Log Sync via exec**
+
+When `spinner exec` runs inside a GCP VM, it detects GCS configuration via environment variables
+(`SPINNER_LOG_BUCKET`, `SPINNER_INSTANCE_NAME` — set by the runtime startup script). If present, it spawns a
+background goroutine before entering the iteration loop:
+
+```go
+// internal/exec/loop.go — inside Run(), before iteration loop
+if bucket := os.Getenv("SPINNER_LOG_BUCKET"); bucket != "" {
+    instanceName := os.Getenv("SPINNER_INSTANCE_NAME")
+    sink, err := logs.NewGCSSink(ctx, bucket, instanceName+"/logs/raw.log")
+    if err == nil {
+        watcher, _ := logs.NewWatcher(logFilePath)
+        lineCh := make(chan string, 100)
+        go watcher.WatchLines(ctx, lineCh)
+        go sink.ConsumeLines(ctx, lineCh) // buffers + uploads to GCS
+        defer sink.Close()
+    }
+}
+```
+
+The `GCSSink` (`internal/logs/gcs_sink.go`):
+- Consumes lines from the LogWatcher channel
+- Buffers writes and periodically uploads to GCS (every 2 seconds or on buffer threshold)
+- Overwrites the GCS object with the full log content each sync cycle
+- Object size serves as the implicit byte offset for readers
+- Uses `cloud.google.com/go/storage` directly — small, focused dependency
+
+**Control Plane Side: GCS Log Reader**
+
+GCP provider's `WatchLogs()` (`internal/gcp/logs.go`):
+1. Polls GCS object at `{bucket}/{instance}/logs/raw.log` every 2 seconds
+2. Checks object size vs last-read byte offset
+3. If new content exists, performs a Range read (`Range: bytes={offset}-`)
+4. Splits new bytes into lines, sends to channel
+5. Updates offset
+
+GCP provider's `Logs()`:
+1. Downloads the full GCS log object
+2. Returns as `io.ReadCloser`
+
+```
+VM (raw.log is local)              GCS (transport)           Control Plane
+┌────────────────────┐         ┌──────────────────┐     ┌──────────────────────┐
+│ Executor           │         │ {instance}/logs/  │     │ GCP Provider         │
+│   └─ TeeReader ──→ raw.log  │   raw.log         │     │   WatchLogs()        │
+│                    │         │                   │     │     │                │
+│ LogWatcher         │         │                   │     │   Poll GCS every 2s  │
+│   └─ fsnotify ──→ lines ──→ │  GCSSink uploads  │ ──→ │   Range read offset  │
+│     (reused code)  │         │  every 2s         │     │   Split lines → ch   │
+└────────────────────┘         └──────────────────┘     └──────────────────────┘
+```
+
+Serial port output is still used for **boot/bake diagnostics** (e.g., `SPINNER_BAKE_COMPLETE` marker during
+setup), but agent log streaming uses GCS exclusively.
 
 ##### Metrics Implementation
 
@@ -365,7 +433,8 @@ flag is planned as a follow-up to give users explicit control.
 | **SDK-only, no gcloud CLI** | Avoids runtime dependency; type safety; testable with mocks |
 | **Image baking for setup** | Matches Docker's "build image once, run many" model; fast VM boot |
 | **Metadata for secrets** | Same security model as Docker env vars; simple; single-tenant VMs |
-| **Serial port for logs** | Always available; no agent needed; simple offset-based polling |
+| **GCS for log streaming** | Reuses LogWatcher code from Docker; exec owns the sync goroutine; no SSH or extra agents needed |
+| **Serial port for bake diagnostics** | Always available; used only for boot/bake completion markers, not agent logs |
 | **GitHub Releases for binary** | No GCS needed for binary distribution; works without Go on setup machine; benefits Docker too |
 | **GCS for state** | Durable; accessible from control plane and VM; strong consistency |
 | **Factory pattern for backend selection** | Clean DI; no changes to Provider interface; supports future backends |
@@ -510,8 +579,11 @@ PROMPT=$(curl -sf -H "Metadata-Flavor: Google" "$META_URL/PROMPT" || echo "")
 BRANCH=$(curl -sf -H "Metadata-Flavor: Google" "$META_URL/BRANCH" || echo "")
 MAX_ITERATIONS=$(curl -sf -H "Metadata-Flavor: Google" "$META_URL/MAX_ITERATIONS" || echo "100")
 CLAUDE_CODE_OAUTH_TOKEN=$(curl -sf -H "Metadata-Flavor: Google" "$META_URL/CLAUDE_CODE_OAUTH_TOKEN")
+SPINNER_LOG_BUCKET=$(curl -sf -H "Metadata-Flavor: Google" "$META_URL/SPINNER_LOG_BUCKET" || echo "")
+SPINNER_INSTANCE_NAME=$(curl -sf -H "Metadata-Flavor: Google" "$META_URL/SPINNER_INSTANCE_NAME" || echo "")
 
 export GITHUB_TOKEN REPO_URL PROMPT BRANCH MAX_ITERATIONS CLAUDE_CODE_OAUTH_TOKEN
+export SPINNER_LOG_BUCKET SPINNER_INSTANCE_NAME
 
 # Switch to spinner user and run startup
 su - spinner -c "cd /home/spinner/workspace && /usr/local/bin/startup.sh"
@@ -525,7 +597,7 @@ maximizing code reuse between Docker and GCP backends.
 | Trade-off | Analysis |
 |---|---|
 | **Image bake time vs boot speed** | Baking takes ~5-10 min but VMs boot in ~30s. Worth the upfront cost for repeated spins. |
-| **Serial port vs Cloud Logging** | Serial port is simple but unstructured. Cloud Logging requires ops agent. Start with serial port, add Cloud Logging as enhancement. |
+| **GCS log streaming latency** | ~2s polling delay vs Docker's real-time fsnotify. Acceptable for watch TUI; GCS transport reuses LogWatcher code, avoiding 250 LOC duplication. |
 | **GCS for state vs persistent disk** | GCS is simpler (no disk attach/detach) and works across VM recreations. Persistent disks are faster but more complex to manage. |
 | **Metadata secrets vs Secret Manager** | Metadata is simpler (matches Docker model) but visible in GCP Console. Acceptable for single-tenant; document the trade-off. |
 | **External IP vs Cloud NAT** | External IP is simpler but exposes VM on internet (mitigated by firewall denying all ingress). Cloud NAT is more secure but adds setup complexity. |
