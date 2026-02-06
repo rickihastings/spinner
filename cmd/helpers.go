@@ -98,6 +98,38 @@ func validateBackendFlags(cmd *cobra.Command, backend string) error {
 	return nil
 }
 
+// validateDockerFlags checks Docker-specific flag constraints.
+// When the command has a --setup flag (e.g. spin), --base-image and --dockerfile
+// require --setup. In all cases, --base-image and --dockerfile are mutually exclusive.
+func validateDockerFlags(cmd *cobra.Command) error {
+	baseImage := viper.GetString(flagBaseImage)
+	dockerfile := viper.GetString(flagDockerfile)
+
+	// If the command has a --setup flag, build flags require it
+	if setupFlag := cmd.Flags().Lookup(flagSetup); setupFlag != nil {
+		setup, _ := cmd.Flags().GetBool(flagSetup)
+
+		if !setup && baseImage != "" {
+			fmt.Fprintf(os.Stderr, "Error: --%s requires --%s flag\n", flagBaseImage, flagSetup)
+			return fmt.Errorf("--%s requires --%s flag", flagBaseImage, flagSetup)
+		}
+
+		if !setup && dockerfile != "" {
+			fmt.Fprintf(os.Stderr, "Error: --%s requires --%s flag\n", flagDockerfile, flagSetup)
+			return fmt.Errorf("--%s requires --%s flag", flagDockerfile, flagSetup)
+		}
+	}
+
+	if baseImage != "" && dockerfile != "" {
+		fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
+		fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
+
+		return fmt.Errorf("mutually exclusive flags provided")
+	}
+
+	return nil
+}
+
 // validateRequiredGCPFlags checks that required GCP flags are set (from any
 // source: CLI, env, or config file) when backend is "gcp".
 func validateRequiredGCPFlags(cmd *cobra.Command) error {

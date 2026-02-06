@@ -95,11 +95,8 @@ EXAMPLES:
 
 			// Docker-specific validation
 			if backend == provider.BackendDocker {
-				if setupBaseImage != "" && setupDockerfile != "" {
-					fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
-					fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
-
-					return fmt.Errorf("mutually exclusive flags provided")
+				if err := validateDockerFlags(cmd); err != nil {
+					return err
 				}
 			}
 

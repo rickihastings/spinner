@@ -130,21 +130,8 @@ EXAMPLES:
 
 			// Docker-specific setup flag validation
 			if backend == provider.BackendDocker {
-				if !spinSetup && spinBaseImage != "" {
-					fmt.Fprintln(os.Stderr, "Error: --base-image requires --setup flag")
-					return fmt.Errorf("--base-image requires --setup flag")
-				}
-
-				if !spinSetup && spinDockerfile != "" {
-					fmt.Fprintln(os.Stderr, "Error: --dockerfile requires --setup flag")
-					return fmt.Errorf("--dockerfile requires --setup flag")
-				}
-
-				if spinSetup && spinBaseImage != "" && spinDockerfile != "" {
-					fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
-					fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
-
-					return fmt.Errorf("mutually exclusive flags provided")
+				if err := validateDockerFlags(cmd); err != nil {
+					return err
 				}
 			}
 
