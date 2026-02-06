@@ -203,15 +203,8 @@ The GCP provider SHALL map Compute Engine VM statuses to `provider.InstanceStatu
 
 ### Requirement: GCP Log Streaming via GCS
 
-The GCP provider SHALL support log retrieval and real-time streaming via GCS, reusing the extracted `LogWatcher`
-for file-watching on the VM side.
-
-#### Scenario: LogWatcher extraction
-
-- **WHEN** the GCP log streaming feature is implemented
-- **THEN** the existing `LogWatcher` from `internal/docker/logs.go` SHALL be extracted to `internal/logs/watcher.go`
-- **AND** the Docker provider SHALL import from the shared package (no behavior change)
-- **NOTE** the GCP VM side does NOT use LogWatcher — it taps directly into the executor's TeeReader pipeline
+The GCP provider SHALL support log retrieval and real-time streaming via GCS, tapping directly into the
+executor's existing TeeReader pipeline on the VM side.
 
 #### Scenario: VM-side log sync via executor pipeline
 

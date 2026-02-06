@@ -18,11 +18,8 @@
 | `internal/gcp/image_test.go` | **create** | Image baking tests |
 | `internal/gcp/instance.go` | **create** | VM instance lifecycle operations |
 | `internal/gcp/instance_test.go` | **create** | Instance lifecycle tests |
-| `internal/logs/watcher.go` | **extract** | LogWatcher moved from `internal/docker/logs.go` — fsnotify-based file tailing (Docker control plane) |
-| `internal/logs/watcher_test.go` | **extract** | LogWatcher tests (moved from docker package) |
 | `internal/logs/gcs_sink.go` | **create** | GCS log sink — `io.Writer` that buffers and flushes to GCS |
 | `internal/logs/gcs_sink_test.go` | **create** | GCS sink tests |
-| `internal/docker/logs.go` | **modify** | Import LogWatcher from `internal/logs/` instead of defining locally |
 | `internal/agent/claude/executor.go` | **modify** | Support optional `AdditionalWriter` in config for GCS sink |
 | `internal/gcp/logs.go` | **create** | GCS-based log reader for control plane `WatchLogs` / `Logs` |
 | `internal/gcp/logs_test.go` | **create** | GCS log reader tests |
@@ -328,17 +325,6 @@ GCP instance names: lowercase, max 63 chars, `[a-z]([-a-z0-9]*[a-z0-9])?`.
 In Docker, `WatchLogs` reads `raw.log` directly from the host filesystem via a volume mount + fsnotify. For GCP,
 the file lives on a remote VM, so we use GCS as the transport layer.
 
-**LogWatcher Extraction (Docker control plane)**
-
-The existing `internal/docker/logs.go` (`LogWatcher`, ~250 LOC) is extracted to `internal/logs/watcher.go`. It
-provides fsnotify-based local file watching:
-
-- `TailExistingLines(ctx, n)` — ring buffer over existing content
-- `WatchLines(ctx, ch)` — stream new lines to channel via fsnotify
-
-Docker's control plane `WatchLogs` continues to use this (reading from the host-side volume mount).
-`internal/docker/logs.go` becomes a thin wrapper that imports from `internal/logs/`.
-
 **VM Side: Direct Pipeline via Executor**
 
 The executor already streams Claude's stdout through `io.TeeReader(stdout, logFile)` — the bytes are right
@@ -447,7 +433,7 @@ flag is planned as a follow-up to give users explicit control.
 | **SDK-only, no gcloud CLI** | Avoids runtime dependency; type safety; testable with mocks |
 | **Image baking for setup** | Matches Docker's "build image once, run many" model; fast VM boot |
 | **Metadata for secrets** | Same security model as Docker env vars; simple; single-tenant VMs |
-| **GCS for log streaming** | Reuses LogWatcher code from Docker; exec owns the sync goroutine; no SSH or extra agents needed |
+| **GCS for log streaming** | Taps directly into executor's TeeReader via MultiWriter; no SSH, no file watchers, no extra agents |
 | **Serial port for bake diagnostics** | Always available; used only for boot/bake completion markers, not agent logs |
 | **GitHub Releases for binary** | No GCS needed for binary distribution; works without Go on setup machine; benefits Docker too |
 | **GCS for state** | Durable; accessible from control plane and VM; strong consistency |
@@ -611,7 +597,7 @@ maximizing code reuse between Docker and GCP backends.
 | Trade-off | Analysis |
 |---|---|
 | **Image bake time vs boot speed** | Baking takes ~5-10 min but VMs boot in ~30s. Worth the upfront cost for repeated spins. |
-| **GCS log streaming latency** | ~2s polling delay vs Docker's real-time fsnotify. Acceptable for watch TUI; GCS transport reuses LogWatcher code, avoiding 250 LOC duplication. |
+| **GCS log streaming latency** | ~2s polling delay vs Docker's real-time fsnotify. Acceptable for watch TUI. |
 | **GCS for state vs persistent disk** | GCS is simpler (no disk attach/detach) and works across VM recreations. Persistent disks are faster but more complex to manage. |
 | **Metadata secrets vs Secret Manager** | Metadata is simpler (matches Docker model) but visible in GCP Console. Acceptable for single-tenant; document the trade-off. |
 | **External IP vs Cloud NAT** | External IP is simpler but exposes VM on internet (mitigated by firewall denying all ingress). Cloud NAT is more secure but adds setup complexity. |
