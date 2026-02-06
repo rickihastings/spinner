@@ -51,6 +51,22 @@ The setup command SHALL accept GCP-specific flags when `--backend gcp` is select
 - **WHEN** user does not provide `--machine-type` with GCP backend
 - **THEN** the CLI SHALL default to `e2-standard-2`
 
+#### Scenario: Optional disk-size flag
+
+- **WHEN** user runs `spinner setup --backend gcp --name my-env --project p --zone z --disk-size 50`
+- **THEN** the CLI SHALL pass the disk size (in GB) to the GCP provider for the bake VM
+
+#### Scenario: Default disk-size
+
+- **WHEN** user does not provide `--disk-size` with GCP backend
+- **THEN** the CLI SHALL default to 30 GB
+
+#### Scenario: Required state-bucket flag for GCP
+
+- **WHEN** user runs `spinner setup --backend gcp --name my-env --project p --zone z` without `--state-bucket`
+- **THEN** the CLI SHALL print an error indicating `--state-bucket` is required for GCP backend
+- **AND** explain that GCS bucket names are globally unique and must be pre-created
+
 #### Scenario: Docker flags ignored for GCP
 
 - **WHEN** user provides `--base-image` or `--dockerfile` with `--backend gcp`

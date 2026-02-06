@@ -204,13 +204,26 @@ Cloud Monitoring API:
 
 ##### State Persistence
 
-GCS bucket `spinner-state-{project}`:
+GCS bucket (user-configured via `--state-bucket` flag — required for GCP backend):
+- GCS bucket names are **globally unique** across all of Google Cloud, so we cannot auto-generate a safe default
+- Users must provide their own bucket name (e.g., `--state-bucket my-org-spinner-state`)
 - State path: `{instance-name}/state.json`
 - Atomic writes via GCS object overwrite (GCS provides strong consistency)
 - Read on VM start to resume iteration count
 - The runtime startup script downloads state from GCS before running `spinner exec`
 - `spinner exec` writes state to local `/state/state.json` as usual
 - A periodic sync (or on-completion hook) uploads state back to GCS
+
+##### VM Completion Behavior
+
+The VM stays running after `spinner exec` completes — matching Docker's behavior where containers
+remain alive via `tail -f /dev/null`. This enables:
+- SSH access for debugging after completion
+- Manual inspection of workspace state
+- Consistent behavior across backends
+
+The trade-off is cost: idle VMs bill per-minute unlike idle Docker containers. An `--auto-stop`
+flag is planned as a follow-up to give users explicit control.
 
 ### Key Decisions
 
@@ -223,8 +236,10 @@ GCS bucket `spinner-state-{project}`:
 | **GCS for state** | Durable; accessible from control plane and VM; strong consistency |
 | **Factory pattern for backend selection** | Clean DI; no changes to Provider interface; supports future backends |
 | **Default VPC with external IP** | Simplest networking; outbound access for GitHub and Claude API |
-| **e2-standard-2 default machine type** | 2 vCPU / 8 GB; good balance for agent workloads; cost-effective |
-| **pd-balanced default disk** | SSD-backed; good performance; cheaper than pd-ssd |
+| **e2-standard-2 default machine type** | 2 vCPU / 8 GB; good balance for agent workloads; cost-effective; configurable via `--machine-type` |
+| **30 GB pd-balanced default disk** | SSD-backed; good performance; cheaper than pd-ssd; configurable via `--disk-size` |
+| **Required `--state-bucket` flag** | GCS bucket names are globally unique; no safe auto-generated default; user must provide |
+| **VM stays running after completion** | Docker parity; enables debugging; auto-stop is a follow-up feature |
 | **Labels for resource management** | Cost attribution; automated cleanup scripts; resource identification |
 
 ### Architecture Diagram

@@ -58,6 +58,16 @@ required tooling, and creating an image from the resulting disk.
 - **WHEN** user does not provide `--machine-type` during setup
 - **THEN** the temporary VM SHALL use `e2-standard-2` as the default
 
+#### Scenario: Custom disk size for baking
+
+- **WHEN** user provides `--disk-size 50` during setup
+- **THEN** the temporary VM SHALL use the specified disk size in GB
+
+#### Scenario: Default disk size for baking
+
+- **WHEN** user does not provide `--disk-size` during setup
+- **THEN** the temporary VM SHALL use 30 GB pd-balanced as the default
+
 #### Scenario: Image already exists
 
 - **WHEN** an image named `spinner-{name}` already exists in the project
@@ -88,6 +98,8 @@ The GCP provider SHALL manage VM instance lifecycle through the Compute Engine I
 
 - **WHEN** `Provider.Create()` is called with valid configuration
 - **THEN** the provider SHALL create a VM from the custom image with runtime metadata
+- **AND** use the machine type from `--machine-type` (default: `e2-standard-2`)
+- **AND** use the disk size from `--disk-size` (default: 30 GB pd-balanced)
 - **AND** wait for the VM to reach `RUNNING` status
 - **AND** return an `Instance` with the VM name and running status
 
@@ -242,16 +254,23 @@ The GCP provider SHALL support resource metrics via Cloud Monitoring API.
 ### Requirement: GCP State Persistence
 
 The GCP provider SHALL persist execution state to Google Cloud Storage for durability across VM lifecycle events.
+GCS bucket names are globally unique across all of Google Cloud, so the bucket name MUST be user-configured.
 
-#### Scenario: State bucket creation
+#### Scenario: Required state bucket flag
 
-- **WHEN** the GCP provider is initialized and no state bucket exists
-- **THEN** the provider SHALL create a GCS bucket named `spinner-state-{project}` in the project's default location
+- **WHEN** user runs a GCP operation that requires state persistence
+- **THEN** the `--state-bucket` flag SHALL be required
+- **AND** the CLI SHALL error if the flag is not provided
+
+#### Scenario: State bucket does not exist
+
+- **WHEN** the specified GCS bucket does not exist
+- **THEN** the provider SHALL return a clear error indicating the bucket was not found and must be created
 
 #### Scenario: State write
 
 - **WHEN** execution state needs to be persisted
-- **THEN** the provider SHALL write `state.json` to `gs://spinner-state-{project}/{instance-name}/state.json`
+- **THEN** the provider SHALL write `state.json` to `gs://{state-bucket}/{instance-name}/state.json`
 
 #### Scenario: State read on startup
 
@@ -286,6 +305,21 @@ The GCP provider SHALL correctly handle Compute Engine's asynchronous operations
 
 - **WHEN** the context is cancelled while waiting for an operation
 - **THEN** the provider SHALL return immediately with a cancellation error
+
+### Requirement: GCP VM Completion Behavior
+
+The GCP provider SHALL keep VMs running after `spinner exec` completes, matching Docker's container behavior.
+
+#### Scenario: VM stays running after exec completes
+
+- **WHEN** `spinner exec` finishes inside a GCP VM (success or failure)
+- **THEN** the VM SHALL remain in `RUNNING` state
+- **AND** the user can SSH into the VM for debugging or inspection
+
+#### Scenario: VM stays running when no prompt provided
+
+- **WHEN** a VM is created without a `--prompt` flag
+- **THEN** the VM SHALL remain running and accessible via SSH
 
 ### Requirement: GCP Resource Cleanup
 

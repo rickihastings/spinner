@@ -5,7 +5,7 @@
 - [ ] 1.1 Create `internal/provider/factory.go` with `Factory` struct, `Register()`, `Create()`, `Available()` methods
 - [ ] 1.2 Create `internal/provider/factory_test.go` with unit tests for factory registration, creation, and error cases
 - [ ] 1.3 Modify `cmd/constructors.go` — change `NewSetupCommand` and `NewSpinCommand` to accept `*provider.Factory` and add `--backend` flag (default: `"docker"`)
-- [ ] 1.4 Modify `cmd/setup.go` and `cmd/spin.go` — wire factory with Docker registered; add GCP-specific flags (`--project`, `--zone`, `--machine-type`)
+- [ ] 1.4 Modify `cmd/setup.go` and `cmd/spin.go` — wire factory with Docker registered; add GCP-specific flags (`--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`)
 - [ ] 1.5 Modify `cmd/constructors_watch.go` and `cmd/watch.go` — add `--backend` flag to standalone watch command
 - [ ] 1.6 Update command tests to use factory instead of direct provider injection
 - [ ] 1.7 Verify build and all existing tests pass (no regressions)

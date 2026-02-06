@@ -51,6 +51,21 @@ The spin command SHALL accept GCP-specific flags when `--backend gcp` is selecte
 - **WHEN** user does not provide `--machine-type` with GCP backend
 - **THEN** the CLI SHALL default to `e2-standard-2`
 
+#### Scenario: Optional disk-size flag for spin
+
+- **WHEN** user provides `--disk-size 50` with GCP backend
+- **THEN** the CLI SHALL create the VM with the specified boot disk size in GB
+
+#### Scenario: Default disk-size for spin
+
+- **WHEN** user does not provide `--disk-size` with GCP backend
+- **THEN** the CLI SHALL default to 30 GB
+
+#### Scenario: Required state-bucket flag for GCP spin
+
+- **WHEN** user runs `spinner spin --backend gcp --image my-env --repo <url> --project p --zone z` without `--state-bucket`
+- **THEN** the CLI SHALL print an error indicating `--state-bucket` is required for GCP backend
+
 #### Scenario: GCP instance management instructions
 
 - **WHEN** a GCP instance is created successfully

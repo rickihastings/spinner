@@ -41,12 +41,12 @@ A complete GCP Compute Engine provider implementing the `provider.Provider` inte
 ### Modified Capability: `cli-setup`
 
 - **ADDED** `--backend` flag (default: `"docker"`) to select which provider handles setup
-- **ADDED** GCP-specific setup options: `--project`, `--zone`, `--machine-type`
+- **ADDED** GCP-specific setup options: `--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`
 
 ### Modified Capability: `cli-spin`
 
 - **ADDED** `--backend` flag (default: `"docker"`) to select which provider handles spin
-- **ADDED** GCP-specific spin options: `--project`, `--zone`, `--machine-type`
+- **ADDED** GCP-specific spin options: `--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`
 
 ### New Internal Package: Provider Factory
 
@@ -100,7 +100,8 @@ A complete GCP Compute Engine provider implementing the `provider.Provider` inte
 |---|---|---|
 | GCP SDK adds significant dependency weight | Larger binary, longer builds | Tree-shaking via Go modules; lazy import only when GCP backend is selected |
 | Image baking is slow (~5-10 min) | Poor UX for first-time setup | Cache images; show progress; document expected time |
-| Cloud costs from forgotten VMs | Unexpected charges | Auto-stop after completion; labels for cost tracking; clear teardown instructions |
+| Cloud costs from forgotten VMs | Unexpected charges | VM stays running after completion (Docker parity); labels for cost tracking; clear teardown instructions; auto-stop is a follow-up |
+| GCS bucket name collision | Bucket names are globally unique across all GCP | User-configurable `--state-bucket` flag; no auto-generated default that could collide |
 | Metadata-based secrets visible in console | Security concern for shared projects | Document threat model; recommend Secret Manager for multi-tenant use |
 | Async operations (LROs) add complexity | Harder error handling | Consistent operation-wait pattern with timeout and progress reporting |
 | Network connectivity requirements | VM needs outbound internet | Default to VPC with NAT or external IP; document firewall requirements |
@@ -113,3 +114,5 @@ A complete GCP Compute Engine provider implementing the `provider.Provider` inte
 - **Custom VPC creation** — Uses default VPC or user-specified existing VPC; no VPC provisioning
 - **GPU support** — Standard machine types only for initial implementation
 - **Multi-region** — Single zone per command invocation; multi-region orchestration is out of scope
+- **Spot/preemptible VMs** — Follow-up; agent loops can be long-running, preemption adds complexity
+- **Auto-stop on completion** — Follow-up; VM stays running after exec completes (Docker parity), auto-stop flag added later
