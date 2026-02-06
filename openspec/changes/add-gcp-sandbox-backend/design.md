@@ -256,17 +256,20 @@ Currently there is no release process — the Docker backend works around this b
 locally and `COPY`ing the binary into the image. For GCP, this won't work (can't COPY into a VM),
 so a lightweight release pipeline is a prerequisite:
 
-- **GoReleaser** (`.goreleaser.yaml`) — builds multi-platform binaries on tag push
-- **GitHub Actions** (`.github/workflows/release.yml`) — triggers GoReleaser on `v*` tags
-- Produces: `spinner_linux_amd64` (and others) attached to GitHub Releases
+- **GoReleaser** (`.goreleaser.yaml`) — builds multi-platform binaries on tag push (already on main)
+- **GitHub Actions** (`.github/workflows/release.yaml`) — triggers GoReleaser on `v*` tags (already on main)
+- Produces: `spinner_{version}_{os}_{arch}.tar.gz` archives (e.g., `spinner_0.1.0_linux_amd64.tar.gz`)
 - This also benefits Docker: `setup` could download the release binary instead of requiring Go on the host
 
 The bake script then does:
 ```bash
-SPINNER_VERSION=$(curl -sf https://api.github.com/repos/rickihastings/spinner/releases/latest | grep tag_name | cut -d'"' -f4)
-curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_linux_amd64" \
-    -o /usr/local/bin/spinner
+SPINNER_VERSION=$(curl -sf https://api.github.com/repos/rickihastings/spinner/releases/latest | jq -r '.tag_name')
+VERSION_NUM="${SPINNER_VERSION#v}"  # Strip leading 'v' for archive name
+curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_${VERSION_NUM}_linux_amd64.tar.gz" \
+    -o /tmp/spinner.tar.gz
+tar -xzf /tmp/spinner.tar.gz -C /usr/local/bin spinner
 chmod +x /usr/local/bin/spinner
+rm /tmp/spinner.tar.gz
 ```
 
 **Full bake flow:**
@@ -473,9 +476,12 @@ su - spinner -c 'curl -fsSL https://claude.ai/install.sh | bash'
 # Download spinner binary from latest GitHub Release
 SPINNER_VERSION=$(curl -sf https://api.github.com/repos/rickihastings/spinner/releases/latest \
     | jq -r '.tag_name')
-curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_linux_amd64" \
-    -o /usr/local/bin/spinner
+VERSION_NUM="${SPINNER_VERSION#v}"  # Strip leading 'v' for archive name
+curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_${VERSION_NUM}_linux_amd64.tar.gz" \
+    -o /tmp/spinner.tar.gz
+tar -xzf /tmp/spinner.tar.gz -C /usr/local/bin spinner
 chmod +x /usr/local/bin/spinner
+rm /tmp/spinner.tar.gz
 
 # Copy startup script (passed via metadata)
 curl -sf -H "Metadata-Flavor: Google" \

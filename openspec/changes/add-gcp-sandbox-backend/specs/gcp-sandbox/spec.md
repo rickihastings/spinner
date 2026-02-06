@@ -83,7 +83,7 @@ required tooling, and creating an image from the resulting disk.
 - **WHEN** the bake VM's startup script installs tooling
 - **THEN** it SHALL download the spinner binary from the latest GitHub Release
 - **AND** use the GitHub Releases API to resolve the latest version tag
-- **AND** download the `spinner_linux_amd64` asset to `/usr/local/bin/spinner`
+- **AND** download the `spinner_{version}_linux_amd64.tar.gz` archive and extract the binary to `/usr/local/bin/spinner`
 
 #### Scenario: GitHub Release not available
 
