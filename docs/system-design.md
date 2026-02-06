@@ -63,9 +63,10 @@ backend-specific types.
 ```
 /
 ├── cmd/                           # CLI commands
-│   ├── constructors.go            # Provider-agnostic command constructors
-│   ├── setup.go                   # Setup command (wires Docker provider)
-│   ├── spin.go                    # Spin command (wires Docker provider)
+│   ├── setup.go                   # Setup command (wires Docker provider, constructor injection)
+│   ├── spin.go                    # Spin command (wires Docker provider, constructor injection)
+│   ├── watch.go                   # Watch command
+│   ├── exec.go                    # Exec command (runs inside containers)
 │   └── *_test.go                  # Tests using MockProvider
 │
 ├── internal/

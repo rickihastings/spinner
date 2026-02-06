@@ -196,7 +196,7 @@ Launch a container and optionally start an agent:
 | `--repo` | Git repository URL (required) |
 | `--prompt` | Task for the agent; if omitted, container stays idle |
 | `--branch` | Git branch to checkout |
-| `--max-iterations` | Stop after N iterations (default: 30) |
+| `--max-iterations` | Stop after N iterations (default: 100) |
 | `--recreate` | Force fresh container, removing any existing one |
 | `--watch` | Enter watch mode after container is ready |
 
