@@ -13,15 +13,15 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 
 ## 1.0 Provider Factory, Config File & Backend Selection
 
-- [ ] 1.1 Create `internal/provider/factory.go` with `Factory` struct, `Register()`, `Create()`, `Available()` methods
-- [ ] 1.2 Create `internal/provider/factory_test.go` with unit tests for factory registration, creation, and error cases
-- [ ] 1.3 Modify `cmd/root.go` — add `.spinner.json` config file loading via Viper (alongside existing `.env` support)
-- [ ] 1.4 Modify `cmd/constructors.go` — change `NewSetupCommand` and `NewSpinCommand` to accept `*provider.Factory`; add `--backend` flag (default: `"docker"`)
-- [ ] 1.5 Add GCP-specific flags to setup and spin commands (`--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`) organized into flag groups
-- [ ] 1.6 Implement conditional flag validation in `RunE` — hard error when backend-specific CLI flags are used with the wrong `--backend`; config file values silently ignored cross-backend
-- [ ] 1.7 Modify `cmd/constructors_watch.go` and `cmd/watch.go` — add `--backend` flag to standalone watch command
-- [ ] 1.8 Update command tests to use factory instead of direct provider injection
-- [ ] 1.9 Verify build and all existing tests pass (no regressions)
+- [x] 1.1 Create `internal/provider/factory.go` with `Factory` struct, `Register()`, `Create()`, `Available()` methods
+- [x] 1.2 Create `internal/provider/factory_test.go` with unit tests for factory registration, creation, and error cases
+- [x] 1.3 Modify `cmd/root.go` — add `.spinner.json` config file loading via Viper (alongside existing `.env` support)
+- [x] 1.4 Modify `cmd/setup.go`, `cmd/spin.go`, `cmd/watch.go` — change constructors to accept `*provider.Factory`; add `--backend` flag (default: `"docker"`); create `cmd/factory.go` for default factory wiring
+- [x] 1.5 Add GCP-specific flags to setup and spin commands (`--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`) organized into flag groups
+- [x] 1.6 Implement conditional flag validation in `RunE` — hard error when backend-specific CLI flags are used with the wrong `--backend`; config file values silently ignored cross-backend
+- [x] 1.7 Modify `cmd/watch.go` — add `--backend` flag to standalone watch command with GCP flags
+- [x] 1.8 Update command tests to use factory instead of direct provider injection
+- [x] 1.9 Verify build and all existing tests pass (no regressions)
 
 ## 2.0 GCP Client Interface & Authentication
 
