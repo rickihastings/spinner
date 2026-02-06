@@ -177,7 +177,7 @@ These are tested, working examples for future reference:
 - The `--image` parameter must match a `--name` from a previous setup
 - Repository must be a valid git URL (https://, http://, or git@)
 - Either `--prompt` or `--branch` (or both) must be provided
-- Default `max-iterations` is 30 if not specified
+- Default `max-iterations` is 100 if not specified
 - The `--watch` flag can be combined with any spin flags
 
 ## State Management
