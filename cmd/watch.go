@@ -10,58 +10,95 @@ import (
 
 	"github.com/rickihastings/spinner/internal/agent"
 	"github.com/rickihastings/spinner/internal/agent/claude"
-	"github.com/rickihastings/spinner/internal/docker"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/tui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-// watchCmd is the production watch command using Provider
-var watchCmd = NewWatchCommand(docker.NewDockerProvider(docker.NewRealDockerClient()))
+// watchCmd is the production watch command using the default provider factory.
+var watchCmd = NewWatchCommand(defaultFactory)
 
 func init() {
 	rootCmd.AddCommand(watchCmd)
 }
 
-// NewWatchCommand creates a new watch command with the given Provider.
+// NewWatchCommand creates a new watch command with the given Factory.
 // This constructor enables dependency injection for testing.
-func NewWatchCommand(p provider.Provider) *cobra.Command {
+func NewWatchCommand(f *provider.Factory) *cobra.Command {
+	var (
+		backend     string
+		project     string
+		zone        string
+		stateBucket string
+	)
+
 	cmd := &cobra.Command{
-		Use:   "watch <container-name>",
-		Short: "Monitor container logs and metrics in real-time",
-		Long: `Monitor container logs and metrics in real-time using a terminal UI
+		Use:   "watch <instance-name>",
+		Short: "Monitor instance logs and metrics in real-time",
+		Long: `Monitor instance logs and metrics in real-time using a terminal UI
 
 USAGE:
-  spinner watch <container-name>
+  spinner watch <instance-name> [--backend docker|gcp] [options]
 
 DESCRIPTION:
   The watch command provides a real-time terminal UI for monitoring a running
-  container. It displays:
+  instance. It displays:
 
-  - Container status (running/stopped/exited)
+  - Instance status (running/stopped/exited)
   - CPU and memory usage metrics
-  - Streaming container logs with structured formatting
-
-  Logs are read from ~/.spinner/<container-name>/logs/ directory and displayed
-  with syntax highlighting for JSON-formatted entries.
+  - Streaming logs with structured formatting
 
 KEYBOARD SHORTCUTS:
   q         - Quit watch mode
   Ctrl+C    - Quit watch mode
 
 EXAMPLES:
-  # Watch a running container
+  # Watch a Docker container
   spinner watch my-container
 
-  # Watch after spinning up a container
-  spinner spin --image my-env --repo git@github.com:user/repo.git
-  spinner watch spinner-my-env-<hash>`,
+  # Watch a GCP VM instance
+  spinner watch my-instance --backend gcp --project my-proj --zone us-central1-a --state-bucket my-bucket`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Bind GCP flags to Viper
+			_ = viper.BindPFlag("project", cmd.Flags().Lookup("project"))
+			_ = viper.BindPFlag("zone", cmd.Flags().Lookup("zone"))
+			_ = viper.BindPFlag("state-bucket", cmd.Flags().Lookup("state-bucket"))
+
+			// Resolve backend (CLI > env > config > default "docker")
+			backend = resolveBackend(cmd)
+
+			// Validate cross-backend flags
+			if err := validateBackendFlags(cmd, backend); err != nil {
+				return err
+			}
+
+			// GCP-specific validation
+			if backend == "gcp" {
+				if err := validateRequiredGCPFlags(cmd); err != nil {
+					return err
+				}
+			}
+
+			// Create provider from factory
+			p, err := f.Create(backend)
+			if err != nil {
+				return err
+			}
+
 			containerName := args[0]
 			return PerformWatch(context.Background(), p, containerName)
 		},
 	}
+
+	// General flags
+	cmd.Flags().StringVar(&backend, "backend", "", "Backend provider: docker, gcp (default: docker)")
+
+	// GCP backend flags
+	cmd.Flags().StringVar(&project, "project", "", "GCP project ID (GCP backend)")
+	cmd.Flags().StringVar(&zone, "zone", "", "GCP zone (GCP backend)")
+	cmd.Flags().StringVar(&stateBucket, "state-bucket", "", "GCS bucket for state persistence (GCP backend)")
 
 	return cmd
 }
@@ -138,17 +175,17 @@ func getImageID(containerName string) string {
 	return strings.TrimSpace(string(output))
 }
 
-// PerformWatch executes the watch workflow for a container.
+// PerformWatch executes the watch workflow for an instance.
 // This is exported so it can be used by both the standalone watch command
 // and the spin command with --watch flag.
 func PerformWatch(ctx context.Context, p provider.Provider, containerName string) error {
-	// Check if container exists using provider abstraction
+	// Check if instance exists using provider abstraction
 	status, err := p.Status(ctx, containerName)
 	if err != nil || status == provider.InstanceStatusNone {
-		fmt.Fprintf(os.Stderr, "✗ Error: Container '%s' not found\n", containerName)
-		fmt.Fprintf(os.Stderr, "Tip: Use 'docker ps -a' to list available containers\n")
+		fmt.Fprintf(os.Stderr, "✗ Error: Instance '%s' not found\n", containerName)
+		fmt.Fprintf(os.Stderr, "Tip: Check that the instance exists and the correct backend is selected\n")
 
-		return fmt.Errorf("container not found: %s", containerName)
+		return fmt.Errorf("instance not found: %s", containerName)
 	}
 
 	// Create parser and formatter - the only place in cmd that imports claude
@@ -212,7 +249,7 @@ func PerformWatch(ctx context.Context, p provider.Provider, containerName string
 	}()
 
 	// Run TUI (blocks until quit)
-	fmt.Printf("Starting watch mode for container: %s\n", containerName)
+	fmt.Printf("Starting watch mode for instance: %s\n", containerName)
 	fmt.Printf("Press 'q' or Ctrl+C to quit\n\n")
 
 	if err := ui.Run(logCh, metricsCh); err != nil {

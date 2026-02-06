@@ -10,10 +10,21 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// testFactory wraps a MockProvider into a Factory with the "docker" backend.
+func testFactory(mockProv *provider.MockProvider) *provider.Factory {
+	f := provider.NewFactory()
+
+	f.Register("docker", func() (provider.Provider, error) {
+		return mockProv, nil
+	})
+
+	return f
+}
+
 // TestSetupCommand_MissingNameFlag tests that the setup command returns an error when --name is missing
 func TestSetupCommand_MissingNameFlag(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
-	cmd := NewSetupCommand(mockProvider)
+	cmd := NewSetupCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -30,7 +41,7 @@ func TestSetupCommand_MissingNameFlag(t *testing.T) {
 // TestSetupCommand_MutuallyExclusiveFlags tests that --base-image and --dockerfile are mutually exclusive
 func TestSetupCommand_MutuallyExclusiveFlags(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
-	cmd := NewSetupCommand(mockProvider)
+	cmd := NewSetupCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -56,7 +67,7 @@ func TestSetupCommand_NameOnly(t *testing.T) {
 		return cfg.Name == "test-env" && cfg.Options["base-image"] == "" && cfg.Options["dockerfile"] == ""
 	})).Return(nil)
 
-	cmd := NewSetupCommand(mockProvider)
+	cmd := NewSetupCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -77,7 +88,7 @@ func TestSetupCommand_WithBaseImage(t *testing.T) {
 		return cfg.Name == "test-env" && cfg.Options["base-image"] == "node:20" && cfg.Options["dockerfile"] == ""
 	})).Return(nil)
 
-	cmd := NewSetupCommand(mockProvider)
+	cmd := NewSetupCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -108,7 +119,7 @@ func TestSetupCommand_WithDockerfile(t *testing.T) {
 		return cfg.Name == "test-env" && cfg.Options["base-image"] == "" && cfg.Options["dockerfile"] == tmpfile.Name()
 	})).Return(nil)
 
-	cmd := NewSetupCommand(mockProvider)
+	cmd := NewSetupCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -185,7 +196,7 @@ func TestSetupCommand_FlagCombinations(t *testing.T) {
 			mockProvider := new(provider.MockProvider)
 			tt.mockSetup(mockProvider)
 
-			cmd := NewSetupCommand(mockProvider)
+			cmd := NewSetupCommand(testFactory(mockProvider))
 			b := new(bytes.Buffer)
 			cmd.SetOut(b)
 			cmd.SetErr(b)
@@ -205,4 +216,91 @@ func TestSetupCommand_FlagCombinations(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSetupCommand_GCPFlagsWithDockerBackend tests that GCP flags error with docker backend
+func TestSetupCommand_GCPFlagsWithDockerBackend(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		errorMsg string
+	}{
+		{
+			name:     "project flag with docker backend",
+			args:     []string{"--name", "test", "--project", "my-proj"},
+			errorMsg: "--project requires --backend gcp",
+		},
+		{
+			name:     "zone flag with docker backend",
+			args:     []string{"--name", "test", "--zone", "us-central1-a"},
+			errorMsg: "--zone requires --backend gcp",
+		},
+		{
+			name:     "machine-type flag with docker backend",
+			args:     []string{"--name", "test", "--machine-type", "e2-standard-4"},
+			errorMsg: "--machine-type requires --backend gcp",
+		},
+		{
+			name:     "disk-size flag with docker backend",
+			args:     []string{"--name", "test", "--disk-size", "50"},
+			errorMsg: "--disk-size requires --backend gcp",
+		},
+		{
+			name:     "state-bucket flag with docker backend",
+			args:     []string{"--name", "test", "--state-bucket", "my-bucket"},
+			errorMsg: "--state-bucket requires --backend gcp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockProvider := new(provider.MockProvider)
+			cmd := NewSetupCommand(testFactory(mockProvider))
+
+			b := new(bytes.Buffer)
+			cmd.SetOut(b)
+			cmd.SetErr(b)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.Execute()
+
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errorMsg)
+		})
+	}
+}
+
+// TestSetupCommand_UnknownBackend tests that an unknown backend errors with available list
+func TestSetupCommand_UnknownBackend(t *testing.T) {
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSetupCommand(testFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{"--name", "test", "--backend", "kubernetes"})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown backend")
+	assert.Contains(t, err.Error(), "docker")
+}
+
+// TestSetupCommand_DockerBackendExplicit tests explicit --backend docker works
+func TestSetupCommand_DockerBackendExplicit(t *testing.T) {
+	mockProvider := new(provider.MockProvider)
+	mockProvider.On("Setup", mock.Anything, mock.Anything).Return(nil)
+
+	cmd := NewSetupCommand(testFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{"--name", "test", "--backend", "docker"})
+
+	err := cmd.Execute()
+
+	assert.NoError(t, err)
+	mockProvider.AssertExpectations(t)
 }
