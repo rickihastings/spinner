@@ -67,12 +67,60 @@ The setup command SHALL accept GCP-specific flags when `--backend gcp` is select
 - **THEN** the CLI SHALL print an error indicating `--state-bucket` is required for GCP backend
 - **AND** explain that GCS bucket names are globally unique and must be pre-created
 
-#### Scenario: Docker flags ignored for GCP
+#### Scenario: Docker flags rejected for GCP backend
 
-- **WHEN** user provides `--base-image` or `--dockerfile` with `--backend gcp`
-- **THEN** the CLI SHALL print a warning that these flags are Docker-specific and will be ignored
+- **WHEN** user provides `--base-image` or `--dockerfile` CLI flags with `--backend gcp`
+- **THEN** the CLI SHALL return an error indicating these flags require `--backend docker`
 
-#### Scenario: GCP flags ignored for Docker
+#### Scenario: GCP flags rejected for Docker backend
 
-- **WHEN** user provides `--project` or `--zone` without `--backend gcp`
-- **THEN** the CLI SHALL print a warning that these flags are GCP-specific and will be ignored
+- **WHEN** user provides `--project`, `--zone`, `--machine-type`, `--disk-size`, or `--state-bucket` CLI flags
+  without `--backend gcp`
+- **THEN** the CLI SHALL return an error indicating these flags require `--backend gcp`
+
+#### Scenario: Config file values not rejected cross-backend
+
+- **WHEN** `.spinner.json` contains keys for a different backend (e.g., `project` when using Docker)
+- **THEN** the CLI SHALL silently ignore those values (no error)
+- **AND** only CLI flags that are explicitly set trigger cross-backend validation
+
+### Requirement: Configuration File Support
+
+The setup command SHALL read infrastructure defaults from a `.spinner.json` file at the repo root.
+
+#### Scenario: Config file provides backend default
+
+- **WHEN** `.spinner.json` contains `{"backend": "gcp", "project": "my-proj", "zone": "us-central1-a", "state-bucket": "my-bucket"}`
+- **AND** user runs `spinner setup --name my-env`
+- **THEN** the CLI SHALL use the GCP backend with values from the config file
+
+#### Scenario: CLI flags override config file
+
+- **WHEN** `.spinner.json` contains `{"zone": "us-central1-a"}`
+- **AND** user runs `spinner setup --backend gcp --name my-env --zone us-east1-b`
+- **THEN** the CLI SHALL use `us-east1-b` (CLI flag takes precedence)
+
+#### Scenario: Environment variables override config file
+
+- **WHEN** `.spinner.json` contains `{"project": "file-project"}`
+- **AND** `SPINNER_PROJECT=env-project` is set
+- **THEN** the CLI SHALL use `env-project` (env var takes precedence over config file)
+
+#### Scenario: No config file present
+
+- **WHEN** no `.spinner.json` exists in the current directory
+- **THEN** the CLI SHALL continue normally using CLI flags, env vars, and defaults
+
+#### Scenario: Invalid config file
+
+- **WHEN** `.spinner.json` exists but contains invalid JSON
+- **THEN** the CLI SHALL print a warning and continue using CLI flags and defaults
+
+### Requirement: Grouped Help Output
+
+The setup command help SHALL organize flags into backend-specific groups for clarity.
+
+#### Scenario: Help shows flag groups
+
+- **WHEN** user runs `spinner setup --help`
+- **THEN** flags SHALL be organized into labeled sections: General, Docker Backend, GCP Backend

@@ -53,6 +53,34 @@ A complete GCP Compute Engine provider implementing the `provider.Provider` inte
 - `internal/provider/factory.go` — Registry/factory that maps backend names to `Provider` constructors
 - Allows commands to remain backend-agnostic while supporting runtime selection
 
+### New Capability: Configuration File (`.spinner.json`)
+
+A JSON configuration file at the repo root that stores infrastructure defaults:
+
+```json
+{
+  "backend": "gcp",
+  "project": "my-gcp-project",
+  "zone": "us-central1-a",
+  "state-bucket": "my-org-spinner-state",
+  "machine-type": "e2-standard-4",
+  "disk-size": 50
+}
+```
+
+- Loaded via Viper's config file support (already in use for `.env`)
+- Precedence: **CLI flags > env vars (`SPINNER_*`) > `.spinner.json` > defaults**
+- Can be committed to the repo so team members share the same infra config
+- Only infrastructure defaults belong here — runtime values (`prompt`, `branch`, `repo`) stay as CLI flags
+
+### Modified Capability: Conditional Flag Validation
+
+Backend-specific flags are organized into groups and validated at runtime:
+
+- **Hard error** if a backend-specific flag is used with the wrong `--backend` (e.g., `--project` without `--backend gcp`)
+- **Grouped help output** — `spinner setup --help` shows Docker flags and GCP flags in separate labeled sections
+- Uses Cobra's `AddGroup` for visual organization + `RunE` validation for enforcement
+
 ## GCP APIs Used
 
 | API / Service | SDK Package | Purpose |
@@ -81,9 +109,10 @@ A complete GCP Compute Engine provider implementing the `provider.Provider` inte
 | `internal/provider/` | New `factory.go` for provider registry |
 | `internal/gcp/` | **New package** — GCP provider, client, types, templates |
 | `cmd/constructors.go` | Modify command constructors to accept factory instead of single provider |
-| `cmd/setup.go` | Wire factory; add GCP-specific flags |
-| `cmd/spin.go` | Wire factory; add GCP-specific flags |
+| `cmd/setup.go` | Wire factory; add GCP-specific flags with conditional validation |
+| `cmd/spin.go` | Wire factory; add GCP-specific flags with conditional validation |
 | `cmd/watch.go` | Wire factory for standalone watch mode |
+| `cmd/root.go` | Add `.spinner.json` config file loading via Viper |
 | `templates/scripts/` | New GCP-specific startup scripts (bake + runtime) |
 | `go.mod` | New dependencies: `cloud.google.com/go/*` packages |
 

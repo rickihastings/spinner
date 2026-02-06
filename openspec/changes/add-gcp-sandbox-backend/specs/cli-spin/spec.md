@@ -99,12 +99,49 @@ The spin command SHALL accept GCP-specific flags when `--backend gcp` is selecte
 - **WHEN** user runs spin with `--setup` and `--backend gcp`
 - **THEN** the CLI SHALL bake a GCP image before creating the VM instance
 
-#### Scenario: Docker flags ignored for GCP
+#### Scenario: Docker flags rejected for GCP backend
 
-- **WHEN** user provides Docker-specific flags (e.g., `--dockerfile`) with `--backend gcp`
-- **THEN** the CLI SHALL print a warning that these flags are Docker-specific and will be ignored
+- **WHEN** user provides `--dockerfile` CLI flag with `--backend gcp`
+- **THEN** the CLI SHALL return an error indicating this flag requires `--backend docker`
 
-#### Scenario: GCP flags ignored for Docker
+#### Scenario: GCP flags rejected for Docker backend
 
-- **WHEN** user provides GCP-specific flags (e.g., `--project`, `--zone`) without `--backend gcp`
-- **THEN** the CLI SHALL print a warning that these flags are GCP-specific and will be ignored
+- **WHEN** user provides `--project`, `--zone`, `--machine-type`, `--disk-size`, or `--state-bucket` CLI flags
+  without `--backend gcp`
+- **THEN** the CLI SHALL return an error indicating these flags require `--backend gcp`
+
+#### Scenario: Config file values not rejected cross-backend
+
+- **WHEN** `.spinner.json` contains keys for a different backend (e.g., `project` when using Docker)
+- **THEN** the CLI SHALL silently ignore those values (no error)
+- **AND** only CLI flags that are explicitly set trigger cross-backend validation
+
+### Requirement: Configuration File Support
+
+The spin command SHALL read infrastructure defaults from a `.spinner.json` file at the repo root.
+
+#### Scenario: Config file provides full GCP config
+
+- **WHEN** `.spinner.json` contains `{"backend": "gcp", "project": "p", "zone": "z", "state-bucket": "b"}`
+- **AND** user runs `spinner spin --image my-env --repo <url> --prompt "Fix bug"`
+- **THEN** the CLI SHALL use the GCP backend with project, zone, and state-bucket from the config file
+
+#### Scenario: CLI flags override config file
+
+- **WHEN** `.spinner.json` contains `{"machine-type": "e2-standard-2"}`
+- **AND** user runs `spinner spin --backend gcp --image my-env --repo <url> --machine-type n2-standard-4`
+- **THEN** the CLI SHALL use `n2-standard-4` (CLI flag takes precedence)
+
+#### Scenario: No config file present
+
+- **WHEN** no `.spinner.json` exists in the current directory
+- **THEN** the CLI SHALL continue normally using CLI flags, env vars, and defaults
+
+### Requirement: Grouped Help Output
+
+The spin command help SHALL organize flags into backend-specific groups for clarity.
+
+#### Scenario: Help shows flag groups
+
+- **WHEN** user runs `spinner spin --help`
+- **THEN** flags SHALL be organized into labeled sections: General, Docker Backend, GCP Backend

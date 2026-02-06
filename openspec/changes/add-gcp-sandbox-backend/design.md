@@ -27,11 +27,12 @@
 | `internal/gcp/startup.go` | **create** | Startup script generation for GCP VMs |
 | `templates/scripts/gcp_bake.sh` | **create** | Image baking startup script (installs tooling) |
 | `templates/scripts/gcp_runtime.sh` | **create** | Runtime startup script (clones repo, runs exec) |
-| `cmd/constructors.go` | **modify** | Accept provider factory; add `--backend` flag |
-| `cmd/setup.go` | **modify** | Wire factory; register GCP-specific flags |
-| `cmd/spin.go` | **modify** | Wire factory; register GCP-specific flags |
+| `cmd/constructors.go` | **modify** | Accept provider factory; add `--backend` flag; conditional flag validation |
+| `cmd/setup.go` | **modify** | Wire factory; register grouped GCP-specific flags |
+| `cmd/spin.go` | **modify** | Wire factory; register grouped GCP-specific flags |
 | `cmd/constructors_watch.go` | **modify** | Wire factory for standalone watch |
 | `cmd/watch.go` | **modify** | Wire factory |
+| `cmd/root.go` | **modify** | Add `.spinner.json` config file loading |
 | `go.mod` | **modify** | Add GCP SDK dependencies |
 
 ### Approach
@@ -76,6 +77,116 @@ func (f *Factory) Available() []string { /* sorted keys */ }
 
 Commands change from `NewSpinCommand(p provider.Provider)` to `NewSpinCommand(f *provider.Factory)`, resolving the
 provider at runtime based on the `--backend` flag.
+
+#### Phase 1b: Configuration File (`.spinner.json`)
+
+Add repo-level JSON config for infrastructure defaults. This builds on Viper's existing config file support:
+
+```go
+// cmd/root.go init()
+func init() {
+    viper.SetEnvPrefix("SPINNER")
+    viper.AutomaticEnv()
+
+    // Primary config: .spinner.json in repo root (committed, team-shared)
+    viper.SetConfigName(".spinner")
+    viper.SetConfigType("json")
+    viper.AddConfigPath(".")
+    _ = viper.ReadInConfig()
+
+    // Secondary: .env file (not committed, local overrides)
+    // Handled separately since Viper only reads one config file
+    loadDotEnv()
+}
+```
+
+**Config file contents** — infrastructure defaults only:
+
+```json
+{
+  "backend": "gcp",
+  "project": "my-gcp-project",
+  "zone": "us-central1-a",
+  "state-bucket": "my-org-spinner-state",
+  "machine-type": "e2-standard-4",
+  "disk-size": 50,
+  "base-image": "node:20-bullseye"
+}
+```
+
+**Precedence chain** (highest wins):
+1. CLI flags (`--project my-project`)
+2. Environment variables (`SPINNER_PROJECT=my-project`)
+3. `.spinner.json` in current directory
+4. Built-in defaults
+
+**What belongs in `.spinner.json`** vs CLI:
+| Config file (infrastructure, rarely changes) | CLI only (runtime, per-invocation) |
+|---|---|
+| `backend`, `project`, `zone` | `name`, `image`, `repo` |
+| `state-bucket`, `machine-type`, `disk-size` | `prompt`, `branch`, `max-iterations` |
+| `base-image` | `recreate`, `watch`, `setup` |
+
+This means a typical GCP invocation goes from:
+```bash
+spinner spin --backend gcp --project my-proj --zone us-central1-a \
+  --state-bucket my-bucket --machine-type e2-standard-4 \
+  --image my-env --repo git@github.com:org/repo.git --prompt "Fix bug"
+```
+To just:
+```bash
+spinner spin --image my-env --repo git@github.com:org/repo.git --prompt "Fix bug"
+```
+With everything else coming from `.spinner.json`.
+
+#### Phase 1c: Conditional Flag Validation
+
+Backend-specific flags are grouped visually and validated at runtime:
+
+```go
+// Register flags in labeled groups
+cmd.Flags().StringVar(&project, "project", "", "GCP project ID (GCP backend)")
+cmd.Flags().StringVar(&zone, "zone", "", "GCP zone (GCP backend)")
+cmd.Flags().StringVar(&machineType, "machine-type", "", "VM machine type (GCP backend)")
+cmd.Flags().IntVar(&diskSize, "disk-size", 0, "Boot disk size in GB (GCP backend)")
+cmd.Flags().StringVar(&stateBucket, "state-bucket", "", "GCS bucket for state (GCP backend)")
+
+cmd.Flags().StringVar(&baseImage, "base-image", "", "Base Docker image (Docker backend)")
+cmd.Flags().StringVar(&dockerfile, "dockerfile", "", "Path to Dockerfile (Docker backend)")
+```
+
+**Validation in RunE** — hard errors for mismatched flags:
+
+```go
+// Define which flags belong to which backend
+gcpFlags := []string{"project", "zone", "machine-type", "disk-size", "state-bucket"}
+dockerFlags := []string{"base-image", "dockerfile"}
+
+backend := viper.GetString("backend")
+
+// Reject flags from wrong backend
+if backend != "gcp" {
+    for _, f := range gcpFlags {
+        if cmd.Flags().Changed(f) {
+            return fmt.Errorf("--%s requires --backend gcp", f)
+        }
+    }
+}
+if backend != "docker" {
+    for _, f := range dockerFlags {
+        if cmd.Flags().Changed(f) {
+            return fmt.Errorf("--%s requires --backend docker (or omit --backend)", f)
+        }
+    }
+}
+```
+
+This approach:
+- Registers all flags so they appear in `--help` (grouped by backend)
+- Only validates flags that the user **explicitly set** (`cmd.Flags().Changed()`)
+- Values from `.spinner.json` pass through Viper and aren't "changed" flags, so they don't trigger
+  cross-backend errors — only explicit CLI flags do
+- Help output uses Cobra's flag grouping annotations for clear sections
 
 #### Phase 2: GCP Client Interface
 
