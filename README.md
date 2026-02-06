@@ -14,22 +14,53 @@ When running autonomous AI agents (like Ralph loops), you want:
 
 Spinner handles the container orchestration so you can focus on the prompts.
 
+## Installation
+
+### Download Binary (Recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/rickihastings/spinner/releases):
+
+```bash
+# macOS (Apple Silicon)
+curl -Lo spinner https://github.com/rickihastings/spinner/releases/latest/download/spinner_darwin_arm64.tar.gz
+tar -xzf spinner_darwin_arm64.tar.gz
+sudo mv spinner /usr/local/bin/
+
+# macOS (Intel)
+curl -Lo spinner https://github.com/rickihastings/spinner/releases/latest/download/spinner_darwin_amd64.tar.gz
+tar -xzf spinner_darwin_amd64.tar.gz
+sudo mv spinner /usr/local/bin/
+
+# Linux (amd64)
+curl -Lo spinner https://github.com/rickihastings/spinner/releases/latest/download/spinner_linux_amd64.tar.gz
+tar -xzf spinner_linux_amd64.tar.gz
+sudo mv spinner /usr/local/bin/
+```
+
+### Build from Source
+
+```bash
+git clone https://github.com/rickihastings/spinner.git
+cd spinner
+make build
+sudo mv dist/spinner /usr/local/bin/
+```
+
+### Update
+
+Spinner can update itself:
+
+```bash
+spinner update
+```
+
 ## Quick Start
 
 ### Prerequisites
 
 - Docker (running)
-- Go 1.21+ (for building)
 - `GITHUB_TOKEN` environment variable (for cloning repos)
 - `CLAUDE_CODE_OAUTH_TOKEN` environment variable (for the agent)
-
-### Build
-
-```bash
-git clone https://github.com/rickihastings/spinner.git
-cd spinner
-go build -o dist/spinner
-```
 
 ### Create a Sandbox Image
 
@@ -192,6 +223,16 @@ Use `q` or `Ctrl+C` to exit watch mode.
 # Or watch an existing container
 ./dist/spinner watch spinner-default-<hash>
 ```
+
+### update
+
+Update spinner to the latest version:
+
+```bash
+spinner update
+```
+
+This checks GitHub Releases for a newer version and updates the binary in place.
 
 ### exec
 

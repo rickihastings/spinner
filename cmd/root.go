@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rickihastings/spinner/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -43,7 +44,7 @@ NOTES:
   - Spin: Running spin with same image/repo/branch reuses the existing container
   - Spin: Use --recreate to force removal and recreation of existing container
   - Spin: Containers are persistent and must be manually stopped/removed`,
-	Version: "0.1.0",
+	Version: version.Info(),
 }
 
 func init() {

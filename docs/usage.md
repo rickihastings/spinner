@@ -1,11 +1,30 @@
 # Development Setup & Workflow
 
-## Package Manager
+## Build System
 
-- **Go modules for dependencies**: This project uses Go modules for managing Go dependencies
-- **npm for OpenSpec only**: npm is used only for OpenSpec tooling (`@fission-ai/openspec` package)
-- Use `go mod download` for Go dependencies
-- Use `npm install` only when working with OpenSpec features
+This project uses **Make** for build automation and **Go modules** for dependency management.
+
+### Common Commands
+
+```bash
+make build          # Build the spinner binary to dist/spinner
+make test           # Build and run all tests
+make lint           # Run go vet and golangci-lint
+make format         # Format code with go fmt
+make format-check   # Check formatting (used by pre-commit)
+make install-hooks  # Install git pre-commit hooks
+make clean          # Remove build artifacts
+make snapshot       # Test release build locally (no tag required)
+make release        # Create a release (requires git tag)
+```
+
+### Pre-commit Hooks
+
+Install git hooks to run format, lint, and test before each commit:
+
+```bash
+make install-hooks
+```
 
 ## Environment Variable Configuration
 
@@ -60,13 +79,23 @@ Always build before testing CLI commands:
 
 ```bash
 # 1. Build
-go build -o dist/spinner
+make build
 
 # 2. Setup (required before first spin)
 ./dist/spinner setup --name default
 
 # 3. Test
 ./dist/spinner spin --image default --repo . --prompt "your test prompt"
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Run tests for a specific package
+go test ./internal/docker/...
 ```
 
 ### Debugging Checklist
