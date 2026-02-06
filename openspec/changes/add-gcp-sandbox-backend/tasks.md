@@ -81,5 +81,18 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 - [ ] 6.4 Create `internal/gcp/state_test.go` — unit tests for state persistence with mock client
 - [ ] 6.5 Register GCP provider in factory wiring (`cmd/setup.go`, `cmd/spin.go`)
 - [ ] 6.6 Update documentation: `docs/system-design.md` (architecture), `docs/usage.md` (GCP commands, `.spinner.json` config)
-- [ ] 6.7 Full build + test suite verification
-- [ ] 6.8 Integration test smoke plan documented (manual verification steps for GCP)
+- [ ] 6.7 Full build + unit test suite verification
+
+## 7.0 GCP Integration Tests
+
+Mirrors the existing Docker integration tests in `tests/integration/`. Skipped when GCP is not available
+(no credentials / no project), same pattern as Docker tests skipping when Docker daemon is unavailable.
+
+- [ ] 7.1 Create `tests/testutil/gcp.go` — GCP test helpers: `SkipIfGCPNotAvailable(t)`, `GenerateTestInstanceName(t)`, VM cleanup helpers, GCS cleanup helpers
+- [ ] 7.2 Create `tests/integration/gcp_setup_test.go` — setup command with `--backend gcp`: image bake, custom machine type, custom disk size, bake failure cleanup
+- [ ] 7.3 Create `tests/integration/gcp_spin_test.go` — spin command with `--backend gcp`: VM creation, deterministic naming, container reuse/restart, recreate flag, repo cloning, branch handling
+- [ ] 7.4 Create `tests/integration/gcp_watch_test.go` — watch command with `--backend gcp`: GCS log streaming, metrics polling, log object polling before VM writes
+- [ ] 7.5 Create `tests/integration/gcp_lifecycle_test.go` — full lifecycle: setup → spin → watch → stop → start → remove; verify state persistence across stop/start via GCS
+- [ ] 7.6 Create `tests/integration/gcp_flags_test.go` — conditional flag validation: wrong-backend flags error, `.spinner.json` config loading, precedence chain (CLI > env > config > defaults)
+- [ ] 7.7 Create `tests/integration/gcp_cleanup_test.go` — resource cleanup: VM + disk deletion on remove, labels applied correctly, GCS state preserved after remove
+- [ ] 7.8 Verify all integration tests pass with `go test ./tests/integration/... -run GCP` and existing Docker tests still pass
