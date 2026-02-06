@@ -18,11 +18,12 @@
 | `internal/gcp/image_test.go` | **create** | Image baking tests |
 | `internal/gcp/instance.go` | **create** | VM instance lifecycle operations |
 | `internal/gcp/instance_test.go` | **create** | Instance lifecycle tests |
-| `internal/logs/watcher.go` | **extract** | LogWatcher moved from `internal/docker/logs.go` — fsnotify-based file tailing |
+| `internal/logs/watcher.go` | **extract** | LogWatcher moved from `internal/docker/logs.go` — fsnotify-based file tailing (Docker control plane) |
 | `internal/logs/watcher_test.go` | **extract** | LogWatcher tests (moved from docker package) |
-| `internal/logs/gcs_sink.go` | **create** | GCS log sink — receives lines from LogWatcher, uploads to GCS |
+| `internal/logs/gcs_sink.go` | **create** | GCS log sink — `io.Writer` that buffers and flushes to GCS |
 | `internal/logs/gcs_sink_test.go` | **create** | GCS sink tests |
 | `internal/docker/logs.go` | **modify** | Import LogWatcher from `internal/logs/` instead of defining locally |
+| `internal/agent/claude/executor.go` | **modify** | Support optional `AdditionalWriter` in config for GCS sink |
 | `internal/gcp/logs.go` | **create** | GCS-based log reader for control plane `WatchLogs` / `Logs` |
 | `internal/gcp/logs_test.go` | **create** | GCS log reader tests |
 | `internal/gcp/metrics.go` | **create** | Cloud Monitoring integration |
@@ -32,7 +33,7 @@
 | `internal/gcp/startup.go` | **create** | Startup script generation for GCP VMs |
 | `templates/scripts/gcp_bake.sh` | **create** | Image baking startup script (installs tooling) |
 | `templates/scripts/gcp_runtime.sh` | **create** | Runtime startup script (clones repo, runs exec) |
-| `internal/exec/loop.go` | **modify** | Spawn GCS log sync goroutine when `SPINNER_LOG_BUCKET` env var is set |
+| `internal/exec/loop.go` | **modify** | Create GCS sink and pass to executor when `SPINNER_LOG_BUCKET` env var is set |
 | `cmd/constructors.go` | **modify** | Accept provider factory; add `--backend` flag; conditional flag validation |
 | `cmd/setup.go` | **modify** | Wire factory; register grouped GCP-specific flags |
 | `cmd/spin.go` | **modify** | Wire factory; register grouped GCP-specific flags |
@@ -327,7 +328,7 @@ GCP instance names: lowercase, max 63 chars, `[a-z]([-a-z0-9]*[a-z0-9])?`.
 In Docker, `WatchLogs` reads `raw.log` directly from the host filesystem via a volume mount + fsnotify. For GCP,
 the file lives on a remote VM, so we use GCS as the transport layer.
 
-**Shared Component: LogWatcher Extraction**
+**LogWatcher Extraction (Docker control plane)**
 
 The existing `internal/docker/logs.go` (`LogWatcher`, ~250 LOC) is extracted to `internal/logs/watcher.go`. It
 provides fsnotify-based local file watching:
@@ -335,15 +336,30 @@ provides fsnotify-based local file watching:
 - `TailExistingLines(ctx, n)` — ring buffer over existing content
 - `WatchLines(ctx, ch)` — stream new lines to channel via fsnotify
 
-Both backends reuse this. Docker uses it on the control plane (host filesystem via volume mount). GCP uses it on
-the VM (where `raw.log` is a local file). `internal/docker/logs.go` becomes a thin wrapper that imports from
-`internal/logs/`.
+Docker's control plane `WatchLogs` continues to use this (reading from the host-side volume mount).
+`internal/docker/logs.go` becomes a thin wrapper that imports from `internal/logs/`.
 
-**VM Side: Log Sync via exec**
+**VM Side: Direct Pipeline via Executor**
 
-When `spinner exec` runs inside a GCP VM, it detects GCS configuration via environment variables
-(`SPINNER_LOG_BUCKET`, `SPINNER_INSTANCE_NAME` — set by the runtime startup script). If present, it spawns a
-background goroutine before entering the iteration loop:
+The executor already streams Claude's stdout through `io.TeeReader(stdout, logFile)` — the bytes are right
+there in-process. Rather than setting up a separate fsnotify watcher on the same file, we tap directly into the
+existing pipeline with `io.MultiWriter`:
+
+```go
+// internal/agent/claude/executor.go — inside Execute()
+var writers []io.Writer
+if logFile != nil {
+    writers = append(writers, logFile)
+}
+if e.config.AdditionalWriter != nil {
+    writers = append(writers, e.config.AdditionalWriter)
+}
+if len(writers) > 0 {
+    reader = io.TeeReader(stdout, io.MultiWriter(writers...))
+}
+```
+
+The exec loop creates the GCS sink and passes it to the executor:
 
 ```go
 // internal/exec/loop.go — inside Run(), before iteration loop
@@ -351,21 +367,19 @@ if bucket := os.Getenv("SPINNER_LOG_BUCKET"); bucket != "" {
     instanceName := os.Getenv("SPINNER_INSTANCE_NAME")
     sink, err := logs.NewGCSSink(ctx, bucket, instanceName+"/logs/raw.log")
     if err == nil {
-        watcher, _ := logs.NewWatcher(logFilePath)
-        lineCh := make(chan string, 100)
-        go watcher.WatchLines(ctx, lineCh)
-        go sink.ConsumeLines(ctx, lineCh) // buffers + uploads to GCS
+        executorConfig.AdditionalWriter = sink
         defer sink.Close()
     }
 }
 ```
 
-The `GCSSink` (`internal/logs/gcs_sink.go`):
-- Consumes lines from the LogWatcher channel
-- Buffers writes and periodically uploads to GCS (every 2 seconds or on buffer threshold)
-- Overwrites the GCS object with the full log content each sync cycle
+The `GCSSink` (`internal/logs/gcs_sink.go`) implements `io.Writer`:
+- Receives bytes directly from the executor's TeeReader — no file watching, no extra goroutines
+- Buffers writes and flushes to GCS periodically (every 2 seconds or on buffer threshold)
+- Overwrites the GCS object with accumulated content each sync cycle
 - Object size serves as the implicit byte offset for readers
 - Uses `cloud.google.com/go/storage` directly — small, focused dependency
+- Runs a background flush goroutine; `Close()` does a final flush
 
 **Control Plane Side: GCS Log Reader**
 
@@ -381,14 +395,14 @@ GCP provider's `Logs()`:
 2. Returns as `io.ReadCloser`
 
 ```
-VM (raw.log is local)              GCS (transport)           Control Plane
+VM (inside executor)               GCS (transport)           Control Plane
 ┌────────────────────┐         ┌──────────────────┐     ┌──────────────────────┐
-│ Executor           │         │ {instance}/logs/  │     │ GCP Provider         │
-│   └─ TeeReader ──→ raw.log  │   raw.log         │     │   WatchLogs()        │
-│                    │         │                   │     │     │                │
-│ LogWatcher         │         │                   │     │   Poll GCS every 2s  │
-│   └─ fsnotify ──→ lines ──→ │  GCSSink uploads  │ ──→ │   Range read offset  │
-│     (reused code)  │         │  every 2s         │     │   Split lines → ch   │
+│ Claude CLI stdout  │         │ {instance}/logs/  │     │ GCP Provider         │
+│   │                │         │   raw.log         │     │   WatchLogs()        │
+│   └─ TeeReader     │         │                   │     │     │                │
+│        ├─ raw.log  │         │                   │     │   Poll GCS every 2s  │
+│        └─ GCSSink ─────────→ │  flush every 2s   │ ──→ │   Range read offset  │
+│     (io.MultiWriter)         │                   │     │   Split lines → ch   │
 └────────────────────┘         └──────────────────┘     └──────────────────────┘
 ```
 

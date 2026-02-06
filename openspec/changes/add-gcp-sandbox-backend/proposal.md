@@ -120,7 +120,8 @@ Backend-specific flags are organized into groups and validated at runtime:
 ### Also Affected (refactor only, no behavior change)
 
 - `internal/docker/logs.go` — `LogWatcher` extracted to `internal/logs/`; Docker provider imports from shared package
-- `internal/exec/loop.go` — Spawns GCS log sync goroutine when `SPINNER_LOG_BUCKET` env var is set (GCP VMs only)
+- `internal/agent/claude/executor.go` — Accepts optional `AdditionalWriter` for GCS sink via `io.MultiWriter`
+- `internal/exec/loop.go` — Creates GCS sink and passes to executor when `SPINNER_LOG_BUCKET` env var is set
 
 ### Not Affected
 

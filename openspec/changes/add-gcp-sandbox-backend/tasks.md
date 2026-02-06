@@ -61,12 +61,13 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 - [ ] 5.1 Extract `LogWatcher` from `internal/docker/logs.go` → `internal/logs/watcher.go` (move, not copy)
 - [ ] 5.2 Extract tests → `internal/logs/watcher_test.go`
 - [ ] 5.3 Update `internal/docker/logs.go` to import from `internal/logs/` — verify no behavior change, all existing tests pass
-- [ ] 5.4 Create `internal/logs/gcs_sink.go` — `GCSSink` that consumes lines from LogWatcher channel and uploads to GCS (buffered, every 2s)
+- [ ] 5.4 Create `internal/logs/gcs_sink.go` — `GCSSink` implementing `io.Writer`, buffers and flushes to GCS every 2s
 - [ ] 5.5 Create `internal/logs/gcs_sink_test.go` — unit tests for GCS sink
-- [ ] 5.6 Modify `internal/exec/loop.go` — detect `SPINNER_LOG_BUCKET` env var, spawn LogWatcher + GCSSink goroutine before iteration loop
-- [ ] 5.7 Create `internal/gcp/logs.go` — GCS-based log reader: `Logs()` downloads full object, `WatchLogs()` polls with byte offset + Range reads
-- [ ] 5.8 Create `internal/gcp/logs_test.go` — unit tests for GCS log reader with mock client
-- [ ] 5.9 Verify build and all tests pass (Docker + new GCS paths)
+- [ ] 5.6 Modify `internal/agent/claude/executor.go` — add `AdditionalWriter` field to executor config, use `io.MultiWriter` in TeeReader when set
+- [ ] 5.7 Modify `internal/exec/loop.go` — detect `SPINNER_LOG_BUCKET` env var, create GCSSink, pass to executor config as `AdditionalWriter`
+- [ ] 5.8 Create `internal/gcp/logs.go` — GCS-based log reader: `Logs()` downloads full object, `WatchLogs()` polls with byte offset + Range reads
+- [ ] 5.9 Create `internal/gcp/logs_test.go` — unit tests for GCS log reader with mock client
+- [ ] 5.10 Verify build and all tests pass (Docker + new GCS paths)
 
 ## 5.5 GCP Metrics
 

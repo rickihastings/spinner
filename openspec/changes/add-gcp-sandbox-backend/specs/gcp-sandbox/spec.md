@@ -211,20 +211,21 @@ for file-watching on the VM side.
 - **WHEN** the GCP log streaming feature is implemented
 - **THEN** the existing `LogWatcher` from `internal/docker/logs.go` SHALL be extracted to `internal/logs/watcher.go`
 - **AND** the Docker provider SHALL import from the shared package (no behavior change)
-- **AND** the GCP log sync goroutine SHALL reuse the same `LogWatcher` on the VM
+- **NOTE** the GCP VM side does NOT use LogWatcher — it taps directly into the executor's TeeReader pipeline
 
-#### Scenario: VM-side log sync via exec
+#### Scenario: VM-side log sync via executor pipeline
 
 - **WHEN** `spinner exec` runs inside a GCP VM
 - **AND** the `SPINNER_LOG_BUCKET` environment variable is set
-- **THEN** exec SHALL spawn a background goroutine that watches `/logs/raw.log` using `LogWatcher`
-- **AND** uploads new content to GCS at `{bucket}/{instance-name}/logs/raw.log` every 2 seconds
-- **AND** the sync goroutine SHALL be cleaned up when exec completes
+- **THEN** exec SHALL create a `GCSSink` (`io.Writer`) and pass it to the executor as an additional writer
+- **AND** the executor SHALL use `io.MultiWriter(logFile, gcsSink)` in its `TeeReader` pipeline
+- **AND** the GCS sink SHALL buffer writes and flush to GCS at `{bucket}/{instance-name}/logs/raw.log` every 2 seconds
+- **AND** the GCS sink SHALL be closed when exec completes
 
 #### Scenario: VM-side log sync not on GCP
 
 - **WHEN** `spinner exec` runs inside a Docker container (no `SPINNER_LOG_BUCKET` set)
-- **THEN** exec SHALL NOT spawn any log sync goroutine (no behavior change)
+- **THEN** the executor SHALL use only the log file writer (no behavior change)
 
 #### Scenario: Full log retrieval
 
