@@ -61,5 +61,3 @@ go build -o dist/spinner
 - All code must have tests
 - Keep functions small and focused
 - Follow SOLID principles and Go conventions
-
-See **[docs/standards.md](docs/standards.md)** for code quality rules (test helpers, unused code, duplication, linting).
