@@ -28,7 +28,7 @@ func NewGCPProvider(client Client, project, zone, bucket string) *Provider {
 }
 
 // Setup provisions a named environment by baking a GCP Compute Engine image.
-// Options: "project", "zone", "machine-type", "disk-size", "state-bucket".
+// Options: "project", "zone", "machine-type", "disk-size", "state-bucket", "bake-script".
 func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error {
 	project := config.Options["project"]
 	zone := config.Options["zone"]
@@ -57,8 +57,14 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 		}
 	}
 
-	// Load bake script
-	bakeScript, err := LoadBakeScript()
+	// Load custom bake script contents (if path provided)
+	customBakeScript, err := LoadBakeScriptFile(config.Options["bake-script"])
+	if err != nil {
+		return err
+	}
+
+	// Load and render bake script template with custom script
+	bakeScript, err := LoadBakeScript(customBakeScript)
 	if err != nil {
 		return fmt.Errorf("failed to load bake script: %w", err)
 	}

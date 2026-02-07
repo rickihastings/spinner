@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/rickihastings/spinner/internal/provider"
@@ -297,6 +298,11 @@ func TestSpinCommand_GCPFlagsWithDockerBackend(t *testing.T) {
 			args:     []string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--state-bucket", "my-bucket"},
 			errorMsg: "--state-bucket requires --backend gcp",
 		},
+		{
+			name:     "bake-script flag with docker backend",
+			args:     []string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--bake-script", "/tmp/bake.sh"},
+			errorMsg: "--bake-script requires --backend gcp",
+		},
 	}
 
 	for _, tt := range tests {
@@ -334,6 +340,38 @@ func TestSpinCommand_UnknownBackend(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown backend")
+}
+
+// TestSpinCommand_BakeScriptRequiresSetup tests that --bake-script requires --setup on spin
+func TestSpinCommand_BakeScriptRequiresSetup(t *testing.T) {
+	tmpfile, err := os.CreateTemp("", "bake-script-*.sh")
+	assert.NoError(t, err)
+
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+
+	_, _ = tmpfile.WriteString("#!/bin/bash\necho hello\n")
+	_ = tmpfile.Close()
+
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(testGCPFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "test",
+		"--repo", "https://github.com/test/repo.git",
+		"--backend", "gcp",
+		"--project", "my-proj",
+		"--zone", "us-central1-a",
+		"--state-bucket", "my-bucket",
+		"--bake-script", tmpfile.Name(),
+	})
+
+	err = cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "--bake-script requires --setup flag")
 }
 
 // TestSpinCommand_DockerBackendExplicit tests explicit --backend docker works
