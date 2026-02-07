@@ -1,7 +1,7 @@
 package gcp
 
-// InstanceConfig holds configuration for creating a GCP Compute Engine VM instance.
-type InstanceConfig struct {
+// instanceConfig holds configuration for creating a GCP Compute Engine VM instance.
+type instanceConfig struct {
 	// Name is the VM instance name (must match GCP naming: lowercase, max 63 chars).
 	Name string
 
@@ -48,8 +48,8 @@ type InstanceConfig struct {
 	Scopes []string
 }
 
-// ImageConfig holds configuration for creating a GCP Compute Engine image.
-type ImageConfig struct {
+// imageConfig holds configuration for creating a GCP Compute Engine image.
+type imageConfig struct {
 	// Name is the image name.
 	Name string
 
@@ -63,8 +63,8 @@ type ImageConfig struct {
 	Labels map[string]string
 }
 
-// SerialPortOutput holds output from a VM's serial port.
-type SerialPortOutput struct {
+// serialPortOutput holds output from a VM's serial port.
+type serialPortOutput struct {
 	// Contents is the serial port output text.
 	Contents string
 
@@ -72,8 +72,8 @@ type SerialPortOutput struct {
 	Next int64
 }
 
-// MetricsQuery holds parameters for a Cloud Monitoring time series query.
-type MetricsQuery struct {
+// metricsQuery holds parameters for a Cloud Monitoring time series query.
+type metricsQuery struct {
 	// MetricType is the fully-qualified metric type
 	// (e.g., "compute.googleapis.com/instance/cpu/utilization").
 	MetricType string
@@ -88,37 +88,37 @@ type MetricsQuery struct {
 	IntervalSeconds int64
 }
 
-// MetricPoint holds a single data point from a metrics query.
-type MetricPoint struct {
+// metricPoint holds a single data point from a metrics query.
+type metricPoint struct {
 	// Value is the metric value (e.g., CPU utilization as 0.0-1.0).
 	Value float64
 }
 
-// VMStatus represents the status of a GCP VM instance as reported by the API.
-type VMStatus string
+// vmStatus represents the status of a GCP VM instance as reported by the API.
+type vmStatus string
 
 const (
-	// VMStatusProvisioning indicates the VM is being provisioned.
-	VMStatusProvisioning VMStatus = "PROVISIONING"
+	// vmStatusProvisioning indicates the VM is being provisioned.
+	vmStatusProvisioning vmStatus = "PROVISIONING"
 
-	// VMStatusStaging indicates the VM is being staged.
-	VMStatusStaging VMStatus = "STAGING"
+	// vmStatusStaging indicates the VM is being staged.
+	vmStatusStaging vmStatus = "STAGING"
 
-	// VMStatusRunning indicates the VM is running.
-	VMStatusRunning VMStatus = "RUNNING"
+	// vmStatusRunning indicates the VM is running.
+	vmStatusRunning vmStatus = "RUNNING"
 
-	// VMStatusStopping indicates the VM is being stopped.
-	VMStatusStopping VMStatus = "STOPPING"
+	// vmStatusStopping indicates the VM is being stopped.
+	vmStatusStopping vmStatus = "STOPPING"
 
-	// VMStatusStopped indicates the VM is stopped.
-	VMStatusStopped VMStatus = "STOPPED"
+	// vmStatusStopped indicates the VM is stopped.
+	vmStatusStopped vmStatus = "STOPPED"
 
-	// VMStatusSuspending indicates the VM is being suspended.
-	VMStatusSuspending VMStatus = "SUSPENDING"
+	// vmStatusSuspending indicates the VM is being suspended.
+	vmStatusSuspending vmStatus = "SUSPENDING"
 
-	// VMStatusSuspended indicates the VM is suspended.
-	VMStatusSuspended VMStatus = "SUSPENDED"
+	// vmStatusSuspended indicates the VM is suspended.
+	vmStatusSuspended vmStatus = "SUSPENDED"
 
-	// VMStatusTerminated indicates the VM has been terminated.
-	VMStatusTerminated VMStatus = "TERMINATED"
+	// vmStatusTerminated indicates the VM has been terminated.
+	vmStatusTerminated vmStatus = "TERMINATED"
 )

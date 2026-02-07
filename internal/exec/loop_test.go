@@ -26,15 +26,24 @@ func (m *mockExecutor) ExecuteAndCollect(_ context.Context, _ string) (*agent.Re
 	return m.result, m.err
 }
 
-// mockNoGCSSink disables the GCS sink factory for testing.
-// Returns a cleanup function that restores the original factory.
+// mockNoGCS disables the GCS sink and state sync factories for testing.
+// Returns a cleanup function that restores the original factories.
 func mockNoGCSSink() func() {
-	old := gcsSinkFactory
+	oldSink := gcsSinkFactory
+	oldStateSync := gcsStateSyncFactory
+
 	gcsSinkFactory = func(_ context.Context) (*logs.GCSSink, func()) {
 		return nil, nil
 	}
 
-	return func() { gcsSinkFactory = old }
+	gcsStateSyncFactory = func(_ context.Context) StateSyncFunc {
+		return nil
+	}
+
+	return func() {
+		gcsSinkFactory = oldSink
+		gcsStateSyncFactory = oldStateSync
+	}
 }
 
 func TestNewRunner(t *testing.T) {

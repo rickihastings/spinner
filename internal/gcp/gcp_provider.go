@@ -60,25 +60,25 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 	}
 
 	// Load custom bake script contents (if path provided)
-	customBakeScript, err := LoadBakeScriptFile(config.Options["bake-script"])
+	customBakeScript, err := loadBakeScriptFile(config.Options["bake-script"])
 	if err != nil {
 		return err
 	}
 
 	// Load and render bake script template with custom script
-	bakeScript, err := LoadBakeScript(customBakeScript)
+	bakeScript, err := loadBakeScript(customBakeScript)
 	if err != nil {
 		return fmt.Errorf("failed to load bake script: %w", err)
 	}
 
 	// Load the standard startup.sh so it can be embedded in the baked image.
 	// The bake script reads this from metadata and installs it at /usr/local/bin/startup.sh.
-	startupScript, err := LoadStartupScript()
+	startupScript, err := loadStartupScript()
 	if err != nil {
 		return fmt.Errorf("failed to load startup script: %w", err)
 	}
 
-	return BakeImage(ctx, p.client, BakeConfig{
+	return bakeImage(ctx, p.client, bakeConfig{
 		ImageName:     config.Name,
 		Project:       project,
 		Zone:          zone,
@@ -95,7 +95,7 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 // GCP instance names: lowercase, max 63 chars, [a-z]([-a-z0-9]*[a-z0-9])?.
 func (p *Provider) InstanceName(config provider.CreateConfig) string {
 	image := config.Options["image"]
-	return GenerateInstanceName(image, config.Repo, config.Branch)
+	return generateInstanceName(image, config.Repo, config.Branch)
 }
 
 // Create creates and starts a new VM instance from a baked image.
@@ -111,7 +111,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	}
 
 	// Load runtime startup script
-	runtimeScript, err := LoadRuntimeScript()
+	runtimeScript, err := loadRuntimeScript()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load runtime script: %w", err)
 	}
@@ -153,11 +153,11 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 
 	labels := map[string]string{
 		"spinner-managed": "true",
-		"spinner-image":   SanitizeLabel(image),
-		"spinner-repo":    SanitizeLabel(extractRepoName(config.Repo)),
+		"spinner-image":   sanitizeLabel(image),
+		"spinner-repo":    sanitizeLabel(extractRepoName(config.Repo)),
 	}
 
-	err = p.client.CreateInstance(ctx, InstanceConfig{
+	err = p.client.CreateInstance(ctx, instanceConfig{
 		Name:         name,
 		Project:      p.project,
 		Zone:         p.zone,
@@ -238,7 +238,7 @@ func (p *Provider) Status(ctx context.Context, name string) (provider.InstanceSt
 		return provider.InstanceStatusNone, fmt.Errorf("failed to get instance status: %w", err)
 	}
 
-	return MapVMStatus(instance.GetStatus()), nil
+	return mapVMStatus(instance.GetStatus()), nil
 }
 
 // WatchLogs streams log lines from GCS by polling for new content.

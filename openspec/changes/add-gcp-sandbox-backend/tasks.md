@@ -80,13 +80,14 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 
 ## 6.0 GCP State Persistence & Integration
 
-- [ ] 6.1 Create `internal/gcp/state.go` — GCS-based state read/write operations
-- [ ] 6.2 Integrate state download into runtime startup script (read from GCS before `spinner exec`)
-- [ ] 6.3 Integrate state upload into exec completion hook or Provider.Stop()
-- [ ] 6.4 Create `internal/gcp/state_test.go` — unit tests for state persistence with mock client
-- [ ] 6.5 Register GCP provider in factory wiring (`cmd/setup.go`, `cmd/spin.go`)
-- [ ] 6.6 Update documentation: `docs/system-design.md` (architecture), `docs/usage.md` (GCP commands, `.spinner.json` config)
-- [ ] 6.7 Full build + unit test suite verification
+- [x] 6.1 Create `internal/gcp/state.go` — GCS-based state read/write operations
+- [x] 6.2 Integrate state download into runtime startup script (read from GCS before `spinner exec`)
+- [x] 6.3 Integrate state upload into exec loop — GCS state sync after each `SaveState()` call
+- [x] 6.4 Create `internal/gcp/state_test.go` — unit tests for state persistence with mock client
+- [x] 6.5 Register GCP provider in factory wiring (`cmd/factory.go`) — already done in prior slice
+- [x] 6.6 Update documentation: `docs/system-design.md` (GCP architecture, directory structure), `docs/usage.md` (GCP state persistence)
+- [x] 6.7 Full build + unit test suite verification
+- [x] 6.8 Audit GCP package API visibility — made internal types/functions unexported, refactored GCS env resolution
 
 ## 7.0 GCP Integration Tests
 

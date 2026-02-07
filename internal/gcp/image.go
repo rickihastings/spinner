@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// BakeConfig holds configuration for baking a GCP image.
-type BakeConfig struct {
+// bakeConfig holds configuration for baking a GCP image.
+type bakeConfig struct {
 	// ImageName is the name for the resulting custom image.
 	ImageName string
 
@@ -51,7 +51,7 @@ var (
 	bakeTimeout = 30 * time.Minute
 )
 
-// BakeImage creates a custom GCP image by running the bake script on a temporary VM.
+// bakeImage creates a custom GCP image by running the bake script on a temporary VM.
 //
 // Flow:
 //  1. Create temp VM with bake script as startup-script
@@ -60,7 +60,7 @@ var (
 //  4. Delete the temporary VM
 //
 // The temp VM is always cleaned up, even if image creation fails.
-func BakeImage(ctx context.Context, client Client, config BakeConfig) error {
+func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 	bakeVMName := bakeVMPrefix + config.ImageName
 
 	// Step 1: Create temporary bake VM
@@ -73,7 +73,7 @@ func BakeImage(ctx context.Context, client Client, config BakeConfig) error {
 		metadata[k] = v
 	}
 
-	err := client.CreateInstance(ctx, InstanceConfig{
+	err := client.CreateInstance(ctx, instanceConfig{
 		Name:         bakeVMName,
 		Project:      config.Project,
 		Zone:         config.Zone,
@@ -125,7 +125,7 @@ func BakeImage(ctx context.Context, client Client, config BakeConfig) error {
 		config.Project, config.Zone, bakeVMName,
 	)
 
-	err = client.CreateImage(ctx, config.Project, ImageConfig{
+	err = client.CreateImage(ctx, config.Project, imageConfig{
 		Name:        config.ImageName,
 		SourceDisk:  sourceDisk,
 		Description: fmt.Sprintf("Spinner baked image: %s", config.ImageName),
@@ -166,12 +166,12 @@ func waitForVMTerminated(ctx context.Context, client Client, project, zone, name
 				return fmt.Errorf("failed to check bake VM status: %w", err)
 			}
 
-			status := VMStatus(instance.GetStatus())
+			status := vmStatus(instance.GetStatus())
 
 			switch status {
-			case VMStatusTerminated:
+			case vmStatusTerminated:
 				return nil
-			case VMStatusRunning, VMStatusProvisioning, VMStatusStaging, VMStatusStopping:
+			case vmStatusRunning, vmStatusProvisioning, vmStatusStaging, vmStatusStopping:
 				// Still working, continue polling
 				continue
 			default:
