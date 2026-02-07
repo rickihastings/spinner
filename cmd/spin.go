@@ -59,6 +59,7 @@ GCP BACKEND FLAGS:
   --machine-type <type>      VM machine type (default: e2-standard-2)
   --disk-size <gb>           Boot disk size in GB (default: 30)
   --state-bucket <bucket>    GCS bucket for state persistence (required for GCP)
+  --bake-script <path>       Path to custom bake script run during image creation (GCP backend, requires --setup)
 
 EXAMPLES:
   # Docker (default)
@@ -260,6 +261,7 @@ EXAMPLES:
 	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
 	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
 	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
+	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
 
 	return cmd
 }

@@ -57,7 +57,12 @@ chown spinner:spinner /home/spinner/workspace
 # Set up log and state directories
 mkdir -p /home/spinner/logs /home/spinner/state
 chown spinner:spinner /home/spinner/logs /home/spinner/state
-
+{{if .BakeScript}}
+# --- Custom bake script (injected via --bake-script flag) ---
+echo "Running custom bake script..."
+{{.BakeScript}}
+echo "Custom bake script completed."
+{{end}}
 echo "=== Bake Complete ==="
 echo "SPINNER_BAKE_COMPLETE" > /dev/ttyS0
 

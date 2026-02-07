@@ -84,16 +84,6 @@ export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
 
 The agent will clone the repo, start working, and continue until it signals completion or hits the iteration limit.
 
-## Migration Notes
-
-**Breaking Change:** If you have existing Docker images built with older Spinner versions (before the `exec` command), you must rebuild them:
-
-```bash
-./dist/spinner setup --name <your-image-name>
-```
-
-The iteration loop has been rewritten from Bash to Go for better reliability, error handling, and state management. Old images using the Bash-based `ralph-loop.sh` will not work with current versions of Spinner.
-
 ## Writing Effective Prompts
 
 **Spec-driven development works best.** Point the agent at a specification file, design doc, or task list in your repo:

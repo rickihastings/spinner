@@ -61,3 +61,12 @@ go build -o dist/spinner
 - All code must have tests
 - Keep functions small and focused
 - Follow SOLID principles and Go conventions
+
+### Sandbox Proxy Fix
+
+If `go mod download` fails with DNS errors for `storage.googleapis.com`, the sandbox `no_proxy`/`NO_PROXY` vars are blocking the HTTP proxy. Fix by removing Google domains before running Go commands:
+
+```bash
+export no_proxy=$(echo "$no_proxy" | sed 's/,\*\.googleapis\.com//g;s/,\*\.google\.com//g;s/,storage\.googleapis\.com//g')
+export NO_PROXY=$(echo "$NO_PROXY" | sed 's/,\*\.googleapis\.com//g;s/,\*\.google\.com//g;s/,storage\.googleapis\.com//g')
+```
