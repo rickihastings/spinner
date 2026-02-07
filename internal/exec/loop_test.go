@@ -2,11 +2,13 @@ package exec
 
 import (
 	"context"
+	"io"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/rickihastings/spinner/internal/agent"
+	"github.com/rickihastings/spinner/internal/logs"
 )
 
 // mockExecutor is a test helper that implements agent.Executor interface
@@ -22,6 +24,17 @@ func (m *mockExecutor) Execute(_ context.Context, _ string) (<-chan agent.Event,
 
 func (m *mockExecutor) ExecuteAndCollect(_ context.Context, _ string) (*agent.Result, error) {
 	return m.result, m.err
+}
+
+// mockNoGCSSink disables the GCS sink factory for testing.
+// Returns a cleanup function that restores the original factory.
+func mockNoGCSSink() func() {
+	old := gcsSinkFactory
+	gcsSinkFactory = func(_ context.Context) (*logs.GCSSink, func()) {
+		return nil, nil
+	}
+
+	return func() { gcsSinkFactory = old }
 }
 
 func TestNewRunner(t *testing.T) {
@@ -72,12 +85,14 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
+	defer mockNoGCSSink()()
+
 	// Mock executor factory to return no completion
 	oldExecutorFactory := executorFactory
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
 		return &mockExecutor{
 			result: &agent.Result{
 				Completed:   false,
@@ -143,12 +158,14 @@ func TestRunner_Run_Completion(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
+	defer mockNoGCSSink()()
+
 	// Mock executor factory to return completion on first iteration
 	oldExecutorFactory := executorFactory
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
 		return &mockExecutor{
 			result: &agent.Result{
 				Completed: true,
@@ -199,11 +216,13 @@ func TestRunner_Run_AuthError(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
+	defer mockNoGCSSink()()
+
 	oldExecutorFactory := executorFactory
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
 		return &mockExecutor{
 			result: &agent.Result{
 				AuthError:    true,
@@ -259,13 +278,15 @@ func TestRunner_Run_RateLimit(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
+	defer mockNoGCSSink()()
+
 	// Mock executor factory to return rate limit on first call, then completion
 	callCount := 0
 	oldExecutorFactory := executorFactory
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
 		callCount++
 		if callCount == 1 {
 			return &mockExecutor{
@@ -323,11 +344,13 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
+	defer mockNoGCSSink()()
+
 	oldExecutorFactory := executorFactory
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
 		return &mockExecutor{
 			result: &agent.Result{},
 			err:    nil,
