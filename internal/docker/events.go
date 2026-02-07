@@ -19,8 +19,8 @@ type LogEvent struct {
 	Error error
 }
 
-// BuildEvent represents a build progress event during image building.
-type BuildEvent struct {
+// buildEvent represents a build progress event during image building.
+type buildEvent struct {
 	// Stream contains build output text
 	Stream string
 
@@ -34,25 +34,25 @@ type BuildEvent struct {
 	Error string
 
 	// ErrorDetail provides detailed error information
-	ErrorDetail *BuildErrorDetail
+	ErrorDetail *buildErrorDetail
 
 	// Aux contains auxiliary data (e.g., image ID after successful build)
-	Aux *BuildAux
+	Aux *buildAux
 }
 
-// BuildErrorDetail provides detailed error information for build failures.
-type BuildErrorDetail struct {
+// buildErrorDetail provides detailed error information for build failures.
+type buildErrorDetail struct {
 	Code    int
 	Message string
 }
 
-// BuildAux contains auxiliary build data.
-type BuildAux struct {
+// buildAux contains auxiliary build data.
+type buildAux struct {
 	ID string
 }
 
-// IsError returns true if this build event represents an error.
-func (e *BuildEvent) IsError() bool {
+// isError returns true if this build event represents an error.
+func (e *buildEvent) isError() bool {
 	return e.Error != "" || e.ErrorDetail != nil
 }
 
@@ -80,8 +80,8 @@ type LogStreamOptions struct {
 	Stderr bool
 }
 
-// DefaultLogStreamOptions returns sensible defaults for log streaming.
-func DefaultLogStreamOptions() LogStreamOptions {
+// defaultLogStreamOptions returns sensible defaults for log streaming.
+func defaultLogStreamOptions() LogStreamOptions {
 	return LogStreamOptions{
 		Follow:     false,
 		Timestamps: false,

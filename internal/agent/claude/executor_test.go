@@ -15,8 +15,8 @@ func TestNewExecutor(t *testing.T) {
 		t.Fatal("expected executor, got nil")
 	}
 
-	if executor.CompletionSignal != "~~ FEATURE_COMPLETED ~~" {
-		t.Errorf("expected default completion signal, got %s", executor.CompletionSignal)
+	if executor.completionSignal != "~~ FEATURE_COMPLETED ~~" {
+		t.Errorf("expected default completion signal, got %s", executor.completionSignal)
 	}
 
 	if executor.parser == nil {
@@ -41,53 +41,53 @@ func TestNewExecutor_WithConfig(t *testing.T) {
 		t.Errorf("expected work dir /tmp, got %s", executor.config.WorkDir)
 	}
 
-	if !executor.parser.IncludeRaw {
-		t.Error("expected parser.IncludeRaw to be true")
+	if !executor.parser.includeRaw {
+		t.Error("expected parser.includeRaw to be true")
 	}
 }
 
 func TestEventCollector_Collect(t *testing.T) {
-	collector := NewEventCollector()
+	collector := newEventCollector()
 	events := make(chan agent.Event, 3)
 
 	events <- agent.Event{Type: EventTypeSystemInit}
 
-	events <- agent.Event{Type: EventTypeAssistantMessage}
+	events <- agent.Event{Type: eventTypeAssistantMessage}
 
-	events <- agent.Event{Type: EventTypeResult}
+	events <- agent.Event{Type: eventTypeResult}
 
 	close(events)
-	collector.Collect(events)
+	collector.collect(events)
 
-	collected := collector.Events()
+	collected := collector.events()
 	if len(collected) != 3 {
 		t.Fatalf("expected 3 events, got %d", len(collected))
 	}
 }
 
 func TestEventCollector_Filter(t *testing.T) {
-	collector := NewEventCollector()
+	collector := newEventCollector()
 	events := make(chan agent.Event, 5)
 
 	events <- agent.Event{Type: EventTypeSystemInit}
 
-	events <- agent.Event{Type: EventTypeAssistantMessage}
+	events <- agent.Event{Type: eventTypeAssistantMessage}
 
-	events <- agent.Event{Type: EventTypeError}
+	events <- agent.Event{Type: eventTypeError}
 
-	events <- agent.Event{Type: EventTypeAssistantMessage}
+	events <- agent.Event{Type: eventTypeAssistantMessage}
 
-	events <- agent.Event{Type: EventTypeResult}
+	events <- agent.Event{Type: eventTypeResult}
 
 	close(events)
-	collector.Collect(events)
+	collector.collect(events)
 
-	filtered := collector.Filter(EventTypeAssistantMessage)
+	filtered := collector.filter(eventTypeAssistantMessage)
 	if len(filtered) != 2 {
 		t.Errorf("expected 2 assistant messages, got %d", len(filtered))
 	}
 
-	filtered = collector.Filter(EventTypeError, EventTypeResult)
+	filtered = collector.filter(eventTypeError, eventTypeResult)
 	if len(filtered) != 2 {
 		t.Errorf("expected 2 error/result events, got %d", len(filtered))
 	}
@@ -103,7 +103,7 @@ func TestEventCollector_HasError(t *testing.T) {
 			name: "with_error",
 			events: []agent.Event{
 				{Type: EventTypeSystemInit},
-				{Type: EventTypeError, Data: ErrorData{Type: "api_error"}},
+				{Type: eventTypeError, Data: errorData{Type: "api_error"}},
 			},
 			expected: true,
 		},
@@ -111,7 +111,7 @@ func TestEventCollector_HasError(t *testing.T) {
 			name: "no_error",
 			events: []agent.Event{
 				{Type: EventTypeSystemInit},
-				{Type: EventTypeAssistantMessage},
+				{Type: eventTypeAssistantMessage},
 			},
 			expected: false,
 		},
@@ -119,7 +119,7 @@ func TestEventCollector_HasError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			collector := NewEventCollector()
+			collector := newEventCollector()
 
 			ch := make(chan agent.Event, len(tt.events))
 
@@ -128,34 +128,34 @@ func TestEventCollector_HasError(t *testing.T) {
 			}
 
 			close(ch)
-			collector.Collect(ch)
+			collector.collect(ch)
 
-			if collector.HasError() != tt.expected {
-				t.Errorf("expected HasError=%v, got %v", tt.expected, collector.HasError())
+			if collector.hasError() != tt.expected {
+				t.Errorf("expected hasError=%v, got %v", tt.expected, collector.hasError())
 			}
 		})
 	}
 }
 
 func TestEventCollector_GetAllText(t *testing.T) {
-	collector := NewEventCollector()
+	collector := newEventCollector()
 
 	events := make(chan agent.Event, 3)
 	events <- agent.Event{
-		Type: EventTypeAssistantMessage,
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
+		Type: eventTypeAssistantMessage,
+		Data: assistantMessageData{
+			Content: []contentBlock{
 				{Type: "text", Text: "First message"},
 			},
 		},
 	}
 
-	events <- agent.Event{Type: EventTypeUserMessage}
+	events <- agent.Event{Type: eventTypeUserMessage}
 
 	events <- agent.Event{
-		Type: EventTypeAssistantMessage,
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
+		Type: eventTypeAssistantMessage,
+		Data: assistantMessageData{
+			Content: []contentBlock{
 				{Type: "text", Text: "Second message"},
 			},
 		},
@@ -163,9 +163,9 @@ func TestEventCollector_GetAllText(t *testing.T) {
 
 	close(events)
 
-	collector.Collect(events)
+	collector.collect(events)
 
-	text := collector.GetAllText()
+	text := collector.getAllText()
 
 	if !strings.Contains(text, "First message") {
 		t.Error("expected text to contain 'First message'")
@@ -177,22 +177,22 @@ func TestEventCollector_GetAllText(t *testing.T) {
 }
 
 func TestEventCollector_GetAllToolUses(t *testing.T) {
-	collector := NewEventCollector()
+	collector := newEventCollector()
 
 	events := make(chan agent.Event, 2)
 	events <- agent.Event{
-		Type: EventTypeAssistantMessage,
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
+		Type: eventTypeAssistantMessage,
+		Data: assistantMessageData{
+			Content: []contentBlock{
 				{Type: "tool_use", ID: "tool1", Name: "Read", Input: json.RawMessage(`{}`)},
 			},
 		},
 	}
 
 	events <- agent.Event{
-		Type: EventTypeAssistantMessage,
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
+		Type: eventTypeAssistantMessage,
+		Data: assistantMessageData{
+			Content: []contentBlock{
 				{Type: "tool_use", ID: "tool2", Name: "Write", Input: json.RawMessage(`{}`)},
 				{Type: "tool_use", ID: "tool3", Name: "Bash", Input: json.RawMessage(`{}`)},
 			},
@@ -201,9 +201,9 @@ func TestEventCollector_GetAllToolUses(t *testing.T) {
 
 	close(events)
 
-	collector.Collect(events)
+	collector.collect(events)
 
-	tools := collector.GetAllToolUses()
+	tools := collector.getAllToolUses()
 	if len(tools) != 3 {
 		t.Fatalf("expected 3 tool uses, got %d", len(tools))
 	}

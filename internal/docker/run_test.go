@@ -13,13 +13,13 @@ import (
 func TestGenerateContainerName_BasicNaming(t *testing.T) {
 	tests := []struct {
 		name         string
-		config       SpinConfig
+		config       spinConfig
 		expectedName string
 		description  string
 	}{
 		{
 			name: "image with tag and https repo",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "spinner:test-env",
 				Repo:  "https://github.com/octocat/Hello-World.git",
 			},
@@ -28,7 +28,7 @@ func TestGenerateContainerName_BasicNaming(t *testing.T) {
 		},
 		{
 			name: "image with tag and ssh repo",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "spinner:test-env",
 				Repo:  "git@github.com:user/my-repo.git",
 			},
@@ -37,7 +37,7 @@ func TestGenerateContainerName_BasicNaming(t *testing.T) {
 		},
 		{
 			name: "image without tag",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "myimage",
 				Repo:  "https://github.com/user/repo.git",
 			},
@@ -46,7 +46,7 @@ func TestGenerateContainerName_BasicNaming(t *testing.T) {
 		},
 		{
 			name: "repo without .git suffix",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "spinner:env",
 				Repo:  "https://github.com/user/repo",
 			},
@@ -57,7 +57,7 @@ func TestGenerateContainerName_BasicNaming(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateContainerName(tt.config)
+			result := generateContainerName(tt.config)
 			assert.Equal(t, tt.expectedName, result, tt.description)
 		})
 	}
@@ -67,13 +67,13 @@ func TestGenerateContainerName_BasicNaming(t *testing.T) {
 func TestGenerateContainerName_Sanitization(t *testing.T) {
 	tests := []struct {
 		name         string
-		config       SpinConfig
+		config       spinConfig
 		expectedName string
 		description  string
 	}{
 		{
 			name: "special characters in image and repo",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "my_image:v1.0",
 				Repo:  "https://github.com/user/My-Repo.git",
 			},
@@ -82,7 +82,7 @@ func TestGenerateContainerName_Sanitization(t *testing.T) {
 		},
 		{
 			name: "spaces and invalid chars",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "test image:tag",
 				Repo:  "https://github.com/user/test repo.git",
 			},
@@ -91,7 +91,7 @@ func TestGenerateContainerName_Sanitization(t *testing.T) {
 		},
 		{
 			name: "consecutive special chars",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "image::test",
 				Repo:  "https://github.com/user/repo--name.git",
 			},
@@ -100,7 +100,7 @@ func TestGenerateContainerName_Sanitization(t *testing.T) {
 		},
 		{
 			name: "leading and trailing hyphens",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "-image-",
 				Repo:  "https://github.com/user/-repo-.git",
 			},
@@ -109,7 +109,7 @@ func TestGenerateContainerName_Sanitization(t *testing.T) {
 		},
 		{
 			name: "uppercase letters",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "MyImage:TAG",
 				Repo:  "https://github.com/User/RepoName.git",
 			},
@@ -120,7 +120,7 @@ func TestGenerateContainerName_Sanitization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateContainerName(tt.config)
+			result := generateContainerName(tt.config)
 			assert.Equal(t, tt.expectedName, result, tt.description)
 		})
 	}
@@ -130,13 +130,13 @@ func TestGenerateContainerName_Sanitization(t *testing.T) {
 func TestGenerateContainerName_WithBranch(t *testing.T) {
 	tests := []struct {
 		name         string
-		config       SpinConfig
+		config       spinConfig
 		expectedName string
 		description  string
 	}{
 		{
 			name: "with simple branch name",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "spinner:test-env",
 				Repo:   "https://github.com/octocat/Hello-World.git",
 				Branch: "master",
@@ -146,7 +146,7 @@ func TestGenerateContainerName_WithBranch(t *testing.T) {
 		},
 		{
 			name: "with branch containing slashes",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "spinner:test-env",
 				Repo:   "git@github.com:octocat/Hello-World.git",
 				Branch: "feature/auth-v2",
@@ -156,7 +156,7 @@ func TestGenerateContainerName_WithBranch(t *testing.T) {
 		},
 		{
 			name: "with complex branch name",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "myimage:v1",
 				Repo:   "https://github.com/user/repo.git",
 				Branch: "bugfix/TICKET-123_fix",
@@ -166,7 +166,7 @@ func TestGenerateContainerName_WithBranch(t *testing.T) {
 		},
 		{
 			name: "empty branch falls back to no branch",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "spinner:env",
 				Repo:   "https://github.com/user/repo.git",
 				Branch: "",
@@ -178,7 +178,7 @@ func TestGenerateContainerName_WithBranch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateContainerName(tt.config)
+			result := generateContainerName(tt.config)
 			assert.Equal(t, tt.expectedName, result, tt.description)
 		})
 	}
@@ -251,7 +251,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		config         SpinConfig
+		config         spinConfig
 		containerName  string
 		hasNpmrc       bool
 		expectedArgs   []string
@@ -260,7 +260,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 	}{
 		{
 			name: "basic run without prompt",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "spinner:test",
 				Repo:  "https://github.com/user/repo.git",
 			},
@@ -278,7 +278,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 		},
 		{
 			name: "run with prompt",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "spinner:test",
 				Repo:   "https://github.com/user/repo.git",
 				Prompt: "fix the bug",
@@ -294,7 +294,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 		},
 		{
 			name: "run with prompt and custom max iterations",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:         "spinner:test",
 				Repo:          "https://github.com/user/repo.git",
 				Prompt:        "add feature",
@@ -311,7 +311,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 		},
 		{
 			name: "run with prompt and branch",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "spinner:test",
 				Repo:   "https://github.com/user/repo.git",
 				Prompt: "test task",
@@ -328,7 +328,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 		},
 		{
 			name: "run with branch but no prompt",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "spinner:test",
 				Repo:   "https://github.com/user/repo.git",
 				Branch: "develop",
@@ -345,7 +345,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, err := BuildDockerRunCommand(tt.config, tt.containerName, tt.hasNpmrc)
+			args, err := buildDockerRunCommand(tt.config, tt.containerName, tt.hasNpmrc)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, args)
@@ -395,12 +395,12 @@ func TestBuildDockerRunCommand_NpmrcHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := SpinConfig{
+			config := spinConfig{
 				Image: "spinner:test",
 				Repo:  "https://github.com/user/repo.git",
 			}
 
-			args, err := BuildDockerRunCommand(config, "test-container", tt.hasNpmrc)
+			args, err := buildDockerRunCommand(config, "test-container", tt.hasNpmrc)
 
 			assert.NoError(t, err)
 
@@ -448,12 +448,12 @@ func TestBuildDockerRunCommand_SshToHttpsConversion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := SpinConfig{
+			config := spinConfig{
 				Image: "spinner:test",
 				Repo:  tt.repoURL,
 			}
 
-			args, err := BuildDockerRunCommand(config, "test-container", false)
+			args, err := buildDockerRunCommand(config, "test-container", false)
 
 			assert.NoError(t, err)
 
@@ -650,12 +650,12 @@ func TestContainerRecreation_MockClient(t *testing.T) {
 func TestNamingScenarios_TableDriven(t *testing.T) {
 	tests := []struct {
 		name         string
-		config       SpinConfig
+		config       spinConfig
 		expectedName string
 	}{
 		{
 			name: "basic https repo",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "spinner:default",
 				Repo:  "https://github.com/user/project.git",
 			},
@@ -663,7 +663,7 @@ func TestNamingScenarios_TableDriven(t *testing.T) {
 		},
 		{
 			name: "ssh repo with branch",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "myimage:v1",
 				Repo:   "git@github.com:org/repo-name.git",
 				Branch: "develop",
@@ -672,7 +672,7 @@ func TestNamingScenarios_TableDriven(t *testing.T) {
 		},
 		{
 			name: "complex image tag with special chars",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "my.image:v2.0.1",
 				Repo:  "https://github.com/user/My_Project.git",
 			},
@@ -680,7 +680,7 @@ func TestNamingScenarios_TableDriven(t *testing.T) {
 		},
 		{
 			name: "branch with slashes and special chars",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "spinner:env",
 				Repo:   "https://github.com/user/repo.git",
 				Branch: "feature/JIRA-123_bugfix",
@@ -689,7 +689,7 @@ func TestNamingScenarios_TableDriven(t *testing.T) {
 		},
 		{
 			name: "uppercase repo and branch",
-			config: SpinConfig{
+			config: spinConfig{
 				Image:  "IMAGE:TAG",
 				Repo:   "https://github.com/User/REPO.git",
 				Branch: "MAIN",
@@ -698,7 +698,7 @@ func TestNamingScenarios_TableDriven(t *testing.T) {
 		},
 		{
 			name: "multiple consecutive special chars",
-			config: SpinConfig{
+			config: spinConfig{
 				Image: "test::image",
 				Repo:  "https://github.com/user/repo--name.git",
 			},
@@ -708,7 +708,7 @@ func TestNamingScenarios_TableDriven(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateContainerName(tt.config)
+			result := generateContainerName(tt.config)
 			assert.Equal(t, tt.expectedName, result)
 		})
 	}

@@ -12,16 +12,16 @@ import (
 	"github.com/rickihastings/spinner/internal/agent"
 )
 
-// LogWatcher monitors container log files and streams parsed entries
-type LogWatcher struct {
+// logWatcher monitors container log files and streams parsed entries
+type logWatcher struct {
 	containerName string
 	logsDir       string
 	parser        agent.LineParser
 }
 
-// NewLogWatcher creates a new LogWatcher for the given container with an explicit LineParser.
+// newLogWatcher creates a new logWatcher for the given container with an explicit LineParser.
 // This keeps the docker package free of agent-implementation imports.
-func NewLogWatcher(containerName string, parser agent.LineParser) (*LogWatcher, error) {
+func newLogWatcher(containerName string, parser agent.LineParser) (*logWatcher, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
@@ -32,15 +32,15 @@ func NewLogWatcher(containerName string, parser agent.LineParser) (*LogWatcher, 
 		return nil, fmt.Errorf("logs directory does not exist: %s", logsDir)
 	}
 
-	return &LogWatcher{
+	return &logWatcher{
 		containerName: containerName,
 		logsDir:       logsDir,
 		parser:        parser,
 	}, nil
 }
 
-// TailExistingLines reads the last N lines from the log file and returns them as raw strings.
-func (lw *LogWatcher) TailExistingLines(_ context.Context, numLines int) ([]string, error) {
+// tailExistingLines reads the last N lines from the log file and returns them as raw strings.
+func (lw *logWatcher) tailExistingLines(_ context.Context, numLines int) ([]string, error) {
 	logFilePath := filepath.Join(lw.logsDir, "raw.log")
 
 	file, err := os.Open(logFilePath)
@@ -101,9 +101,9 @@ func (lw *LogWatcher) TailExistingLines(_ context.Context, numLines int) ([]stri
 	return lines, nil
 }
 
-// TailExistingLogs reads the last N lines from the log file and parses them into events.
-func (lw *LogWatcher) TailExistingLogs(_ context.Context, numLines int) ([]agent.Event, error) {
-	lines, err := lw.TailExistingLines(context.TODO(), numLines)
+// tailExistingLogs reads the last N lines from the log file and parses them into events.
+func (lw *logWatcher) tailExistingLogs(_ context.Context, numLines int) ([]agent.Event, error) {
+	lines, err := lw.tailExistingLines(context.TODO(), numLines)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +120,8 @@ func (lw *LogWatcher) TailExistingLogs(_ context.Context, numLines int) ([]agent
 	return events, nil
 }
 
-// WatchLines watches for new log entries and streams raw lines to the provided channel.
-func (lw *LogWatcher) WatchLines(ctx context.Context, lineCh chan<- string) error {
+// watchLines watches for new log entries and streams raw lines to the provided channel.
+func (lw *logWatcher) watchLines(ctx context.Context, lineCh chan<- string) error {
 	logFilePath := filepath.Join(lw.logsDir, "raw.log")
 
 	// Wait for log file to exist if it doesn't yet
@@ -224,8 +224,8 @@ FileExists:
 	}
 }
 
-// WatchLogs watches for new log entries and streams parsed events to the provided channel.
-func (lw *LogWatcher) WatchLogs(ctx context.Context, logCh chan<- agent.Event) error {
+// watchLogs watches for new log entries and streams parsed events to the provided channel.
+func (lw *logWatcher) watchLogs(ctx context.Context, logCh chan<- agent.Event) error {
 	// Create a channel for raw lines
 	lineCh := make(chan string, 100)
 
@@ -233,7 +233,7 @@ func (lw *LogWatcher) WatchLogs(ctx context.Context, logCh chan<- agent.Event) e
 	go func() {
 		defer close(lineCh)
 
-		_ = lw.WatchLines(ctx, lineCh)
+		_ = lw.watchLines(ctx, lineCh)
 	}()
 
 	// Parse lines and send events

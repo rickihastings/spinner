@@ -8,22 +8,22 @@ import (
 	"time"
 )
 
-// Status represents the current state of the execution loop.
-type Status string
+// status represents the current state of the execution loop.
+type status string
 
 const (
-	StatusRunning     Status = "running"
-	StatusCompleted   Status = "completed"
-	StatusRateLimited Status = "rate_limited"
-	StatusError       Status = "error"
-	StatusAuthError   Status = "auth_error"
+	statusRunning     status = "running"
+	statusCompleted   status = "completed"
+	statusRateLimited status = "rate_limited"
+	statusError       status = "error"
+	statusAuthError   status = "auth_error"
 )
 
 // State represents the persistent state of the execution loop.
 type State struct {
 	Branch       string    `json:"branch"`
 	Iteration    int       `json:"iteration"`
-	Status       Status    `json:"status"`
+	Status       status    `json:"status"`
 	LastUpdated  time.Time `json:"last_updated"`
 	StartedAt    time.Time `json:"started_at"`
 	CompletedAt  time.Time `json:"completed_at,omitempty"`
@@ -38,7 +38,7 @@ func LoadState(path string) (*State, error) {
 		if os.IsNotExist(err) {
 			// Return default state if file doesn't exist
 			return &State{
-				Status:      StatusRunning,
+				Status:      statusRunning,
 				Iteration:   0,
 				StartedAt:   time.Now(),
 				LastUpdated: time.Now(),
@@ -61,8 +61,8 @@ func LoadState(path string) (*State, error) {
 	return &state, nil
 }
 
-// SaveState saves the state to a JSON file using atomic write.
-func SaveState(path string, state *State) error {
+// saveState saves the state to a JSON file using atomic write.
+func saveState(path string, state *State) error {
 	// Update timestamp
 	state.LastUpdated = time.Now()
 

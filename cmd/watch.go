@@ -59,7 +59,7 @@ EXAMPLES:
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			containerName := args[0]
-			return PerformWatch(context.Background(), p, containerName)
+			return performWatch(context.Background(), p, containerName)
 		},
 	}
 
@@ -138,10 +138,9 @@ func getImageID(containerName string) string {
 	return strings.TrimSpace(string(output))
 }
 
-// PerformWatch executes the watch workflow for a container.
-// This is exported so it can be used by both the standalone watch command
-// and the spin command with --watch flag.
-func PerformWatch(ctx context.Context, p provider.Provider, containerName string) error {
+// performWatch executes the watch workflow for a container.
+// Used by both the standalone watch command and the spin command with --watch flag.
+func performWatch(ctx context.Context, p provider.Provider, containerName string) error {
 	// Check if container exists using provider abstraction
 	status, err := p.Status(ctx, containerName)
 	if err != nil || status == provider.InstanceStatusNone {

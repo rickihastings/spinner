@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// SpinConfig contains configuration for spinning up a container.
-type SpinConfig struct {
+// spinConfig contains configuration for spinning up a container.
+type spinConfig struct {
 	Image         string
 	Repo          string
 	Prompt        string
@@ -33,8 +33,8 @@ const (
 	StatusNone    ContainerStatus = "none"
 )
 
-// DefaultMaxIterations is the default maximum number of iterations for the exec loop.
-const DefaultMaxIterations = "100"
+// defaultMaxIterations is the default maximum number of iterations for the exec loop.
+const defaultMaxIterations = "100"
 
 // escapeShellArg escapes a string for safe use as a shell argument.
 // Wraps the string in single quotes and escapes any single quotes within.
@@ -86,9 +86,9 @@ func extractRepoName(repoURL string) string {
 	return "sandbox"
 }
 
-// GenerateContainerName generates a deterministic container name based on image, repo, and branch.
+// generateContainerName generates a deterministic container name based on image, repo, and branch.
 // Format: {image}-{repo} or {image}-{repo}-{branch}
-func GenerateContainerName(config SpinConfig) string {
+func generateContainerName(config spinConfig) string {
 	imagePart := sanitizeComponent(strings.ReplaceAll(config.Image, ":", "-"))
 	repoPart := sanitizeComponent(extractRepoName(config.Repo))
 
@@ -100,8 +100,8 @@ func GenerateContainerName(config SpinConfig) string {
 	return fmt.Sprintf("%s-%s", imagePart, repoPart)
 }
 
-// BuildDockerRunCommand builds the docker run command arguments.
-func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc bool) ([]string, error) {
+// buildDockerRunCommand builds the docker run command arguments.
+func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc bool) ([]string, error) {
 	// Convert SSH URLs to HTTPS for GitHub PAT authentication
 	repoURL := convertSshToHttps(config.Repo)
 
@@ -138,7 +138,7 @@ func BuildDockerRunCommand(config SpinConfig, containerName string, hasNpmrc boo
 
 		maxIterations := config.MaxIterations
 		if maxIterations == "" {
-			maxIterations = DefaultMaxIterations
+			maxIterations = defaultMaxIterations
 		}
 
 		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("MAX_ITERATIONS=%s", maxIterations))

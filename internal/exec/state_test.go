@@ -17,8 +17,8 @@ func TestLoadState_NewFile(t *testing.T) {
 		t.Fatalf("LoadState failed: %v", err)
 	}
 
-	if state.Status != StatusRunning {
-		t.Errorf("expected status %s, got %s", StatusRunning, state.Status)
+	if state.Status != statusRunning {
+		t.Errorf("expected status %s, got %s", statusRunning, state.Status)
 	}
 
 	if state.Iteration != 0 {
@@ -42,7 +42,7 @@ func TestLoadState_ExistingFile(t *testing.T) {
 	originalState := &State{
 		Branch:      "test-branch",
 		Iteration:   5,
-		Status:      StatusCompleted,
+		Status:      statusCompleted,
 		StartedAt:   time.Now().Add(-1 * time.Hour),
 		LastUpdated: time.Now().Add(-30 * time.Minute),
 		CompletedAt: time.Now().Add(-15 * time.Minute),
@@ -119,14 +119,14 @@ func TestLoadState_EmptyStatus(t *testing.T) {
 	}
 }
 
-func TestSaveState(t *testing.T) {
+func Test_saveState(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := filepath.Join(tmpDir, "subdir", "state.json")
 
 	state := &State{
 		Branch:       "main",
 		Iteration:    3,
-		Status:       StatusRunning,
+		Status:       statusRunning,
 		ErrorMessage: "test error",
 		StartedAt:    time.Now().Add(-1 * time.Hour),
 		LastUpdated:  time.Now().Add(-30 * time.Minute),
@@ -137,7 +137,7 @@ func TestSaveState(t *testing.T) {
 	// Wait a bit to ensure timestamp changes
 	time.Sleep(10 * time.Millisecond)
 
-	if err := SaveState(statePath, state); err != nil {
+	if err := saveState(statePath, state); err != nil {
 		t.Fatalf("SaveState failed: %v", err)
 	}
 
@@ -181,12 +181,12 @@ func TestSaveState(t *testing.T) {
 }
 
 func TestState_AllStatuses(t *testing.T) {
-	statuses := []Status{
-		StatusRunning,
-		StatusCompleted,
-		StatusRateLimited,
-		StatusError,
-		StatusAuthError,
+	statuses := []status{
+		statusRunning,
+		statusCompleted,
+		statusRateLimited,
+		statusError,
+		statusAuthError,
 	}
 
 	tmpDir := t.TempDir()
@@ -202,7 +202,7 @@ func TestState_AllStatuses(t *testing.T) {
 			LastUpdated: time.Now(),
 		}
 
-		if err := SaveState(statePath, state); err != nil {
+		if err := saveState(statePath, state); err != nil {
 			t.Fatalf("SaveState failed for status %s: %v", status, err)
 		}
 

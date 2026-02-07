@@ -64,7 +64,7 @@ func TestWatchUI_TestMode(t *testing.T) {
 	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
 
 	// Enable test mode to prevent TUI startup
-	ui.SetTestMode(true)
+	ui.setTestMode(true)
 
 	// Close channels immediately to simulate end of data
 	close(logCh)
