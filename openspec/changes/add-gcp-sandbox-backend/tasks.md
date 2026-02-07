@@ -42,6 +42,11 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 - [x] 3.5 Create `internal/gcp/image_test.go` — unit tests with mock client for full bake flow
 - [x] 3.6 Create `internal/gcp/startup_test.go` — test startup script template rendering
 - [x] 3.7 Verify build and tests pass
+- [ ] 3.8 Add `--bake-script` flag to setup and spin commands — reads user script file, passes contents to bake template as `BakeScript` variable
+- [ ] 3.9 Update `templates/scripts/gcp_bake.sh` — add `{{.BakeScript}}` template block after core tooling, before shutdown
+- [ ] 3.10 Update `internal/gcp/startup.go` — accept `BakeScript` in template data, read file contents from options
+- [ ] 3.11 Add tests for `--bake-script` flag validation and template rendering with custom script
+- [ ] 3.12 Verify build and tests pass
 
 ## 4.0 GCP Instance Lifecycle
 
