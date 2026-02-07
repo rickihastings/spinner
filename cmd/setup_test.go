@@ -10,17 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// testFactory wraps a MockProvider into a Factory with the "docker" backend.
-func testFactory(mockProv *provider.MockProvider) *provider.Factory {
-	f := provider.NewFactory()
-
-	f.Register(provider.BackendDocker, func() (provider.Provider, error) {
-		return mockProv, nil
-	})
-
-	return f
-}
-
 // TestSetupCommand_MissingNameFlag tests that the setup command returns an error when --name is missing
 func TestSetupCommand_MissingNameFlag(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
@@ -250,6 +239,11 @@ func TestSetupCommand_GCPFlagsWithDockerBackend(t *testing.T) {
 			args:     []string{"--name", "test", "--state-bucket", "my-bucket"},
 			errorMsg: "--state-bucket requires --backend gcp",
 		},
+		{
+			name:     "bake-script flag with docker backend",
+			args:     []string{"--name", "test", "--bake-script", "/tmp/bake.sh"},
+			errorMsg: "--bake-script requires --backend gcp",
+		},
 	}
 
 	for _, tt := range tests {
@@ -285,6 +279,64 @@ func TestSetupCommand_UnknownBackend(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown backend")
 	assert.Contains(t, err.Error(), "docker")
+}
+
+// TestSetupCommand_BakeScriptFileNotFound tests that --bake-script errors when file doesn't exist
+func TestSetupCommand_BakeScriptFileNotFound(t *testing.T) {
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSetupCommand(testGCPFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--name", "test",
+		"--backend", "gcp",
+		"--project", "my-proj",
+		"--zone", "us-central1-a",
+		"--state-bucket", "my-bucket",
+		"--bake-script", "/nonexistent/bake.sh",
+	})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bake script not found")
+}
+
+// TestSetupCommand_BakeScriptWithGCPBackend tests that --bake-script is accepted with GCP backend
+func TestSetupCommand_BakeScriptWithGCPBackend(t *testing.T) {
+	tmpfile, err := os.CreateTemp("", "bake-script-*.sh")
+	assert.NoError(t, err)
+
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+
+	_, _ = tmpfile.WriteString("#!/bin/bash\napt-get install -y python3\n")
+	_ = tmpfile.Close()
+
+	mockProvider := new(provider.MockProvider)
+	mockProvider.On("Setup", mock.Anything, mock.MatchedBy(func(cfg provider.SetupConfig) bool {
+		return cfg.Name == "test" && cfg.Options["bake-script"] == tmpfile.Name()
+	})).Return(nil)
+
+	cmd := NewSetupCommand(testGCPFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--name", "test",
+		"--backend", "gcp",
+		"--project", "my-proj",
+		"--zone", "us-central1-a",
+		"--state-bucket", "my-bucket",
+		"--bake-script", tmpfile.Name(),
+	})
+
+	err = cmd.Execute()
+
+	assert.NoError(t, err)
+	mockProvider.AssertExpectations(t)
 }
 
 // TestSetupCommand_DockerBackendExplicit tests explicit --backend docker works

@@ -31,6 +31,7 @@ const (
 	flagMachineType   = "machine-type"
 	flagDiskSize      = "disk-size"
 	flagStateBucket   = "state-bucket"
+	flagBakeScript    = "bake-script"
 )
 
 // GCP default values.
@@ -89,6 +90,10 @@ func resolveAndValidateBackend(cmd *cobra.Command) (string, error) {
 		if err := validateRequiredGCPFlags(cmd); err != nil {
 			return "", err
 		}
+
+		if err := validateBakeScriptFlag(cmd); err != nil {
+			return "", err
+		}
 	}
 
 	return backend, nil
@@ -121,7 +126,7 @@ func runSetup(ctx context.Context, p provider.Provider, backend, name string) er
 // the wrong backend. Only explicitly-set CLI flags trigger errors; values
 // from .spinner.json or env vars are silently ignored.
 func validateBackendFlags(cmd *cobra.Command, backend string) error {
-	gcpOnlyFlags := []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket}
+	gcpOnlyFlags := []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket, flagBakeScript}
 	dockerOnlyFlags := []string{flagBaseImage, flagDockerfile}
 
 	if backend != provider.BackendGCP {
@@ -199,8 +204,40 @@ func validateRequiredGCPFlags(cmd *cobra.Command) error {
 	return nil
 }
 
+// validateBakeScriptFlag checks that --bake-script is valid when provided:
+// - File must exist at the given path
+// - On spin command, --bake-script requires --setup
+func validateBakeScriptFlag(cmd *cobra.Command) error {
+	bakeScriptFlag := cmd.Flags().Lookup(flagBakeScript)
+	if bakeScriptFlag == nil {
+		return nil
+	}
+
+	_ = viper.BindPFlag(flagBakeScript, bakeScriptFlag)
+
+	bakeScript := viper.GetString(flagBakeScript)
+	if bakeScript == "" {
+		return nil
+	}
+
+	// If the command has a --setup flag (spin command), --bake-script requires --setup
+	if setupFlag := cmd.Flags().Lookup(flagSetup); setupFlag != nil {
+		setup, _ := cmd.Flags().GetBool(flagSetup)
+		if !setup {
+			return fmt.Errorf("--%s requires --%s flag", flagBakeScript, flagSetup)
+		}
+	}
+
+	// Validate file exists
+	if _, err := os.Stat(bakeScript); err != nil {
+		return fmt.Errorf("bake script not found: %s", bakeScript)
+	}
+
+	return nil
+}
+
 // gcpFlags is the list of all GCP-specific flag names.
-var gcpFlags = []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket}
+var gcpFlags = []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket, flagBakeScript}
 
 // bindGCPFlags binds all GCP-specific flags on cmd to Viper.
 // Skips flags that don't exist on the command (e.g. watch doesn't have machine-type).
@@ -231,6 +268,7 @@ func gcpOptionsFromViper() map[string]string {
 		flagStateBucket: viper.GetString(flagStateBucket),
 		flagMachineType: mt,
 		flagDiskSize:    strconv.Itoa(ds),
+		flagBakeScript:  viper.GetString(flagBakeScript),
 	}
 }
 

@@ -1,16 +1,27 @@
 package gcp
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"github.com/rickihastings/spinner/internal/util"
 )
 
-// LoadBakeScript reads the GCP bake startup script from templates/scripts/gcp_bake.sh.
-// This script is passed as metadata.startup-script when creating the temporary bake VM.
-func LoadBakeScript() (string, error) {
+// bakeTemplateData holds the template variables for the GCP bake script.
+type bakeTemplateData struct {
+	// BakeScript is the contents of the user's custom bake script (if any).
+	// Injected inline after core tooling is installed, before shutdown.
+	BakeScript string
+}
+
+// LoadBakeScript reads the GCP bake startup script template from
+// templates/scripts/gcp_bake.sh and renders it with the given custom
+// bake script contents. If customBakeScript is empty, the template block
+// is omitted and the default bake runs unchanged.
+func LoadBakeScript(customBakeScript string) (string, error) {
 	scriptPath, err := util.ResolveTemplatePath(filepath.Join("templates", "scripts", "gcp_bake.sh"))
 	if err != nil {
 		return "", fmt.Errorf("failed to find bake script: %w", err)
@@ -19,6 +30,35 @@ func LoadBakeScript() (string, error) {
 	data, err := os.ReadFile(scriptPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read bake script: %w", err)
+	}
+
+	tmpl, err := template.New("gcp_bake").Parse(string(data))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse bake script template: %w", err)
+	}
+
+	var buf bytes.Buffer
+
+	err = tmpl.Execute(&buf, bakeTemplateData{
+		BakeScript: customBakeScript,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to render bake script template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// LoadBakeScriptFile reads a custom bake script file and returns its contents.
+// Returns empty string if path is empty. Returns an error if the file cannot be read.
+func LoadBakeScriptFile(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read custom bake script %s: %w", path, err)
 	}
 
 	return string(data), nil
