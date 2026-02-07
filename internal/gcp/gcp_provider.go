@@ -122,6 +122,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	}
 
 	var diskSizeGB int64 = 30
+
 	if ds := config.Options["disk-size"]; ds != "" {
 		parsed, parseErr := strconv.ParseInt(ds, 10, 64)
 		if parseErr == nil && parsed > 0 {
@@ -135,12 +136,12 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	}
 
 	metadata := map[string]string{
-		"startup-script":       runtimeScript,
-		"REPO_URL":             config.Repo,
-		"PROMPT":               config.Prompt,
-		"BRANCH":               config.Branch,
-		"MAX_ITERATIONS":       maxIterations,
-		"GITHUB_TOKEN":         os.Getenv("GITHUB_TOKEN"),
+		"startup-script":          runtimeScript,
+		"REPO_URL":                config.Repo,
+		"PROMPT":                  config.Prompt,
+		"BRANCH":                  config.Branch,
+		"MAX_ITERATIONS":          maxIterations,
+		"GITHUB_TOKEN":            os.Getenv("GITHUB_TOKEN"),
 		"CLAUDE_CODE_OAUTH_TOKEN": os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"),
 		"SPINNER_INSTANCE_NAME":   name,
 	}

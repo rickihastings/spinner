@@ -360,6 +360,7 @@ func TestProviderCreateNoBucket(t *testing.T) {
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config InstanceConfig) bool {
 		_, hasLogBucket := config.Metadata["SPINNER_LOG_BUCKET"]
 		_, hasStateBucket := config.Metadata["SPINNER_STATE_BUCKET"]
+
 		return !hasLogBucket && !hasStateBucket
 	})).Return(nil)
 
