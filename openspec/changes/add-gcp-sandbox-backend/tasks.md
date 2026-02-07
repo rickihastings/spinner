@@ -35,13 +35,13 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 
 ## 3.0 GCP Setup — Image Baking
 
-- [ ] 3.1 Create `templates/scripts/gcp_bake.sh` — startup script that installs git, gh, claude-code, downloads spinner from GitHub Releases (tar.gz), then shuts down
-- [ ] 3.2 Create `internal/gcp/startup.go` — Go template rendering for bake and runtime startup scripts
-- [ ] 3.3 Create `internal/gcp/image.go` — image baking logic: create temp VM, wait for shutdown, create image, cleanup
-- [ ] 3.4 Implement `Provider.Setup()` — orchestrate image baking flow using client interface
-- [ ] 3.5 Create `internal/gcp/image_test.go` — unit tests with mock client for full bake flow
-- [ ] 3.6 Create `internal/gcp/startup_test.go` — test startup script template rendering
-- [ ] 3.7 Verify build and tests pass
+- [x] 3.1 Create `templates/scripts/gcp_bake.sh` — startup script that installs git, gh, claude-code, downloads spinner from GitHub Releases (tar.gz), then shuts down
+- [x] 3.2 Create `internal/gcp/startup.go` — Go template rendering for bake and runtime startup scripts
+- [x] 3.3 Create `internal/gcp/image.go` — image baking logic: create temp VM, wait for shutdown, create image, cleanup
+- [x] 3.4 Implement `Provider.Setup()` — orchestrate image baking flow using client interface
+- [x] 3.5 Create `internal/gcp/image_test.go` — unit tests with mock client for full bake flow
+- [x] 3.6 Create `internal/gcp/startup_test.go` — test startup script template rendering
+- [x] 3.7 Verify build and tests pass
 
 ## 4.0 GCP Instance Lifecycle
 
