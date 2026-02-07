@@ -13,7 +13,6 @@ import (
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/tui"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // watchCmd is the production watch command using the default provider factory.
@@ -26,12 +25,7 @@ func init() {
 // NewWatchCommand creates a new watch command with the given Factory.
 // This constructor enables dependency injection for testing.
 func NewWatchCommand(f *provider.Factory) *cobra.Command {
-	var (
-		backend     string
-		project     string
-		zone        string
-		stateBucket string
-	)
+	var backend string
 
 	cmd := &cobra.Command{
 		Use:   "watch <instance-name>",
@@ -62,9 +56,7 @@ EXAMPLES:
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind GCP flags to Viper
-			_ = viper.BindPFlag(flagProject, cmd.Flags().Lookup(flagProject))
-			_ = viper.BindPFlag(flagZone, cmd.Flags().Lookup(flagZone))
-			_ = viper.BindPFlag(flagStateBucket, cmd.Flags().Lookup(flagStateBucket))
+			bindGCPFlags(cmd)
 
 			// Resolve backend (CLI > env > config > default "docker")
 			backend = resolveBackend(cmd)
@@ -97,9 +89,9 @@ EXAMPLES:
 	cmd.Flags().StringVar(&backend, flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 
 	// GCP backend flags
-	cmd.Flags().StringVar(&project, flagProject, "", "GCP project ID (GCP backend)")
-	cmd.Flags().StringVar(&zone, flagZone, "", "GCP zone (GCP backend)")
-	cmd.Flags().StringVar(&stateBucket, flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
+	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
+	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
+	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
 
 	return cmd
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/spf13/cobra"
@@ -22,15 +21,8 @@ func init() {
 // This constructor enables dependency injection for testing.
 func NewSetupCommand(f *provider.Factory) *cobra.Command {
 	var (
-		setupName       string
-		setupBaseImage  string
-		setupDockerfile string
-		backend         string
-		project         string
-		zone            string
-		machineType     string
-		diskSize        int
-		stateBucket     string
+		setupName string
+		backend   string
 	)
 
 	cmd := &cobra.Command{
@@ -67,11 +59,7 @@ EXAMPLES:
 			_ = viper.BindPFlag(flagDockerfile, cmd.Flags().Lookup(flagDockerfile))
 
 			// Bind GCP flags to Viper
-			_ = viper.BindPFlag(flagProject, cmd.Flags().Lookup(flagProject))
-			_ = viper.BindPFlag(flagZone, cmd.Flags().Lookup(flagZone))
-			_ = viper.BindPFlag(flagMachineType, cmd.Flags().Lookup(flagMachineType))
-			_ = viper.BindPFlag(flagDiskSize, cmd.Flags().Lookup(flagDiskSize))
-			_ = viper.BindPFlag(flagStateBucket, cmd.Flags().Lookup(flagStateBucket))
+			bindGCPFlags(cmd)
 
 			// Resolve backend (CLI > env > config > default "docker")
 			backend = resolveBackend(cmd)
@@ -83,8 +71,6 @@ EXAMPLES:
 
 			// Read values from Viper
 			setupName = viper.GetString(flagName)
-			setupBaseImage = viper.GetString(flagBaseImage)
-			setupDockerfile = viper.GetString(flagDockerfile)
 
 			if setupName == "" {
 				fmt.Fprintln(os.Stderr, "Error: Missing required flag: --name")
@@ -108,29 +94,12 @@ EXAMPLES:
 			}
 
 			// Build options map with all values; the provider picks what it needs
-			options := map[string]string{
-				flagBaseImage:  setupBaseImage,
-				flagDockerfile: setupDockerfile,
-			}
+			options := dockerSetupOptions()
 
 			if backend == provider.BackendGCP {
-				options[flagProject] = viper.GetString(flagProject)
-				options[flagZone] = viper.GetString(flagZone)
-				options[flagStateBucket] = viper.GetString(flagStateBucket)
-
-				mt := viper.GetString(flagMachineType)
-				if mt == "" {
-					mt = defaultMachineType
+				for k, v := range gcpOptionsFromViper() {
+					options[k] = v
 				}
-
-				options[flagMachineType] = mt
-
-				ds := viper.GetInt(flagDiskSize)
-				if ds == 0 {
-					ds = defaultDiskSize
-				}
-
-				options[flagDiskSize] = strconv.Itoa(ds)
 			}
 
 			// Create provider from factory
@@ -151,15 +120,15 @@ EXAMPLES:
 	cmd.Flags().StringVar(&backend, flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 
 	// Docker backend flags
-	cmd.Flags().StringVar(&setupBaseImage, flagBaseImage, "", "Base Docker image (optional, default: ubuntu:22.04)")
-	cmd.Flags().StringVar(&setupDockerfile, flagDockerfile, "", "Path to custom Dockerfile (optional)")
+	cmd.Flags().String(flagBaseImage, "", "Base Docker image (optional, default: ubuntu:22.04)")
+	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile (optional)")
 
 	// GCP backend flags
-	cmd.Flags().StringVar(&project, flagProject, "", "GCP project ID (GCP backend)")
-	cmd.Flags().StringVar(&zone, flagZone, "", "GCP zone (GCP backend)")
-	cmd.Flags().StringVar(&machineType, flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
-	cmd.Flags().IntVar(&diskSize, flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
-	cmd.Flags().StringVar(&stateBucket, flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
+	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
+	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
+	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
+	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
+	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
 
 	return cmd
 }

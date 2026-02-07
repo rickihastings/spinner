@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/rickihastings/spinner/internal/prerequisites"
@@ -31,15 +30,8 @@ func NewSpinCommand(f *provider.Factory) *cobra.Command {
 		spinMaxIterations string
 		spinRecreate      bool
 		spinSetup         bool
-		spinBaseImage     string
-		spinDockerfile    string
 		spinWatch         bool
 		backend           string
-		project           string
-		zone              string
-		machineType       string
-		diskSize          int
-		stateBucket       string
 	)
 
 	cmd := &cobra.Command{
@@ -94,11 +86,7 @@ EXAMPLES:
 			_ = viper.BindPFlag(flagWatch, cmd.Flags().Lookup(flagWatch))
 
 			// Bind GCP flags to Viper
-			_ = viper.BindPFlag(flagProject, cmd.Flags().Lookup(flagProject))
-			_ = viper.BindPFlag(flagZone, cmd.Flags().Lookup(flagZone))
-			_ = viper.BindPFlag(flagMachineType, cmd.Flags().Lookup(flagMachineType))
-			_ = viper.BindPFlag(flagDiskSize, cmd.Flags().Lookup(flagDiskSize))
-			_ = viper.BindPFlag(flagStateBucket, cmd.Flags().Lookup(flagStateBucket))
+			bindGCPFlags(cmd)
 
 			// Resolve backend (CLI > env > config > default "docker")
 			backend = resolveBackend(cmd)
@@ -116,8 +104,6 @@ EXAMPLES:
 			spinMaxIterations = viper.GetString(flagMaxIterations)
 			spinRecreate = viper.GetBool(flagRecreate)
 			spinSetup = viper.GetBool(flagSetup)
-			spinBaseImage = viper.GetString(flagBaseImage)
-			spinDockerfile = viper.GetString(flagDockerfile)
 			spinWatch = viper.GetBool(flagWatch)
 
 			if spinImage == "" {
@@ -154,29 +140,12 @@ EXAMPLES:
 			if spinSetup {
 				setupName := strings.TrimPrefix(spinImage, "spinner:")
 
-				setupOptions := map[string]string{
-					flagBaseImage:  spinBaseImage,
-					flagDockerfile: spinDockerfile,
-				}
+				setupOptions := dockerSetupOptions()
 
 				if backend == provider.BackendGCP {
-					setupOptions[flagProject] = viper.GetString(flagProject)
-					setupOptions[flagZone] = viper.GetString(flagZone)
-					setupOptions[flagStateBucket] = viper.GetString(flagStateBucket)
-
-					mt := viper.GetString(flagMachineType)
-					if mt == "" {
-						mt = defaultMachineType
+					for k, v := range gcpOptionsFromViper() {
+						setupOptions[k] = v
 					}
-
-					setupOptions[flagMachineType] = mt
-
-					ds := viper.GetInt(flagDiskSize)
-					if ds == 0 {
-						ds = defaultDiskSize
-					}
-
-					setupOptions[flagDiskSize] = strconv.Itoa(ds)
 				}
 
 				if err := performSetup(ctx, p, provider.SetupConfig{
@@ -209,23 +178,9 @@ EXAMPLES:
 			createOptions := map[string]string{flagImage: spinImage}
 
 			if backend == provider.BackendGCP {
-				createOptions[flagProject] = viper.GetString(flagProject)
-				createOptions[flagZone] = viper.GetString(flagZone)
-				createOptions[flagStateBucket] = viper.GetString(flagStateBucket)
-
-				mt := viper.GetString(flagMachineType)
-				if mt == "" {
-					mt = defaultMachineType
+				for k, v := range gcpOptionsFromViper() {
+					createOptions[k] = v
 				}
-
-				createOptions[flagMachineType] = mt
-
-				ds := viper.GetInt(flagDiskSize)
-				if ds == 0 {
-					ds = defaultDiskSize
-				}
-
-				createOptions[flagDiskSize] = strconv.Itoa(ds)
 			}
 
 			createConfig := provider.CreateConfig{
@@ -327,15 +282,15 @@ EXAMPLES:
 	cmd.Flags().BoolVar(&spinWatch, flagWatch, false, "Enter watch mode after instance is ready (optional)")
 
 	// Docker backend flags
-	cmd.Flags().StringVar(&spinBaseImage, flagBaseImage, "", "Base Docker image (Docker backend, requires --setup)")
-	cmd.Flags().StringVar(&spinDockerfile, flagDockerfile, "", "Path to custom Dockerfile (Docker backend, requires --setup)")
+	cmd.Flags().String(flagBaseImage, "", "Base Docker image (Docker backend, requires --setup)")
+	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile (Docker backend, requires --setup)")
 
 	// GCP backend flags
-	cmd.Flags().StringVar(&project, flagProject, "", "GCP project ID (GCP backend)")
-	cmd.Flags().StringVar(&zone, flagZone, "", "GCP zone (GCP backend)")
-	cmd.Flags().StringVar(&machineType, flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
-	cmd.Flags().IntVar(&diskSize, flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
-	cmd.Flags().StringVar(&stateBucket, flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
+	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
+	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
+	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
+	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
+	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
 
 	return cmd
 }

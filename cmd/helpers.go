@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/rickihastings/spinner/internal/provider"
@@ -152,4 +153,47 @@ func validateRequiredGCPFlags(cmd *cobra.Command) error {
 	}
 
 	return nil
+}
+
+// gcpFlags is the list of all GCP-specific flag names.
+var gcpFlags = []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket}
+
+// bindGCPFlags binds all GCP-specific flags on cmd to Viper.
+// Skips flags that don't exist on the command (e.g. watch doesn't have machine-type).
+func bindGCPFlags(cmd *cobra.Command) {
+	for _, f := range gcpFlags {
+		if fl := cmd.Flags().Lookup(f); fl != nil {
+			_ = viper.BindPFlag(f, fl)
+		}
+	}
+}
+
+// gcpOptionsFromViper reads GCP flags from Viper and returns an options map
+// with defaults applied for machine-type and disk-size.
+func gcpOptionsFromViper() map[string]string {
+	mt := viper.GetString(flagMachineType)
+	if mt == "" {
+		mt = defaultMachineType
+	}
+
+	ds := viper.GetInt(flagDiskSize)
+	if ds == 0 {
+		ds = defaultDiskSize
+	}
+
+	return map[string]string{
+		flagProject:     viper.GetString(flagProject),
+		flagZone:        viper.GetString(flagZone),
+		flagStateBucket: viper.GetString(flagStateBucket),
+		flagMachineType: mt,
+		flagDiskSize:    strconv.Itoa(ds),
+	}
+}
+
+// dockerSetupOptions returns the Docker-specific options for a setup config.
+func dockerSetupOptions() map[string]string {
+	return map[string]string{
+		flagBaseImage:  viper.GetString(flagBaseImage),
+		flagDockerfile: viper.GetString(flagDockerfile),
+	}
 }
