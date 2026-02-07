@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	// DefaultFlushInterval is the default interval between GCS flushes.
-	DefaultFlushInterval = 2 * time.Second
+	// defaultFlushInterval is the default interval between GCS flushes.
+	defaultFlushInterval = 2 * time.Second
 )
 
 // ObjectWriter is the minimal interface needed for writing to GCS.
@@ -50,7 +50,7 @@ func NewGCSSink(ctx context.Context, writer ObjectWriter, bucket, object string)
 		ctx:      sinkCtx,
 		cancel:   cancel,
 		buf:      make([]byte, 0, 4096),
-		interval: DefaultFlushInterval,
+		interval: defaultFlushInterval,
 	}
 
 	s.wg.Add(1)
