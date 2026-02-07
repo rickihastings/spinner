@@ -438,6 +438,7 @@ func TestProviderLogs_ReadsFromGCS(t *testing.T) {
 
 	data, _ := io.ReadAll(reader)
 	assert.Equal(t, "iteration 1 output\n", string(data))
+
 	_ = reader.Close()
 
 	mockClient.AssertExpectations(t)
@@ -462,12 +463,24 @@ func TestProviderWatchLogs_NoBucket(t *testing.T) {
 	assert.Contains(t, err.Error(), "no state bucket")
 }
 
-func TestProviderWatchMetricsNotImplemented(t *testing.T) {
+func TestProviderWatchMetrics_StoppedVM(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	ch := make(chan provider.ContainerMetrics)
+	terminated := "TERMINATED"
+	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(&computepb.Instance{Status: &terminated}, nil)
+
+	ch := make(chan provider.ContainerMetrics, 10)
 	err := p.WatchMetrics(context.Background(), "test-vm", ch)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
+	assert.NoError(t, err)
+
+	select {
+	case m := <-ch:
+		assert.Equal(t, provider.StateStopped, m.State)
+	default:
+		t.Fatal("expected metrics in channel")
+	}
+
+	mockClient.AssertExpectations(t)
 }
