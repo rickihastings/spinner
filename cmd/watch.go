@@ -88,6 +88,7 @@ EXAMPLES:
 			}
 
 			containerName := args[0]
+
 			return PerformWatch(context.Background(), p, containerName)
 		},
 	}
