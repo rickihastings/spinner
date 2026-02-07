@@ -27,7 +27,7 @@ var invalidCharsRegex = regexp.MustCompile(`[^a-z0-9-]`)
 // consecutiveHyphensRegex matches runs of multiple hyphens.
 var consecutiveHyphensRegex = regexp.MustCompile(`-{2,}`)
 
-// GenerateInstanceName generates a deterministic GCP instance name from image, repo, and branch.
+// generateInstanceName generates a deterministic GCP instance name from image, repo, and branch.
 // Format: spinner-{image}-{repo}[-{branch}]
 //
 // GCP instance names must:
@@ -39,7 +39,7 @@ var consecutiveHyphensRegex = regexp.MustCompile(`-{2,}`)
 //
 // If the generated name exceeds 63 characters, it is truncated and a hash suffix
 // is appended for uniqueness.
-func GenerateInstanceName(image, repo, branch string) string {
+func generateInstanceName(image, repo, branch string) string {
 	repoPart := extractRepoName(repo)
 
 	var raw string
@@ -108,28 +108,28 @@ func truncateWithHash(sanitized, original string) string {
 	return prefix + "-" + suffix
 }
 
-// MapVMStatus maps a GCP VM status string to a provider.InstanceStatus.
+// mapVMStatus maps a GCP VM status string to a provider.InstanceStatus.
 //
 // Mapping:
 //   - RUNNING, PROVISIONING, STAGING -> InstanceStatusRunning
 //   - TERMINATED, STOPPED, SUSPENDED -> InstanceStatusStopped
 //   - STOPPING, SUSPENDING          -> InstanceStatusStopped (transitioning to stopped)
 //   - Unknown / not found           -> InstanceStatusNone
-func MapVMStatus(status string) provider.InstanceStatus {
-	switch VMStatus(status) {
-	case VMStatusRunning, VMStatusProvisioning, VMStatusStaging:
+func mapVMStatus(status string) provider.InstanceStatus {
+	switch vmStatus(status) {
+	case vmStatusRunning, vmStatusProvisioning, vmStatusStaging:
 		return provider.InstanceStatusRunning
-	case VMStatusTerminated, VMStatusStopped, VMStatusSuspended,
-		VMStatusStopping, VMStatusSuspending:
+	case vmStatusTerminated, vmStatusStopped, vmStatusSuspended,
+		vmStatusStopping, vmStatusSuspending:
 		return provider.InstanceStatusStopped
 	default:
 		return provider.InstanceStatusNone
 	}
 }
 
-// SanitizeLabel sanitizes a string for use as a GCP resource label value.
+// sanitizeLabel sanitizes a string for use as a GCP resource label value.
 // Label values: lowercase, max 63 chars, [a-z0-9_-], must start with lowercase letter.
-func SanitizeLabel(input string) string {
+func sanitizeLabel(input string) string {
 	result := strings.ToLower(input)
 	// Replace invalid characters with hyphens
 	re := regexp.MustCompile(`[^a-z0-9_-]`)

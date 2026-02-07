@@ -240,3 +240,18 @@ To start fresh with a new state, either:
 
 1. Use `--recreate` flag which removes the container and its state directory
 2. Manually remove the state directory: `rm -rf ~/.spinner/<container-name>/state/`
+
+### GCP State Persistence
+
+When using the GCP backend, state is persisted to Google Cloud Storage for durability across VM lifecycle events:
+
+- **Location:** `gs://{state-bucket}/{instance-name}/state.json`
+- **Download on boot:** The GCP runtime startup script checks for existing state in GCS and restores it before running `spinner exec`
+- **Upload after changes:** The exec loop syncs state to GCS after each state change (iteration start, completion, errors, rate limits)
+- **Fresh start:** If no state exists in GCS, the VM starts with default state
+
+View GCP state:
+
+```bash
+gsutil cat gs://<state-bucket>/<instance-name>/state.json
+```

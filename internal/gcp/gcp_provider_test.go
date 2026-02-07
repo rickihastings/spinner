@@ -282,7 +282,7 @@ func TestProviderCreateSuccess(t *testing.T) {
 		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
 
 	// CreateInstance succeeds - use mock.MatchedBy to verify key fields
-	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config InstanceConfig) bool {
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
 		return config.Name == "spinner-my-env-repo" &&
 			config.Project == "test-project" &&
 			config.Zone == "us-central1-a" &&
@@ -325,7 +325,7 @@ func TestProviderCreateWithCustomOptions(t *testing.T) {
 		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
 
 	// CreateInstance with custom machine type and disk size
-	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config InstanceConfig) bool {
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
 		return config.MachineType == "n2-standard-4" &&
 			config.DiskSizeGB == 50
 	})).Return(nil)
@@ -358,7 +358,7 @@ func TestProviderCreateNoBucket(t *testing.T) {
 		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
 
 	// Verify no log/state bucket metadata when bucket is empty
-	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config InstanceConfig) bool {
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
 		_, hasLogBucket := config.Metadata["SPINNER_LOG_BUCKET"]
 		_, hasStateBucket := config.Metadata["SPINNER_STATE_BUCKET"]
 

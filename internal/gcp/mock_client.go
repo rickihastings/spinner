@@ -13,7 +13,7 @@ type MockGCPClient struct {
 }
 
 // CreateInstance mocks the CreateInstance method.
-func (m *MockGCPClient) CreateInstance(ctx context.Context, config InstanceConfig) error {
+func (m *MockGCPClient) CreateInstance(ctx context.Context, config instanceConfig) error {
 	args := m.Called(ctx, config)
 	return args.Error(0)
 }
@@ -53,7 +53,7 @@ func (m *MockGCPClient) DeleteInstance(ctx context.Context, project, zone, name 
 }
 
 // CreateImage mocks the CreateImage method.
-func (m *MockGCPClient) CreateImage(ctx context.Context, project string, config ImageConfig) error {
+func (m *MockGCPClient) CreateImage(ctx context.Context, project string, config imageConfig) error {
 	args := m.Called(ctx, project, config)
 	return args.Error(0)
 }
@@ -75,13 +75,13 @@ func (m *MockGCPClient) DeleteImage(ctx context.Context, project, name string) e
 }
 
 // GetSerialPortOutput mocks the GetSerialPortOutput method.
-func (m *MockGCPClient) GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*SerialPortOutput, error) {
+func (m *MockGCPClient) GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*serialPortOutput, error) {
 	args := m.Called(ctx, project, zone, name, start)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).(*SerialPortOutput), args.Error(1)
+	return args.Get(0).(*serialPortOutput), args.Error(1)
 }
 
 // WriteObject mocks the WriteObject method.
@@ -123,13 +123,13 @@ func (m *MockGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 }
 
 // QueryTimeSeries mocks the QueryTimeSeries method.
-func (m *MockGCPClient) QueryTimeSeries(ctx context.Context, project string, query MetricsQuery) ([]MetricPoint, error) {
+func (m *MockGCPClient) QueryTimeSeries(ctx context.Context, project string, query metricsQuery) ([]metricPoint, error) {
 	args := m.Called(ctx, project, query)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).([]MetricPoint), args.Error(1)
+	return args.Get(0).([]metricPoint), args.Error(1)
 }
 
 // Close mocks the Close method.

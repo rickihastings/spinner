@@ -23,14 +23,16 @@ MAX_ITERATIONS=$(curl -sf -H "$META_HEADER" "$META_URL/MAX_ITERATIONS" || echo "
 SPINNER_LOG_BUCKET=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_LOG_BUCKET" || echo "")
 SPINNER_INSTANCE_NAME=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_INSTANCE_NAME" || echo "")
 
-export GITHUB_TOKEN CLAUDE_CODE_OAUTH_TOKEN REPO_URL PROMPT BRANCH MAX_ITERATIONS
-export SPINNER_LOG_BUCKET SPINNER_INSTANCE_NAME
+SPINNER_STATE_BUCKET=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_STATE_BUCKET" || echo "")
 
-# Set log directory
+export GITHUB_TOKEN CLAUDE_CODE_OAUTH_TOKEN REPO_URL PROMPT BRANCH MAX_ITERATIONS
+export SPINNER_LOG_BUCKET SPINNER_INSTANCE_NAME SPINNER_STATE_BUCKET
+
+# Set log directory and state directory
 export LOG_DIR="/home/spinner/logs"
+export STATE_DIR="/home/spinner/state"
 
 # Download state from GCS if available
-SPINNER_STATE_BUCKET=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_STATE_BUCKET" || echo "")
 if [ -n "$SPINNER_STATE_BUCKET" ] && [ -n "$SPINNER_INSTANCE_NAME" ]; then
     echo "Checking for existing state in GCS..."
     STATE_PATH="gs://${SPINNER_STATE_BUCKET}/${SPINNER_INSTANCE_NAME}/state.json"
@@ -64,6 +66,8 @@ su - spinner -c "cd /home/spinner/workspace && \
     export BRANCH='${BRANCH}' && \
     export MAX_ITERATIONS='${MAX_ITERATIONS}' && \
     export SPINNER_LOG_BUCKET='${SPINNER_LOG_BUCKET}' && \
+    export SPINNER_STATE_BUCKET='${SPINNER_STATE_BUCKET}' && \
     export SPINNER_INSTANCE_NAME='${SPINNER_INSTANCE_NAME}' && \
     export LOG_DIR='${LOG_DIR}' && \
+    export STATE_DIR='${STATE_DIR}' && \
     /usr/local/bin/startup.sh"
