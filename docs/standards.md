@@ -120,6 +120,24 @@ func GenerateContainerName(image, repo, branch string) string {
 - **Update design documents**: If implementation deviates from the design, update the design document with rationale
 - **Document breaking changes**: Clearly document any breaking changes in both specs and commit messages
 
+## Code Quality Rules
+
+### Test Helpers
+
+Place shared test helpers (factory functions, mock builders, etc.) in a dedicated `helpers_test.go` file within the package — never scatter them across individual test files.
+
+### Unused Code
+
+When refactoring or moving code, always check for and remove unused imports, variables, and functions in the affected files.
+
+### Avoid Duplication
+
+Favour early abstraction over copy-paste. If a function, constant, or pattern is used in more than one file, extract it to a shared location immediately.
+
+### Linting
+
+Run `golangci-lint run --fix` after making changes — it auto-fixes `govet`, `staticcheck`, and `wsl_v5` issues. The full lint check is `make lint`.
+
 ## Git Commit Standards
 
 - Use conventional commit format: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`

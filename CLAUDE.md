@@ -62,9 +62,4 @@ go build -o dist/spinner
 - Keep functions small and focused
 - Follow SOLID principles and Go conventions
 
-### Code Quality Rules
-
-- **Test helpers:** Place shared test helpers (factory functions, mock builders, etc.) in a dedicated `helpers_test.go` file within the package — never scatter them across individual test files
-- **Unused code:** When refactoring or moving code, always check for and remove unused imports, variables, and functions in the affected files
-- **Avoid duplication:** Favour early abstraction over copy-paste. If a function, constant, or pattern is used in more than one file, extract it to a shared location immediately
-- **Linting:** Run `golangci-lint run --fix` after making changes — it auto-fixes `govet`, `staticcheck`, and `wsl_v5` issues. The full lint check is `make lint`
+See **[docs/standards.md](docs/standards.md)** for code quality rules (test helpers, unused code, duplication, linting).
