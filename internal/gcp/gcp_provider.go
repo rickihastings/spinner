@@ -251,8 +251,9 @@ func (p *Provider) WatchLogs(ctx context.Context, name string, _ int, ch chan<- 
 }
 
 // WatchMetrics streams resource metrics from Cloud Monitoring.
-func (p *Provider) WatchMetrics(_ context.Context, _ string, _ chan<- provider.ContainerMetrics) error {
-	return fmt.Errorf("gcp: WatchMetrics not yet implemented (see slice 5.5)")
+// Polls CPU utilization at 60-second intervals and maps VM state to ContainerMetrics.
+func (p *Provider) WatchMetrics(ctx context.Context, name string, ch chan<- provider.ContainerMetrics) error {
+	return streamGCPMetrics(ctx, p.client, p.project, p.zone, name, ch)
 }
 
 // isNotFoundError checks whether a GCP API error indicates a resource was not found.
