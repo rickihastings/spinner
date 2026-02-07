@@ -16,7 +16,7 @@ import (
 type gcsEnv struct {
 	bucket       string
 	instanceName string
-	writer       *GCSObjectWriter
+	writer       *gcsObjectWriter
 }
 
 // resolveGCSEnv checks whether we're on GCE, reads the given bucket env var,
@@ -38,7 +38,7 @@ func resolveGCSEnv(ctx context.Context, bucketEnvVar, feature string) *gcsEnv {
 		return nil
 	}
 
-	objectWriter, err := NewGCSObjectWriter(ctx)
+	objectWriter, err := newGCSObjectWriter(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to create GCS client for %s: %v\n", feature, err)
 		return nil
