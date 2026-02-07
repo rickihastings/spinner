@@ -3,8 +3,8 @@ package cmd
 import (
 	"context"
 
-	"github.com/rickihastings/spinner/internal/docker"
-	"github.com/rickihastings/spinner/internal/gcp"
+	"github.com/rickihastings/spinner/internal/backend/docker"
+	"github.com/rickihastings/spinner/internal/backend/gcp"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/spf13/viper"
 )
