@@ -73,10 +73,10 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 
 ## 5.5 GCP Metrics
 
-- [ ] 5.51 Create `internal/gcp/metrics.go` — Cloud Monitoring query for CPU utilization
-- [ ] 5.52 Implement `Provider.WatchMetrics()` — poll Cloud Monitoring at 60s interval, map to `ContainerMetrics`, send to channel
-- [ ] 5.53 Create `internal/gcp/metrics_test.go` — unit tests for metrics with mock client
-- [ ] 5.54 Verify build and tests pass
+- [x] 5.51 Create `internal/gcp/metrics.go` — Cloud Monitoring query for CPU utilization
+- [x] 5.52 Implement `Provider.WatchMetrics()` — poll Cloud Monitoring at 60s interval, map to `ContainerMetrics`, send to channel
+- [x] 5.53 Create `internal/gcp/metrics_test.go` — unit tests for metrics with mock client
+- [x] 5.54 Verify build and tests pass
 
 ## 6.0 GCP State Persistence & Integration
 
