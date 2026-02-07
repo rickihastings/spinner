@@ -69,15 +69,15 @@ func TestGenerateInstanceName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateInstanceName(tt.image, tt.repo, tt.branch)
+			result := generateInstanceName(tt.image, tt.repo, tt.branch)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestGenerateInstanceNameDeterministic(t *testing.T) {
-	name1 := GenerateInstanceName("env", "https://github.com/user/repo.git", "main")
-	name2 := GenerateInstanceName("env", "https://github.com/user/repo.git", "main")
+	name1 := generateInstanceName("env", "https://github.com/user/repo.git", "main")
+	name2 := generateInstanceName("env", "https://github.com/user/repo.git", "main")
 	assert.Equal(t, name1, name2)
 }
 
@@ -118,7 +118,7 @@ func TestGenerateInstanceNameGCPConstraints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := GenerateInstanceName(tt.image, tt.repo, tt.branch)
+			result := generateInstanceName(tt.image, tt.repo, tt.branch)
 
 			// Must be <= 63 characters
 			assert.LessOrEqual(t, len(result), maxInstanceNameLength,
@@ -141,7 +141,7 @@ func TestGenerateInstanceNameTruncation(t *testing.T) {
 	longRepo := "https://github.com/organization/very-long-repository-name-for-testing.git"
 	longBranch := "feature/very-long-branch-name"
 
-	result := GenerateInstanceName(longImage, longRepo, longBranch)
+	result := generateInstanceName(longImage, longRepo, longBranch)
 
 	assert.LessOrEqual(t, len(result), maxInstanceNameLength)
 	assert.True(t, len(result) > 0)
@@ -153,13 +153,13 @@ func TestGenerateInstanceNameTruncation(t *testing.T) {
 		"truncated name should end with %d-char hash suffix", hashSuffixLength)
 
 	// Verify determinism after truncation
-	result2 := GenerateInstanceName(longImage, longRepo, longBranch)
+	result2 := generateInstanceName(longImage, longRepo, longBranch)
 	assert.Equal(t, result, result2)
 }
 
 func TestGenerateInstanceNameNoTruncation(t *testing.T) {
 	// Short name should not be truncated or have hash suffix
-	result := GenerateInstanceName("env", "https://github.com/u/r.git", "")
+	result := generateInstanceName("env", "https://github.com/u/r.git", "")
 	assert.Equal(t, "spinner-env-r", result)
 	assert.Less(t, len(result), maxInstanceNameLength)
 }
@@ -224,7 +224,7 @@ func TestMapVMStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := MapVMStatus(tt.vmStatus)
+			result := mapVMStatus(tt.vmStatus)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -352,7 +352,7 @@ func TestSanitizeLabel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SanitizeLabel(tt.input)
+			result := sanitizeLabel(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

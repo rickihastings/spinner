@@ -63,15 +63,18 @@ backend-specific types.
 ```
 /
 ├── cmd/                           # CLI commands
-│   ├── setup.go                   # Setup command (wires Docker provider, constructor injection)
-│   ├── spin.go                    # Spin command (wires Docker provider, constructor injection)
+│   ├── factory.go                 # Provider factory wiring (Docker + GCP)
+│   ├── helpers.go                 # Shared flag helpers and validation
+│   ├── setup.go                   # Setup command
+│   ├── spin.go                    # Spin command
 │   ├── watch.go                   # Watch command
-│   ├── exec.go                    # Exec command (runs inside containers)
+│   ├── exec.go                    # Exec command (runs inside containers/VMs)
 │   └── *_test.go                  # Tests using MockProvider
 │
 ├── internal/
 │   ├── provider/                  # Backend-agnostic abstractions
 │   │   ├── provider.go            # Provider interface + types
+│   │   ├── factory.go             # Provider factory (backend registry)
 │   │   └── mock_provider.go       # Mock for testing
 │   │
 │   ├── docker/                    # Docker provider implementation
@@ -83,9 +86,30 @@ backend-specific types.
 │   │   ├── dockerfile.go          # Dockerfile generation
 │   │   └── *_test.go              # Docker-specific tests
 │   │
+│   ├── gcp/                       # GCP Compute Engine provider
+│   │   ├── gcp_provider.go        # Implements Provider interface
+│   │   ├── client.go              # GCP Client interface + RealGCPClient
+│   │   ├── mock_client.go         # Mock client for testing
+│   │   ├── image.go               # Image baking (temp VM → custom image)
+│   │   ├── instance.go            # Instance naming, status mapping
+│   │   ├── types.go               # GCP-specific types (InstanceConfig, VMStatus)
+│   │   ├── logs.go                # GCS log streaming (read/watch)
+│   │   ├── metrics.go             # Cloud Monitoring CPU metrics
+│   │   ├── state.go               # GCS state persistence (read/write)
+│   │   ├── startup.go             # Startup script template loading
+│   │   └── *_test.go              # GCP-specific tests
+│   │
+│   ├── logs/                      # Log streaming utilities
+│   │   └── gcs_sink.go            # GCSSink: buffered io.Writer → GCS
+│   │
 │   ├── agent/                     # AI agent integration (provider-agnostic)
 │   ├── exec/                      # Execution logic (provider-agnostic)
 │   └── prerequisites/             # Environment validation
+│
+├── templates/scripts/             # Shell script templates
+│   ├── startup.sh                 # Common startup (clone repo, run exec)
+│   ├── gcp_runtime.sh             # GCP VM boot: metadata → env, state restore
+│   └── gcp_bake.sh                # GCP image bake: install tooling
 │
 └── docs/                          # Documentation
 ```
@@ -117,7 +141,7 @@ func NewSpinCommand(p provider.Provider) *cobra.Command {
 - Log display and formatting
 - Error handling and reporting
 
-### Provider-Specific Code (`internal/docker/`, future: `internal/vm/`, etc.)
+### Provider-Specific Code (`internal/docker/`, `internal/gcp/`)
 
 Each provider package contains all backend-specific logic:
 
@@ -130,12 +154,15 @@ Each provider package contains all backend-specific logic:
 - Container status mapping to InstanceStatus
 - Docker-specific error handling
 
-**Future Providers (e.g., VM, GCP, K8s):**
+**GCP Provider Responsibilities:**
 
-- Each would implement Provider interface in its own package
-- Define its own internal client interface and types
-- Parse Options map according to its needs
-- No changes required to command layer
+- VM instance lifecycle management via Compute Engine SDK
+- Custom image baking (temporary VM → install tooling → create image)
+- Deterministic instance naming (GCP 63-char constraints)
+- Log streaming via GCS (buffered writes from VM, polled reads from control plane)
+- State persistence via GCS (synced after each state change in exec loop)
+- CPU metrics via Cloud Monitoring API
+- VM status mapping to InstanceStatus
 
 ## Dependency Injection
 
@@ -293,11 +320,43 @@ To add a new execution backend (e.g., VM, Kubernetes, cloud instance):
 - Complete state management: Create → Start → Stop → Remove
 - Status checking before operations
 
-## Future Extensions
+## GCP Provider Architecture
 
-The architecture supports future enhancements:
+### Two-Layer Design
 
-- **Multiple providers:** Allow users to choose backend via CLI flag
-- **Provider registry:** Dynamic provider selection based on configuration
-- **Hybrid deployments:** Different providers for different environments
-- **Provider plugins:** Load external provider implementations
+```
+Command Layer (cmd/)
+       ↓
+Provider Interface (internal/provider/)
+       ↓
+GCPProvider (internal/gcp/gcp_provider.go)
+       ↓
+Client Interface (internal/gcp/client.go)
+       ↓
+RealGCPClient / MockGCPClient
+```
+
+### GCP Client Interface
+
+The `Client` interface wraps GCP SDK clients (Compute, Storage, Monitoring) for testability:
+
+- **Instance ops:** CreateInstance, GetInstance, StartInstance, StopInstance, ResetInstance, DeleteInstance
+- **Image ops:** CreateImage, GetImage, DeleteImage
+- **Storage ops:** WriteObject, ReadObject, ReadObjectRange, ObjectSize, ObjectExists
+- **Monitoring:** QueryTimeSeries
+- **Diagnostics:** GetSerialPortOutput
+
+### State Persistence
+
+GCP state persists to GCS at `gs://{bucket}/{instance}/state.json`:
+
+- **Download on boot:** `gcp_runtime.sh` restores state from GCS before running `spinner exec`
+- **Upload after each state change:** The exec loop syncs state to GCS after each local `SaveState()` call
+- **Env-driven activation:** Sync is enabled when `SPINNER_STATE_BUCKET` and `SPINNER_INSTANCE_NAME` are set on a GCE VM
+
+### Log Streaming
+
+Two-tier approach using GCS as the transport:
+
+- **VM side:** `GCSSink` (buffered `io.Writer`) flushes logs to GCS every 2 seconds
+- **Control plane:** `WatchLogs` polls GCS with range reads to stream new content

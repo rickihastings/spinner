@@ -20,7 +20,7 @@ import (
 // mirroring the Docker backend's two-layer pattern (Provider -> Client).
 type Client interface {
 	// Instance operations
-	CreateInstance(ctx context.Context, config InstanceConfig) error
+	CreateInstance(ctx context.Context, config instanceConfig) error
 	GetInstance(ctx context.Context, project, zone, name string) (*computepb.Instance, error)
 	StartInstance(ctx context.Context, project, zone, name string) error
 	StopInstance(ctx context.Context, project, zone, name string) error
@@ -28,12 +28,12 @@ type Client interface {
 	DeleteInstance(ctx context.Context, project, zone, name string) error
 
 	// Image operations
-	CreateImage(ctx context.Context, project string, config ImageConfig) error
+	CreateImage(ctx context.Context, project string, config imageConfig) error
 	GetImage(ctx context.Context, project, name string) (*computepb.Image, error)
 	DeleteImage(ctx context.Context, project, name string) error
 
 	// Serial port (for boot/bake diagnostics)
-	GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*SerialPortOutput, error)
+	GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*serialPortOutput, error)
 
 	// Storage operations (GCS for state persistence + log streaming)
 	WriteObject(ctx context.Context, bucket, object string, data []byte) error
@@ -43,7 +43,7 @@ type Client interface {
 	ObjectExists(ctx context.Context, bucket, object string) (bool, error)
 
 	// Monitoring
-	QueryTimeSeries(ctx context.Context, project string, query MetricsQuery) ([]MetricPoint, error)
+	QueryTimeSeries(ctx context.Context, project string, query metricsQuery) ([]metricPoint, error)
 
 	// Close releases all underlying SDK clients.
 	Close() error
@@ -129,7 +129,7 @@ func (c *RealGCPClient) Close() error {
 
 // CreateInstance creates a GCP Compute Engine VM instance and waits for the
 // operation to complete.
-func (c *RealGCPClient) CreateInstance(ctx context.Context, config InstanceConfig) error {
+func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfig) error {
 	networkInterface := &computepb.NetworkInterface{
 		Network: strPtr(fmt.Sprintf("global/networks/%s", config.Network)),
 	}
@@ -300,7 +300,7 @@ func (c *RealGCPClient) DeleteInstance(ctx context.Context, project, zone, name 
 
 // CreateImage creates a Compute Engine image from a source disk and waits for
 // the operation to complete.
-func (c *RealGCPClient) CreateImage(ctx context.Context, project string, config ImageConfig) error {
+func (c *RealGCPClient) CreateImage(ctx context.Context, project string, config imageConfig) error {
 	image := &computepb.Image{
 		Name:       strPtr(config.Name),
 		SourceDisk: strPtr(config.SourceDisk),
@@ -358,7 +358,7 @@ func (c *RealGCPClient) DeleteImage(ctx context.Context, project, name string) e
 
 // GetSerialPortOutput reads serial port output from a VM instance.
 // The start parameter specifies the byte offset to start reading from (0 for beginning).
-func (c *RealGCPClient) GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*SerialPortOutput, error) {
+func (c *RealGCPClient) GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*serialPortOutput, error) {
 	output, err := c.instances.GetSerialPortOutput(ctx, &computepb.GetSerialPortOutputInstanceRequest{
 		Project:  project,
 		Zone:     zone,
@@ -369,7 +369,7 @@ func (c *RealGCPClient) GetSerialPortOutput(ctx context.Context, project, zone, 
 		return nil, fmt.Errorf("failed to get serial port output: %w", err)
 	}
 
-	return &SerialPortOutput{
+	return &serialPortOutput{
 		Contents: output.GetContents(),
 		Next:     output.GetNext(),
 	}, nil
@@ -468,7 +468,7 @@ func (c *RealGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 }
 
 // QueryTimeSeries queries Cloud Monitoring for time series data points.
-func (c *RealGCPClient) QueryTimeSeries(ctx context.Context, project string, query MetricsQuery) ([]MetricPoint, error) {
+func (c *RealGCPClient) QueryTimeSeries(ctx context.Context, project string, query metricsQuery) ([]metricPoint, error) {
 	now := time.Now()
 	startTime := now.Add(-time.Duration(query.IntervalSeconds) * time.Second)
 
@@ -488,7 +488,7 @@ func (c *RealGCPClient) QueryTimeSeries(ctx context.Context, project string, que
 
 	it := c.monitoring.ListTimeSeries(ctx, req)
 
-	var points []MetricPoint
+	var points []metricPoint
 
 	for {
 		ts, err := it.Next()
@@ -501,7 +501,7 @@ func (c *RealGCPClient) QueryTimeSeries(ctx context.Context, project string, que
 		}
 
 		for _, p := range ts.GetPoints() {
-			points = append(points, MetricPoint{
+			points = append(points, metricPoint{
 				Value: p.GetValue().GetDoubleValue(),
 			})
 		}

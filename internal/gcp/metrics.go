@@ -70,16 +70,16 @@ func getVMState(ctx context.Context, client Client, project, zone, name string) 
 		return provider.StateUnknown, err
 	}
 
-	vmStatus := VMStatus(instance.GetStatus())
+	vmStatus := vmStatus(instance.GetStatus())
 
 	switch vmStatus {
-	case VMStatusRunning:
+	case vmStatusRunning:
 		return provider.StateRunning, nil
-	case VMStatusTerminated, VMStatusStopped, VMStatusSuspended:
+	case vmStatusTerminated, vmStatusStopped, vmStatusSuspended:
 		return provider.StateStopped, nil
-	case VMStatusProvisioning, VMStatusStaging:
+	case vmStatusProvisioning, vmStatusStaging:
 		return provider.StateRunning, nil
-	case VMStatusStopping, VMStatusSuspending:
+	case vmStatusStopping, vmStatusSuspending:
 		return provider.StateStopped, nil
 	default:
 		return provider.StateUnknown, nil
@@ -89,7 +89,7 @@ func getVMState(ctx context.Context, client Client, project, zone, name string) 
 // queryCPUUtilization queries Cloud Monitoring for the latest CPU utilization
 // value and returns it as a percentage (0-100).
 func queryCPUUtilization(ctx context.Context, client Client, project, zone, instanceName string) (float64, error) {
-	points, err := client.QueryTimeSeries(ctx, project, MetricsQuery{
+	points, err := client.QueryTimeSeries(ctx, project, metricsQuery{
 		MetricType:      cpuMetricType,
 		InstanceName:    instanceName,
 		Zone:            zone,

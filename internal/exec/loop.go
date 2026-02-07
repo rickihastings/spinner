@@ -20,6 +20,11 @@ const (
 	RateLimitWaitSeconds = 3660
 )
 
+// StateSyncFunc is called after each local state save to sync state to a
+// remote store (e.g., GCS). It receives the path to the local state file.
+// Errors are logged as warnings but do not fail the loop.
+type StateSyncFunc func(statePath string)
+
 // Function variables for testing
 var (
 	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
@@ -28,10 +33,11 @@ var (
 			AdditionalWriter: additionalWriter,
 		})
 	}
-	pushChangesFunc    = PushChanges
-	gcsSinkFactory     = defaultGCSSinkFactory
-	gcsObjectWriterNew = logs.NewGCSObjectWriter
-	isRunningOnGCE     = metadata.OnGCE
+	pushChangesFunc     = PushChanges
+	gcsSinkFactory      = defaultGCSSinkFactory
+	gcsStateSyncFactory = defaultGCSStateSyncFactory
+	gcsObjectWriterNew  = logs.NewGCSObjectWriter
+	isRunningOnGCE      = metadata.OnGCE
 )
 
 // Runner executes the main iteration loop.
@@ -39,6 +45,7 @@ type Runner struct {
 	config    *Config
 	state     *State
 	statePath string
+	stateSync StateSyncFunc
 }
 
 // NewRunner creates a new Runner with the given config and state.
@@ -50,6 +57,16 @@ func NewRunner(config *Config, state *State, statePath string) *Runner {
 	}
 }
 
+// saveState saves state locally and, if configured, syncs to GCS.
+func (r *Runner) saveState() error {
+	err := SaveState(r.statePath, r.state)
+	if err == nil && r.stateSync != nil {
+		r.stateSync(r.statePath)
+	}
+
+	return err
+}
+
 // Run executes the main iteration loop.
 // Returns exit code: 0 for completion, 1 for auth error, 1 for max iterations reached.
 func (r *Runner) Run(ctx context.Context) int {
@@ -59,8 +76,11 @@ func (r *Runner) Run(ctx context.Context) int {
 	// Set initial state
 	r.state.Branch = r.config.Branch
 
+	// Set up GCS state sync if running on GCP with a state bucket configured.
+	r.stateSync = gcsStateSyncFactory(ctx)
+
 	r.state.Status = StatusRunning
-	if err := SaveState(r.statePath, r.state); err != nil {
+	if err := r.saveState(); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to save initial state: %v\n", err)
 	}
 
@@ -84,7 +104,7 @@ func (r *Runner) Run(ctx context.Context) int {
 
 			r.state.Status = StatusError
 			r.state.ErrorMessage = "interrupted by user"
-			_ = SaveState(r.statePath, r.state)
+			_ = r.saveState()
 
 			return 130
 		default:
@@ -93,7 +113,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		fmt.Printf("\n🔁 Iteration %d/%d\n", r.state.Iteration, r.config.MaxIterations)
 
 		// Save state before iteration
-		if err := SaveState(r.statePath, r.state); err != nil {
+		if err := r.saveState(); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to save state: %v\n", err)
 		}
 
@@ -112,7 +132,7 @@ func (r *Runner) Run(ctx context.Context) int {
 
 			r.state.Status = StatusError
 			r.state.ErrorMessage = err.Error()
-			_ = SaveState(r.statePath, r.state)
+			_ = r.saveState()
 
 			return 1
 		}
@@ -135,7 +155,7 @@ func (r *Runner) Run(ctx context.Context) int {
 
 			r.state.Status = StatusAuthError
 			r.state.ErrorMessage = result.ErrorMessage
-			_ = SaveState(r.statePath, r.state)
+			_ = r.saveState()
 
 			return 1
 		}
@@ -146,7 +166,7 @@ func (r *Runner) Run(ctx context.Context) int {
 
 			r.state.Status = StatusCompleted
 			r.state.CompletedAt = time.Now()
-			_ = SaveState(r.statePath, r.state)
+			_ = r.saveState()
 
 			return 0
 		}
@@ -155,7 +175,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		if result.RateLimited {
 			r.state.Status = StatusRateLimited
 			r.state.ErrorMessage = result.ErrorMessage
-			_ = SaveState(r.statePath, r.state)
+			_ = r.saveState()
 
 			waitForRateLimit(ctx)
 
@@ -173,7 +193,7 @@ func (r *Runner) Run(ctx context.Context) int {
 
 			r.state.Status = StatusError
 			r.state.ErrorMessage = result.ErrorMessage
-			_ = SaveState(r.statePath, r.state)
+			_ = r.saveState()
 			// Continue to next iteration instead of exiting
 		}
 
@@ -184,49 +204,89 @@ func (r *Runner) Run(ctx context.Context) int {
 	fmt.Printf("\n⚠️  Max iterations (%d) reached\n", r.config.MaxIterations)
 	r.state.Status = StatusError
 	r.state.ErrorMessage = "max iterations reached"
-	_ = SaveState(r.statePath, r.state)
+	_ = r.saveState()
 
 	return 1
 }
 
-// defaultGCSSinkFactory creates a GCS sink when running on a GCE VM with
-// SPINNER_LOG_BUCKET set. The metadata server is queried first to confirm
-// this is actually a GCP environment, preventing accidental activation when
-// the env var leaks into a non-GCP context (e.g. Docker).
-// Returns (nil, nil) if not on GCE, the env var is unset, or init fails.
-func defaultGCSSinkFactory(ctx context.Context) (*logs.GCSSink, func()) {
+// gcsEnv holds the resolved GCS environment for a GCE VM.
+type gcsEnv struct {
+	bucket       string
+	instanceName string
+	writer       *logs.GCSObjectWriter
+}
+
+// resolveGCSEnv checks whether we're on GCE, reads the given bucket env var,
+// verifies SPINNER_INSTANCE_NAME, and creates an ObjectWriter. Returns nil if
+// any precondition is not met (not on GCE, env var unset, client error).
+func resolveGCSEnv(ctx context.Context, bucketEnvVar, feature string) *gcsEnv {
 	if !isRunningOnGCE() {
-		return nil, nil
+		return nil
 	}
 
-	bucket := os.Getenv("SPINNER_LOG_BUCKET")
+	bucket := os.Getenv(bucketEnvVar)
 	if bucket == "" {
-		return nil, nil
+		return nil
 	}
 
 	instanceName := os.Getenv("SPINNER_INSTANCE_NAME")
 	if instanceName == "" {
-		fmt.Fprintf(os.Stderr, "Warning: SPINNER_LOG_BUCKET set but SPINNER_INSTANCE_NAME empty, skipping GCS log sink\n")
-		return nil, nil
+		fmt.Fprintf(os.Stderr, "Warning: %s set but SPINNER_INSTANCE_NAME empty, skipping %s\n", bucketEnvVar, feature)
+		return nil
 	}
 
 	objectWriter, err := gcsObjectWriterNew(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to create GCS client for log streaming: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: failed to create GCS client for %s: %v\n", feature, err)
+		return nil
+	}
+
+	return &gcsEnv{bucket: bucket, instanceName: instanceName, writer: objectWriter}
+}
+
+// defaultGCSSinkFactory creates a GCS sink when running on a GCE VM with
+// SPINNER_LOG_BUCKET set. Returns (nil, nil) if not on GCE or init fails.
+func defaultGCSSinkFactory(ctx context.Context) (*logs.GCSSink, func()) {
+	env := resolveGCSEnv(ctx, "SPINNER_LOG_BUCKET", "GCS log sink")
+	if env == nil {
 		return nil, nil
 	}
 
-	object := instanceName + "/logs/raw.log"
-	sink := logs.NewGCSSink(ctx, objectWriter, bucket, object)
+	object := env.instanceName + "/logs/raw.log"
+	sink := logs.NewGCSSink(ctx, env.writer, env.bucket, object)
 
-	fmt.Printf("GCS log streaming enabled: gs://%s/%s\n", bucket, object)
+	fmt.Printf("GCS log streaming enabled: gs://%s/%s\n", env.bucket, object)
 
 	cleanup := func() {
 		_ = sink.Close()
-		_ = objectWriter.Close()
+		_ = env.writer.Close()
 	}
 
 	return sink, cleanup
+}
+
+// defaultGCSStateSyncFactory creates a state sync function when running on a
+// GCE VM with SPINNER_STATE_BUCKET set. Returns nil if not on GCE or init fails.
+func defaultGCSStateSyncFactory(ctx context.Context) StateSyncFunc {
+	env := resolveGCSEnv(ctx, "SPINNER_STATE_BUCKET", "GCS state sync")
+	if env == nil {
+		return nil
+	}
+
+	object := env.instanceName + "/state.json"
+	fmt.Printf("GCS state sync enabled: gs://%s/%s\n", env.bucket, object)
+
+	return func(statePath string) {
+		data, readErr := os.ReadFile(statePath)
+		if readErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to read state file for GCS sync: %v\n", readErr)
+			return
+		}
+
+		if writeErr := env.writer.WriteObject(context.Background(), env.bucket, object, data); writeErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to sync state to GCS: %v\n", writeErr)
+		}
+	}
 }
 
 // waitForRateLimit waits for the rate limit period with a countdown.

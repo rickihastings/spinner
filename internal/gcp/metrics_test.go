@@ -140,12 +140,12 @@ func TestQueryCPUUtilization_WithData(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	client.On("QueryTimeSeries", ctx, "proj", MetricsQuery{
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
 		MetricType:      cpuMetricType,
 		InstanceName:    "vm-1",
 		Zone:            "zone",
 		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]MetricPoint{
+	}).Return([]metricPoint{
 		{Value: 0.25},
 		{Value: 0.50},
 	}, nil)
@@ -161,12 +161,12 @@ func TestQueryCPUUtilization_NoData(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	client.On("QueryTimeSeries", ctx, "proj", MetricsQuery{
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
 		MetricType:      cpuMetricType,
 		InstanceName:    "vm-1",
 		Zone:            "zone",
 		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]MetricPoint{}, nil)
+	}).Return([]metricPoint{}, nil)
 
 	cpuPercent, err := queryCPUUtilization(ctx, client, "proj", "zone", "vm-1")
 	assert.NoError(t, err)
@@ -178,7 +178,7 @@ func TestQueryCPUUtilization_Error(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	client.On("QueryTimeSeries", ctx, "proj", MetricsQuery{
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
 		MetricType:      cpuMetricType,
 		InstanceName:    "vm-1",
 		Zone:            "zone",
@@ -199,12 +199,12 @@ func TestCollectGCPMetrics_RunningWithCPU(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
 
-	client.On("QueryTimeSeries", ctx, "proj", MetricsQuery{
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
 		MetricType:      cpuMetricType,
 		InstanceName:    "vm-1",
 		Zone:            "zone",
 		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]MetricPoint{{Value: 0.75}}, nil)
+	}).Return([]metricPoint{{Value: 0.75}}, nil)
 
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
 	assert.Equal(t, provider.StateRunning, metrics.State)
@@ -221,12 +221,12 @@ func TestCollectGCPMetrics_RunningNoCPUData(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
 
-	client.On("QueryTimeSeries", ctx, "proj", MetricsQuery{
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
 		MetricType:      cpuMetricType,
 		InstanceName:    "vm-1",
 		Zone:            "zone",
 		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]MetricPoint{}, nil)
+	}).Return([]metricPoint{}, nil)
 
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
 	assert.Equal(t, provider.StateRunning, metrics.State)
@@ -243,7 +243,7 @@ func TestCollectGCPMetrics_RunningCPUError(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
 
-	client.On("QueryTimeSeries", ctx, "proj", MetricsQuery{
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
 		MetricType:      cpuMetricType,
 		InstanceName:    "vm-1",
 		Zone:            "zone",
@@ -314,7 +314,7 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil).Once()
 	client.On("QueryTimeSeries", mock.Anything, "proj", mock.Anything).
-		Return([]MetricPoint{{Value: 0.42}}, nil).Once()
+		Return([]metricPoint{{Value: 0.42}}, nil).Once()
 
 	// Second call (ticker fires) — return stopped to exit the loop
 	terminated := "TERMINATED"
@@ -424,7 +424,7 @@ func TestStreamGCPMetrics_ContextCancellation(t *testing.T) {
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
 	client.On("QueryTimeSeries", mock.Anything, "proj", mock.Anything).
-		Return([]MetricPoint{{Value: 0.10}}, nil)
+		Return([]metricPoint{{Value: 0.10}}, nil)
 
 	ch := make(chan provider.ContainerMetrics, 10)
 	done := make(chan error, 1)

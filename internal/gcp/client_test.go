@@ -25,7 +25,7 @@ func TestRealGCPClientImplementsInterface(t *testing.T) {
 func TestMockCreateInstance(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	config := InstanceConfig{
+	config := instanceConfig{
 		Name:        "test-instance",
 		Project:     "test-project",
 		Zone:        "us-central1-a",
@@ -43,7 +43,7 @@ func TestMockCreateInstance(t *testing.T) {
 func TestMockCreateInstanceError(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	config := InstanceConfig{
+	config := instanceConfig{
 		Name:    "test-instance",
 		Project: "test-project",
 		Zone:    "us-central1-a",
@@ -137,7 +137,7 @@ func TestMockDeleteInstance(t *testing.T) {
 func TestMockCreateImage(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	config := ImageConfig{
+	config := imageConfig{
 		Name:       "spinner-test",
 		SourceDisk: "projects/test-project/zones/us-central1-a/disks/temp-bake-vm",
 	}
@@ -178,7 +178,7 @@ func TestMockDeleteImage(t *testing.T) {
 func TestMockGetSerialPortOutput(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	expected := &SerialPortOutput{
+	expected := &serialPortOutput{
 		Contents: "SPINNER_BAKE_COMPLETE",
 		Next:     1024,
 	}
@@ -270,14 +270,14 @@ func TestMockObjectExistsNotFound(t *testing.T) {
 func TestMockQueryTimeSeries(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	query := MetricsQuery{
+	query := metricsQuery{
 		MetricType:      "compute.googleapis.com/instance/cpu/utilization",
 		InstanceName:    "test-instance",
 		Zone:            "us-central1-a",
 		IntervalSeconds: 300,
 	}
 
-	expected := []MetricPoint{
+	expected := []metricPoint{
 		{Value: 0.45},
 		{Value: 0.52},
 	}

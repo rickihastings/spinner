@@ -32,7 +32,7 @@ func TestBakeImageSuccess(t *testing.T) {
 
 	mockClient := &MockGCPClient{}
 
-	config := BakeConfig{
+	config := bakeConfig{
 		ImageName:     "test-image",
 		Project:       "test-project",
 		Zone:          "us-central1-a",
@@ -42,7 +42,7 @@ func TestBakeImageSuccess(t *testing.T) {
 	}
 
 	// Expect CreateInstance
-	mockClient.On("CreateInstance", mock.Anything, InstanceConfig{
+	mockClient.On("CreateInstance", mock.Anything, instanceConfig{
 		Name:         "spinner-bake-test-image",
 		Project:      "test-project",
 		Zone:         "us-central1-a",
@@ -75,7 +75,7 @@ func TestBakeImageSuccess(t *testing.T) {
 		Return(&computepb.Instance{Name: strPtr("spinner-bake-test-image"), Status: &terminated}, nil).Once()
 
 	// Expect CreateImage
-	mockClient.On("CreateImage", mock.Anything, "test-project", ImageConfig{
+	mockClient.On("CreateImage", mock.Anything, "test-project", imageConfig{
 		Name:        "test-image",
 		SourceDisk:  "projects/test-project/zones/us-central1-a/disks/spinner-bake-test-image",
 		Description: "Spinner baked image: test-image",
@@ -89,7 +89,7 @@ func TestBakeImageSuccess(t *testing.T) {
 	mockClient.On("DeleteInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
 		Return(nil)
 
-	err := BakeImage(context.Background(), mockClient, config)
+	err := bakeImage(context.Background(), mockClient, config)
 	assert.NoError(t, err)
 	mockClient.AssertExpectations(t)
 }
@@ -97,7 +97,7 @@ func TestBakeImageSuccess(t *testing.T) {
 func TestBakeImageCreateInstanceError(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	config := BakeConfig{
+	config := bakeConfig{
 		ImageName:     "test-image",
 		Project:       "test-project",
 		Zone:          "us-central1-a",
@@ -109,7 +109,7 @@ func TestBakeImageCreateInstanceError(t *testing.T) {
 	mockClient.On("CreateInstance", mock.Anything, mock.Anything).
 		Return(fmt.Errorf("quota exceeded"))
 
-	err := BakeImage(context.Background(), mockClient, config)
+	err := bakeImage(context.Background(), mockClient, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create bake VM")
 	assert.Contains(t, err.Error(), "quota exceeded")
@@ -121,7 +121,7 @@ func TestBakeImageCreateImageError(t *testing.T) {
 
 	mockClient := &MockGCPClient{}
 
-	config := BakeConfig{
+	config := bakeConfig{
 		ImageName:     "test-image",
 		Project:       "test-project",
 		Zone:          "us-central1-a",
@@ -145,7 +145,7 @@ func TestBakeImageCreateImageError(t *testing.T) {
 	mockClient.On("DeleteInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
 		Return(nil)
 
-	err := BakeImage(context.Background(), mockClient, config)
+	err := bakeImage(context.Background(), mockClient, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create image")
 
@@ -158,7 +158,7 @@ func TestBakeImageWaitError(t *testing.T) {
 
 	mockClient := &MockGCPClient{}
 
-	config := BakeConfig{
+	config := bakeConfig{
 		ImageName:     "test-image",
 		Project:       "test-project",
 		Zone:          "us-central1-a",
@@ -178,7 +178,7 @@ func TestBakeImageWaitError(t *testing.T) {
 	mockClient.On("DeleteInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
 		Return(nil)
 
-	err := BakeImage(context.Background(), mockClient, config)
+	err := bakeImage(context.Background(), mockClient, config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "bake failed")
 	mockClient.AssertCalled(t, "DeleteInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image")
@@ -189,7 +189,7 @@ func TestBakeImageCleanupErrorDoesNotOverride(t *testing.T) {
 
 	mockClient := &MockGCPClient{}
 
-	config := BakeConfig{
+	config := bakeConfig{
 		ImageName:     "test-image",
 		Project:       "test-project",
 		Zone:          "us-central1-a",
@@ -210,7 +210,7 @@ func TestBakeImageCleanupErrorDoesNotOverride(t *testing.T) {
 	mockClient.On("DeleteInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
 		Return(fmt.Errorf("delete failed"))
 
-	err := BakeImage(context.Background(), mockClient, config)
+	err := bakeImage(context.Background(), mockClient, config)
 	assert.NoError(t, err)
 }
 
@@ -315,7 +315,7 @@ func TestWaitForVMTerminatedTimeout(t *testing.T) {
 }
 
 func TestBakeConfigFields(t *testing.T) {
-	config := BakeConfig{
+	config := bakeConfig{
 		ImageName:     "my-image",
 		Project:       "my-project",
 		Zone:          "us-east1-b",
