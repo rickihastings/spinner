@@ -8,11 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"cloud.google.com/go/compute/metadata"
-
 	"github.com/rickihastings/spinner/internal/agent"
 	"github.com/rickihastings/spinner/internal/agent/claude"
-	"github.com/rickihastings/spinner/internal/logs"
 )
 
 const (
@@ -25,6 +22,15 @@ const (
 // Errors are logged as warnings but do not fail the loop.
 type StateSyncFunc func(statePath string)
 
+// LogSinkFactory creates an optional io.Writer for streaming logs to a remote
+// store. Returns (nil, nil) if not applicable. The cleanup function should be
+// called when the writer is no longer needed.
+type LogSinkFactory func(ctx context.Context) (io.Writer, func())
+
+// StateSyncFactory creates an optional function for syncing state to a remote
+// store. Returns nil if not applicable.
+type StateSyncFactory func(ctx context.Context) StateSyncFunc
+
 // Function variables for testing
 var (
 	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
@@ -33,31 +39,52 @@ var (
 			AdditionalWriter: additionalWriter,
 		})
 	}
-	pushChangesFunc     = PushChanges
-	gcsSinkFactory      = defaultGCSSinkFactory
-	gcsStateSyncFactory = defaultGCSStateSyncFactory
-	gcsObjectWriterNew  = logs.NewGCSObjectWriter
-	isRunningOnGCE      = metadata.OnGCE
+	pushChangesFunc = PushChanges
 )
 
 // Runner executes the main iteration loop.
 type Runner struct {
-	config    *Config
-	state     *State
-	statePath string
-	stateSync StateSyncFunc
+	config           *Config
+	state            *State
+	statePath        string
+	stateSync        StateSyncFunc
+	logSinkFactory   LogSinkFactory
+	stateSyncFactory StateSyncFactory
+}
+
+// RunnerOption configures optional Runner behavior.
+type RunnerOption func(*Runner)
+
+// WithLogSinkFactory sets a factory for creating a remote log sink.
+func WithLogSinkFactory(f LogSinkFactory) RunnerOption {
+	return func(r *Runner) {
+		r.logSinkFactory = f
+	}
+}
+
+// WithStateSyncFactory sets a factory for creating a remote state sync function.
+func WithStateSyncFactory(f StateSyncFactory) RunnerOption {
+	return func(r *Runner) {
+		r.stateSyncFactory = f
+	}
 }
 
 // NewRunner creates a new Runner with the given config and state.
-func NewRunner(config *Config, state *State, statePath string) *Runner {
-	return &Runner{
+func NewRunner(config *Config, state *State, statePath string, opts ...RunnerOption) *Runner {
+	r := &Runner{
 		config:    config,
 		state:     state,
 		statePath: statePath,
 	}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
-// saveState saves state locally and, if configured, syncs to GCS.
+// saveState saves state locally and, if configured, syncs to a remote store.
 func (r *Runner) saveState() error {
 	err := SaveState(r.statePath, r.state)
 	if err == nil && r.stateSync != nil {
@@ -76,24 +103,28 @@ func (r *Runner) Run(ctx context.Context) int {
 	// Set initial state
 	r.state.Branch = r.config.Branch
 
-	// Set up GCS state sync if running on GCP with a state bucket configured.
-	r.stateSync = gcsStateSyncFactory(ctx)
+	// Set up remote state sync if a factory is configured.
+	if r.stateSyncFactory != nil {
+		r.stateSync = r.stateSyncFactory(ctx)
+	}
 
 	r.state.Status = StatusRunning
 	if err := r.saveState(); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to save initial state: %v\n", err)
 	}
 
-	// Create GCS log sink if running inside a GCP VM with a log bucket configured.
-	// Use io.Writer type to avoid Go's interface nil pitfall: a nil *GCSSink
-	// stored in an io.Writer interface would not compare equal to nil.
+	// Create remote log sink if a factory is configured.
+	// Use io.Writer type to avoid Go's interface nil pitfall: a nil concrete
+	// type stored in an io.Writer interface would not compare equal to nil.
 	var additionalWriter io.Writer
 
-	sink, cleanup := gcsSinkFactory(ctx)
-	if sink != nil {
-		additionalWriter = sink
+	if r.logSinkFactory != nil {
+		sink, cleanup := r.logSinkFactory(ctx)
+		if sink != nil {
+			additionalWriter = sink
 
-		defer cleanup()
+			defer cleanup()
+		}
 	}
 
 	for r.state.Iteration = 1; r.state.Iteration <= r.config.MaxIterations; r.state.Iteration++ {
@@ -207,86 +238,6 @@ func (r *Runner) Run(ctx context.Context) int {
 	_ = r.saveState()
 
 	return 1
-}
-
-// gcsEnv holds the resolved GCS environment for a GCE VM.
-type gcsEnv struct {
-	bucket       string
-	instanceName string
-	writer       *logs.GCSObjectWriter
-}
-
-// resolveGCSEnv checks whether we're on GCE, reads the given bucket env var,
-// verifies SPINNER_INSTANCE_NAME, and creates an ObjectWriter. Returns nil if
-// any precondition is not met (not on GCE, env var unset, client error).
-func resolveGCSEnv(ctx context.Context, bucketEnvVar, feature string) *gcsEnv {
-	if !isRunningOnGCE() {
-		return nil
-	}
-
-	bucket := os.Getenv(bucketEnvVar)
-	if bucket == "" {
-		return nil
-	}
-
-	instanceName := os.Getenv("SPINNER_INSTANCE_NAME")
-	if instanceName == "" {
-		fmt.Fprintf(os.Stderr, "Warning: %s set but SPINNER_INSTANCE_NAME empty, skipping %s\n", bucketEnvVar, feature)
-		return nil
-	}
-
-	objectWriter, err := gcsObjectWriterNew(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to create GCS client for %s: %v\n", feature, err)
-		return nil
-	}
-
-	return &gcsEnv{bucket: bucket, instanceName: instanceName, writer: objectWriter}
-}
-
-// defaultGCSSinkFactory creates a GCS sink when running on a GCE VM with
-// SPINNER_LOG_BUCKET set. Returns (nil, nil) if not on GCE or init fails.
-func defaultGCSSinkFactory(ctx context.Context) (*logs.GCSSink, func()) {
-	env := resolveGCSEnv(ctx, "SPINNER_LOG_BUCKET", "GCS log sink")
-	if env == nil {
-		return nil, nil
-	}
-
-	object := env.instanceName + "/logs/raw.log"
-	sink := logs.NewGCSSink(ctx, env.writer, env.bucket, object)
-
-	fmt.Printf("GCS log streaming enabled: gs://%s/%s\n", env.bucket, object)
-
-	cleanup := func() {
-		_ = sink.Close()
-		_ = env.writer.Close()
-	}
-
-	return sink, cleanup
-}
-
-// defaultGCSStateSyncFactory creates a state sync function when running on a
-// GCE VM with SPINNER_STATE_BUCKET set. Returns nil if not on GCE or init fails.
-func defaultGCSStateSyncFactory(ctx context.Context) StateSyncFunc {
-	env := resolveGCSEnv(ctx, "SPINNER_STATE_BUCKET", "GCS state sync")
-	if env == nil {
-		return nil
-	}
-
-	object := env.instanceName + "/state.json"
-	fmt.Printf("GCS state sync enabled: gs://%s/%s\n", env.bucket, object)
-
-	return func(statePath string) {
-		data, readErr := os.ReadFile(statePath)
-		if readErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to read state file for GCS sync: %v\n", readErr)
-			return
-		}
-
-		if writeErr := env.writer.WriteObject(context.Background(), env.bucket, object, data); writeErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to sync state to GCS: %v\n", writeErr)
-		}
-	}
 }
 
 // waitForRateLimit waits for the rate limit period with a countdown.

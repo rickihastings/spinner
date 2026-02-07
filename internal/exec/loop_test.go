@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/rickihastings/spinner/internal/agent"
-	"github.com/rickihastings/spinner/internal/logs"
 )
 
 // mockExecutor is a test helper that implements agent.Executor interface
@@ -24,26 +23,6 @@ func (m *mockExecutor) Execute(_ context.Context, _ string) (<-chan agent.Event,
 
 func (m *mockExecutor) ExecuteAndCollect(_ context.Context, _ string) (*agent.Result, error) {
 	return m.result, m.err
-}
-
-// mockNoGCS disables the GCS sink and state sync factories for testing.
-// Returns a cleanup function that restores the original factories.
-func mockNoGCSSink() func() {
-	oldSink := gcsSinkFactory
-	oldStateSync := gcsStateSyncFactory
-
-	gcsSinkFactory = func(_ context.Context) (*logs.GCSSink, func()) {
-		return nil, nil
-	}
-
-	gcsStateSyncFactory = func(_ context.Context) StateSyncFunc {
-		return nil
-	}
-
-	return func() {
-		gcsSinkFactory = oldSink
-		gcsStateSyncFactory = oldStateSync
-	}
 }
 
 func TestNewRunner(t *testing.T) {
@@ -93,8 +72,6 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 	}
 
 	runner := NewRunner(config, state, statePath)
-
-	defer mockNoGCSSink()()
 
 	// Mock executor factory to return no completion
 	oldExecutorFactory := executorFactory
@@ -167,8 +144,6 @@ func TestRunner_Run_Completion(t *testing.T) {
 
 	runner := NewRunner(config, state, statePath)
 
-	defer mockNoGCSSink()()
-
 	// Mock executor factory to return completion on first iteration
 	oldExecutorFactory := executorFactory
 
@@ -224,8 +199,6 @@ func TestRunner_Run_AuthError(t *testing.T) {
 	}
 
 	runner := NewRunner(config, state, statePath)
-
-	defer mockNoGCSSink()()
 
 	oldExecutorFactory := executorFactory
 
@@ -286,8 +259,6 @@ func TestRunner_Run_RateLimit(t *testing.T) {
 	}
 
 	runner := NewRunner(config, state, statePath)
-
-	defer mockNoGCSSink()()
 
 	// Mock executor factory to return rate limit on first call, then completion
 	callCount := 0
@@ -352,8 +323,6 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 	}
 
 	runner := NewRunner(config, state, statePath)
-
-	defer mockNoGCSSink()()
 
 	oldExecutorFactory := executorFactory
 

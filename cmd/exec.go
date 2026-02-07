@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/rickihastings/spinner/internal/backend/gcp"
 	"github.com/rickihastings/spinner/internal/exec"
 	"github.com/spf13/cobra"
 )
@@ -80,8 +81,12 @@ EXAMPLES:
 				cancel()
 			}()
 
-			// Create runner and execute loop
-			runner := exec.NewRunner(config, state, statePath)
+			// Create runner with GCP remote hooks for log streaming and state sync.
+			// These are no-ops when not running on a GCE VM.
+			runner := exec.NewRunner(config, state, statePath,
+				exec.WithLogSinkFactory(gcp.NewLogSinkFactory()),
+				exec.WithStateSyncFactory(gcp.NewStateSyncFactory()),
+			)
 			exitCode := runner.Run(ctx)
 
 			// Exit with the appropriate code
