@@ -54,6 +54,8 @@ func TestBakeImageSuccess(t *testing.T) {
 		ExternalIP:   true,
 		Metadata: map[string]string{
 			"startup-script": "#!/bin/bash\necho hello",
+			"LOCAL_BUILD":    "",
+			"STATE_BUCKET":   "",
 		},
 		Labels: map[string]string{
 			"spinner-managed": "true",

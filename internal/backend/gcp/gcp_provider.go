@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/rickihastings/spinner/internal/provider"
+	"github.com/rickihastings/spinner/internal/util"
 )
 
 // Provider implements provider.Provider using GCP Compute Engine VMs as the backend.
@@ -78,6 +80,33 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 		return fmt.Errorf("failed to load startup script: %w", err)
 	}
 
+	// Load the shared install_spinner.sh script
+	installScript, err := loadInstallSpinnerScript()
+	if err != nil {
+		return fmt.Errorf("failed to load install script: %w", err)
+	}
+
+	stateBucket := config.Options["state-bucket"]
+
+	// Check if we're in development mode (local binary exists)
+	// This happens when running from source after ./scripts/dev-setup.sh
+	if stateBucket != "" {
+		projectRoot, rootErr := util.FindProjectRoot()
+		if rootErr == nil {
+			localTarball := filepath.Join(projectRoot, "dist", "spinner-dev-linux-amd64.tar.gz")
+			if _, statErr := os.Stat(localTarball); statErr == nil {
+				// Local binary exists - upload it automatically
+				fmt.Println("🔧 Local development binary detected, uploading to GCS...")
+				if err := uploadLocalBinary(ctx, p.client, stateBucket); err != nil {
+					return fmt.Errorf("failed to upload local binary: %w", err)
+				}
+				// Set LOCAL_BUILD so bake VM knows to download from GCS
+				os.Setenv("LOCAL_BUILD", "true")
+				fmt.Println("✓ Local binary uploaded to state bucket")
+			}
+		}
+	}
+
 	return bakeImage(ctx, p.client, bakeConfig{
 		ImageName:     config.Name,
 		Project:       project,
@@ -85,8 +114,10 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 		MachineType:   machineType,
 		DiskSizeGB:    diskSizeGB,
 		StartupScript: bakeScript,
+		StateBucket:   stateBucket,
 		ExtraMetadata: map[string]string{
-			"startup-script-runtime": startupScript,
+			"startup-script-runtime":   startupScript,
+			"spinner-install-script":   installScript,
 		},
 	})
 }
