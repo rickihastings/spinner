@@ -5,76 +5,94 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rickihastings/spinner/internal/docker"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// setupCmd is the production setup command using Provider
-var setupCmd = NewSetupCommand(docker.NewDockerProvider(docker.NewRealDockerClient()))
+// setupCmd is the production setup command using the default provider factory.
+var setupCmd = NewSetupCommand(defaultFactory)
 
 func init() {
 	rootCmd.AddCommand(setupCmd)
 }
 
-// NewSetupCommand creates a new setup command with the given Provider.
+// NewSetupCommand creates a new setup command with the given Factory.
 // This constructor enables dependency injection for testing.
-func NewSetupCommand(p provider.Provider) *cobra.Command {
-	var (
-		setupName       string
-		setupBaseImage  string
-		setupDockerfile string
-	)
+func NewSetupCommand(f *provider.Factory) *cobra.Command {
+	var setupName string
 
 	cmd := &cobra.Command{
 		Use:   "setup",
-		Short: "Build a Docker sandbox image",
-		Long: `Build a Docker sandbox image with custom base image or Dockerfile
+		Short: "Build a sandbox environment",
+		Long: `Build a sandbox environment (Docker image or GCP machine image)
 
-SETUP OPTIONS:
-  --name <name>              Name for the Docker image (required)
+GENERAL FLAGS:
+  --name <name>              Name for the environment (required)
+  --backend <backend>        Backend provider: docker, gcp (default: docker)
+
+DOCKER BACKEND FLAGS:
   --base-image <image>       Base Docker image (optional, default: ubuntu:22.04)
   --dockerfile <path>        Path to custom Dockerfile (optional, mutually exclusive with --base-image)
 
-EXAMPLES:
-  spinner setup --name my-sandbox
-  spinner setup --name my-sandbox --base-image ubuntu:22.04
-  spinner setup --name node-env --base-image node:20-bullseye
-  spinner setup --name custom-env --dockerfile ./Dockerfile.custom`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = viper.BindPFlag("name", cmd.Flags().Lookup("name"))
-			_ = viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
-			_ = viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
+GCP BACKEND FLAGS:
+  --project <project>        GCP project ID (required for GCP)
+  --zone <zone>              GCP zone (required for GCP)
+  --machine-type <type>      VM machine type (default: e2-standard-2)
+  --disk-size <gb>           Boot disk size in GB (default: 30)
+  --state-bucket <bucket>    GCS bucket for state persistence (required for GCP)
 
-			setupName = viper.GetString("name")
-			setupBaseImage = viper.GetString("base-image")
-			setupDockerfile = viper.GetString("dockerfile")
+EXAMPLES:
+  # Docker (default)
+  spinner setup --name my-sandbox
+  spinner setup --name my-sandbox --base-image node:20-bullseye
+
+  # GCP
+  spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Bind general flags to Viper
+			_ = viper.BindPFlag(flagName, cmd.Flags().Lookup(flagName))
+			_ = viper.BindPFlag(flagBaseImage, cmd.Flags().Lookup(flagBaseImage))
+			_ = viper.BindPFlag(flagDockerfile, cmd.Flags().Lookup(flagDockerfile))
+
+			// Resolve and validate backend
+			backend, err := resolveAndValidateBackend(cmd)
+			if err != nil {
+				return err
+			}
+
+			setupName = viper.GetString(flagName)
 
 			if setupName == "" {
 				fmt.Fprintln(os.Stderr, "Error: Missing required flag: --name")
-				fmt.Fprintln(os.Stderr, "Usage: spinner setup --name <name> [--base-image <image> | --dockerfile <path>]")
+				fmt.Fprintln(os.Stderr, "Usage: spinner setup --name <name> [--backend docker|gcp] [options]")
 
 				return fmt.Errorf("missing required flag: --name")
 			}
 
-			if setupBaseImage != "" && setupDockerfile != "" {
-				fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
-				fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
-
-				return fmt.Errorf("mutually exclusive flags provided")
+			p, err := f.Create(backend)
+			if err != nil {
+				return err
 			}
 
-			return performSetup(context.Background(), p, provider.SetupConfig{
-				Name:    setupName,
-				Options: map[string]string{"base-image": setupBaseImage, "dockerfile": setupDockerfile},
-			})
+			return runSetup(context.Background(), p, backend, setupName)
 		},
 	}
 
-	cmd.Flags().StringVar(&setupName, "name", "", "Name for the Docker image (required)")
-	cmd.Flags().StringVar(&setupBaseImage, "base-image", "", "Base Docker image (optional, default: ubuntu:22.04)")
-	cmd.Flags().StringVar(&setupDockerfile, "dockerfile", "", "Path to custom Dockerfile (optional)")
+	// General flags
+	cmd.Flags().StringVar(&setupName, flagName, "", "Name for the environment (required)")
+	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
+
+	// Docker backend flags
+	cmd.Flags().String(flagBaseImage, "", "Base Docker image (optional, default: ubuntu:22.04)")
+	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile (optional)")
+
+	// GCP backend flags
+	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
+	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
+	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
+	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
+	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
 
 	return cmd
 }

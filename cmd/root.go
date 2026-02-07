@@ -11,39 +11,39 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "spinner",
-	Short: "CLI tool for running code in isolated Docker containers",
-	Long: `Spinner - CLI tool for running code in isolated Docker containers
+	Short: "CLI tool for running code in isolated sandboxed environments",
+	Long: `Spinner - CLI tool for running code in isolated sandboxed environments
 
 USAGE:
-  spinner setup --name <name> [--base-image <image> | --dockerfile <path>]
-  spinner spin --image <image> --repo <repo> [--prompt <prompt> --branch <branch> [--max-iterations <num>]]
+  spinner setup --name <name> [--backend docker|gcp] [backend-specific options]
+  spinner spin --image <image> --repo <repo> [--backend docker|gcp] [options]
 
 COMMANDS:
-  setup    Build a Docker sandbox image with custom base image or Dockerfile
-  spin     Spin up a development container from a pre-built image
+  setup    Build a sandbox environment (Docker image or GCP machine image)
+  spin     Spin up an instance from a pre-built environment
 
 GENERAL OPTIONS:
   --help                     Show this help message
   --version                  Show version information
 
 EXAMPLES:
+  # Docker (default)
   spinner setup --name my-sandbox
-  spinner setup --name my-sandbox --base-image ubuntu:22.04
-  spinner setup --name node-env --base-image node:20-bullseye
-  spinner setup --name custom-env --dockerfile ./Dockerfile.custom
   spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X"
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X" --branch feature/x
+
+  # GCP
+  spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket
+  spinner spin --backend gcp --image my-env --repo git@github.com:octocat/Hello-World.git
+
+  # Configuration file (.spinner.json) provides defaults for backend-specific flags
+  # Precedence: CLI flags > env vars (SPINNER_*) > .spinner.json > defaults
 
 NOTES:
-  - Setup: Only Ubuntu/Debian-based images are supported (requires apt-get)
-  - Setup: The CLI ensures git and claude-code are installed in the final image
+  - Setup: Only Ubuntu/Debian-based images are supported for Docker (requires apt-get)
   - Setup: If using --dockerfile, the custom Dockerfile is built first and used as base
-  - Spin: SSH agent must be running on host system
-  - Spin: Container names are deterministic based on image + repo + branch
-  - Spin: Running spin with same image/repo/branch reuses the existing container
-  - Spin: Use --recreate to force removal and recreation of existing container
-  - Spin: Containers are persistent and must be manually stopped/removed`,
+  - Spin: Instance names are deterministic based on image + repo + branch
+  - Spin: Running spin with same image/repo/branch reuses the existing instance
+  - Spin: Use --recreate to force removal and recreation of existing instance`,
 	Version: version.Info(),
 }
 
@@ -52,12 +52,17 @@ func init() {
 	viper.SetEnvPrefix("SPINNER")
 	viper.AutomaticEnv()
 
-	// Optional: Load .env file if it exists
+	// Primary config: .spinner.json in repo root (committed, team-shared)
+	viper.SetConfigName(".spinner")
+	viper.SetConfigType("json")
+	viper.AddConfigPath(".")
+	_ = viper.ReadInConfig() // Ignore error if .spinner.json doesn't exist
+
+	// Secondary: .env file (not committed, local overrides)
+	// Viper only reads one config file, so load .env separately via MergeInConfig.
 	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
-	viper.AddConfigPath(".")
-
-	_ = viper.ReadInConfig() // Ignore error if .env doesn't exist
+	_ = viper.MergeInConfig() // Ignore error if .env doesn't exist
 }
 
 // Execute runs the root command and exits on error.

@@ -129,7 +129,7 @@ func init() {
 |---|---|
 | `backend`, `project`, `zone` | `name`, `image`, `repo` |
 | `state-bucket`, `machine-type`, `disk-size` | `prompt`, `branch`, `max-iterations` |
-| `base-image` | `recreate`, `watch`, `setup` |
+| `base-image`, `bake-script` | `recreate`, `watch`, `setup` |
 
 This means a typical GCP invocation goes from:
 ```bash
@@ -154,6 +154,7 @@ cmd.Flags().StringVar(&zone, "zone", "", "GCP zone (GCP backend)")
 cmd.Flags().StringVar(&machineType, "machine-type", "", "VM machine type (GCP backend)")
 cmd.Flags().IntVar(&diskSize, "disk-size", 0, "Boot disk size in GB (GCP backend)")
 cmd.Flags().StringVar(&stateBucket, "state-bucket", "", "GCS bucket for state (GCP backend)")
+cmd.Flags().StringVar(&bakeScript, "bake-script", "", "Path to custom bake script (GCP backend)")
 
 cmd.Flags().StringVar(&baseImage, "base-image", "", "Base Docker image (Docker backend)")
 cmd.Flags().StringVar(&dockerfile, "dockerfile", "", "Path to Dockerfile (Docker backend)")
@@ -163,7 +164,7 @@ cmd.Flags().StringVar(&dockerfile, "dockerfile", "", "Path to Dockerfile (Docker
 
 ```go
 // Define which flags belong to which backend
-gcpFlags := []string{"project", "zone", "machine-type", "disk-size", "state-bucket"}
+gcpFlags := []string{"project", "zone", "machine-type", "disk-size", "state-bucket", "bake-script"}
 dockerFlags := []string{"base-image", "dockerfile"}
 
 backend := viper.GetString("backend")
@@ -285,12 +286,39 @@ rm /tmp/spinner.tar.gz
    - Install GitHub CLI (gh)
    - Install Claude Code CLI
    - Download spinner binary from GitHub Releases (latest)
+   - **Run user's custom bake script** (if `--bake-script` provided)
    - Write completion marker to serial port
    - Shut down the VM
 2. Create a temporary VM with the bake script as `metadata.startup-script`
 3. Wait for VM to reach `TERMINATED` state (script shuts down after install)
 4. Create a custom image from the VM's boot disk
 5. Delete the temporary VM
+
+**Custom Bake Script (`--bake-script`):**
+
+The `--bake-script` flag accepts a path to a shell script that extends the default bake process.
+The user's script is injected **inside** the default `gcp_bake.sh` — after core tooling is installed
+but before the completion marker and shutdown. This ensures essential tools (git, gh, claude-code,
+spinner) are always present regardless of the custom script's contents.
+
+The custom script runs as root and can install any additional packages, configure the environment,
+or set up project-specific tooling. For example:
+
+```bash
+# my-bake.sh — install Node.js and project dependencies
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs
+npm install -g typescript eslint
+```
+
+Usage:
+```bash
+spinner setup --backend gcp --name my-env --bake-script ./my-bake.sh \
+  --project my-proj --zone us-central1-a --state-bucket my-bucket
+```
+
+This mirrors Docker's `--dockerfile` customization pattern — Docker users provide a full Dockerfile
+to customize the image; GCP users provide a script that runs inside the standard bake process.
 
 ##### Create Flow (Launch Instance)
 
@@ -444,6 +472,7 @@ flag is planned as a follow-up to give users explicit control.
 | **Required `--state-bucket` flag** | GCS bucket names are globally unique; no safe auto-generated default; user must provide |
 | **VM stays running after completion** | Docker parity; enables debugging; auto-stop is a follow-up feature |
 | **Labels for resource management** | Cost attribution; automated cleanup scripts; resource identification |
+| **`--bake-script` extends, never replaces** | Core tooling (git, gh, claude-code, spinner) must always be installed; user script is injected after core setup, before shutdown; mirrors Docker's `--dockerfile` customization pattern |
 
 ### Architecture Diagram
 
@@ -524,7 +553,7 @@ All operations use context for cancellation and timeouts. Specific error codes a
 
 ### Startup Script Templates
 
-**gcp_bake.sh** (runs during setup, installs tooling, then shuts down):
+**gcp_bake.sh** (runs during setup, installs tooling, runs custom script if provided, then shuts down):
 ```bash
 #!/bin/bash
 set -e
@@ -561,10 +590,22 @@ chmod +x /usr/local/bin/startup.sh
 # Set up workspace directory
 mkdir -p /home/spinner/workspace && chown spinner:spinner /home/spinner/workspace
 
+# --- Custom bake script (injected via --bake-script flag) ---
+# {{if .BakeScript}}
+echo "Running custom bake script..."
+{{.BakeScript}}
+# {{end}}
+
 # Signal completion and shut down
 echo "SPINNER_BAKE_COMPLETE" > /dev/ttyS0
 shutdown -h now
 ```
+
+The `{{.BakeScript}}` template variable is populated by reading the file at the path provided via
+`--bake-script`. The script contents are embedded inline — not sourced from a separate file on the
+VM — so the user's script has access to the same shell environment (root, `set -e`, installed
+packages). If `--bake-script` is not provided, the template block is omitted and the default
+bake runs unchanged.
 
 **gcp_runtime.sh** (runs on each spin, clones repo, runs exec):
 ```bash

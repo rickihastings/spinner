@@ -13,35 +13,40 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 
 ## 1.0 Provider Factory, Config File & Backend Selection
 
-- [ ] 1.1 Create `internal/provider/factory.go` with `Factory` struct, `Register()`, `Create()`, `Available()` methods
-- [ ] 1.2 Create `internal/provider/factory_test.go` with unit tests for factory registration, creation, and error cases
-- [ ] 1.3 Modify `cmd/root.go` — add `.spinner.json` config file loading via Viper (alongside existing `.env` support)
-- [ ] 1.4 Modify `cmd/constructors.go` — change `NewSetupCommand` and `NewSpinCommand` to accept `*provider.Factory`; add `--backend` flag (default: `"docker"`)
-- [ ] 1.5 Add GCP-specific flags to setup and spin commands (`--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`) organized into flag groups
-- [ ] 1.6 Implement conditional flag validation in `RunE` — hard error when backend-specific CLI flags are used with the wrong `--backend`; config file values silently ignored cross-backend
-- [ ] 1.7 Modify `cmd/constructors_watch.go` and `cmd/watch.go` — add `--backend` flag to standalone watch command
-- [ ] 1.8 Update command tests to use factory instead of direct provider injection
-- [ ] 1.9 Verify build and all existing tests pass (no regressions)
+- [x] 1.1 Create `internal/provider/factory.go` with `Factory` struct, `Register()`, `Create()`, `Available()` methods
+- [x] 1.2 Create `internal/provider/factory_test.go` with unit tests for factory registration, creation, and error cases
+- [x] 1.3 Modify `cmd/root.go` — add `.spinner.json` config file loading via Viper (alongside existing `.env` support)
+- [x] 1.4 Modify `cmd/setup.go`, `cmd/spin.go`, `cmd/watch.go` — change constructors to accept `*provider.Factory`; add `--backend` flag (default: `"docker"`); create `cmd/factory.go` for default factory wiring
+- [x] 1.5 Add GCP-specific flags to setup and spin commands (`--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`) organized into flag groups
+- [x] 1.6 Implement conditional flag validation in `RunE` — hard error when backend-specific CLI flags are used with the wrong `--backend`; config file values silently ignored cross-backend
+- [x] 1.7 Modify `cmd/watch.go` — add `--backend` flag to standalone watch command with GCP flags
+- [x] 1.8 Update command tests to use factory instead of direct provider injection
+- [x] 1.9 Verify build and all existing tests pass (no regressions)
 
 ## 2.0 GCP Client Interface & Authentication
 
-- [ ] 2.1 Create `internal/gcp/types.go` — GCP-specific types: `InstanceConfig`, `ImageConfig`, `SerialPortOutput`, `MetricsQuery`, `MetricPoint`, `VMStatus`
-- [ ] 2.2 Create `internal/gcp/client.go` — `Client` interface with all GCP operations; `RealGCPClient` struct with SDK client fields
-- [ ] 2.3 Implement `NewRealGCPClient(ctx, project)` — initialize all SDK clients with ADC authentication
-- [ ] 2.4 Create `internal/gcp/mock_client.go` — testify mock implementing `Client` interface
-- [ ] 2.5 Create `internal/gcp/client_test.go` — unit tests for client initialization and error handling
-- [ ] 2.6 Add GCP SDK dependencies to `go.mod`: `cloud.google.com/go/compute`, `cloud.google.com/go/storage`, `cloud.google.com/go/logging`, `cloud.google.com/go/monitoring`
-- [ ] 2.7 Verify build succeeds with new dependencies
+- [x] 2.1 Create `internal/gcp/types.go` — GCP-specific types: `InstanceConfig`, `ImageConfig`, `SerialPortOutput`, `MetricsQuery`, `MetricPoint`, `VMStatus`
+- [x] 2.2 Create `internal/gcp/client.go` — `Client` interface with all GCP operations; `RealGCPClient` struct with SDK client fields
+- [x] 2.3 Implement `NewRealGCPClient(ctx, project)` — initialize all SDK clients with ADC authentication
+- [x] 2.4 Create `internal/gcp/mock_client.go` — testify mock implementing `Client` interface
+- [x] 2.5 Create `internal/gcp/client_test.go` — unit tests for client initialization and error handling
+- [x] 2.6 Add GCP SDK dependencies to `go.mod`: `cloud.google.com/go/compute`, `cloud.google.com/go/storage`, `cloud.google.com/go/monitoring`
+- [x] 2.7 Verify build succeeds with new dependencies
 
 ## 3.0 GCP Setup — Image Baking
 
-- [ ] 3.1 Create `templates/scripts/gcp_bake.sh` — startup script that installs git, gh, claude-code, downloads spinner from GitHub Releases (tar.gz), then shuts down
-- [ ] 3.2 Create `internal/gcp/startup.go` — Go template rendering for bake and runtime startup scripts
-- [ ] 3.3 Create `internal/gcp/image.go` — image baking logic: create temp VM, wait for shutdown, create image, cleanup
-- [ ] 3.4 Implement `Provider.Setup()` — orchestrate image baking flow using client interface
-- [ ] 3.5 Create `internal/gcp/image_test.go` — unit tests with mock client for full bake flow
-- [ ] 3.6 Create `internal/gcp/startup_test.go` — test startup script template rendering
-- [ ] 3.7 Verify build and tests pass
+- [x] 3.1 Create `templates/scripts/gcp_bake.sh` — startup script that installs git, gh, claude-code, downloads spinner from GitHub Releases (tar.gz), then shuts down
+- [x] 3.2 Create `internal/gcp/startup.go` — Go template rendering for bake and runtime startup scripts
+- [x] 3.3 Create `internal/gcp/image.go` — image baking logic: create temp VM, wait for shutdown, create image, cleanup
+- [x] 3.4 Implement `Provider.Setup()` — orchestrate image baking flow using client interface
+- [x] 3.5 Create `internal/gcp/image_test.go` — unit tests with mock client for full bake flow
+- [x] 3.6 Create `internal/gcp/startup_test.go` — test startup script template rendering
+- [x] 3.7 Verify build and tests pass
+- [ ] 3.8 Add `--bake-script` flag to setup and spin commands — reads user script file, passes contents to bake template as `BakeScript` variable
+- [ ] 3.9 Update `templates/scripts/gcp_bake.sh` — add `{{.BakeScript}}` template block after core tooling, before shutdown
+- [ ] 3.10 Update `internal/gcp/startup.go` — accept `BakeScript` in template data, read file contents from options
+- [ ] 3.11 Add tests for `--bake-script` flag validation and template rendering with custom script
+- [ ] 3.12 Verify build and tests pass
 
 ## 4.0 GCP Instance Lifecycle
 

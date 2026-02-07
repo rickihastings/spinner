@@ -21,13 +21,13 @@ func setupSpinCommandWithMocks(t *testing.T) *cobra.Command {
 		&provider.Instance{Name: "test-container", Status: provider.InstanceStatusRunning}, nil,
 	)
 
-	return NewSpinCommand(mockProvider)
+	return NewSpinCommand(testFactory(mockProvider))
 }
 
 // TestSpinCommand_MissingImageFlag tests that spin command fails when --image flag is missing
 func TestSpinCommand_MissingImageFlag(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
-	cmd := NewSpinCommand(mockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -43,7 +43,7 @@ func TestSpinCommand_MissingImageFlag(t *testing.T) {
 // TestSpinCommand_MissingRepoFlag tests that spin command fails when --repo flag is missing
 func TestSpinCommand_MissingRepoFlag(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
-	cmd := NewSpinCommand(mockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -111,7 +111,7 @@ func TestSpinCommand_RecreateFlagParsing(t *testing.T) {
 		&provider.Instance{Name: "test-container", Status: provider.InstanceStatusRunning}, nil,
 	)
 
-	cmd := NewSpinCommand(mockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -137,7 +137,7 @@ func TestSpinCommand_SetupFlagParsing(t *testing.T) {
 		&provider.Instance{Name: "test-container", Status: provider.InstanceStatusRunning}, nil,
 	)
 
-	cmd := NewSpinCommand(mockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -153,7 +153,7 @@ func TestSpinCommand_SetupFlagParsing(t *testing.T) {
 // TestSpinCommand_SetupWithBaseImageValidation tests that --base-image requires --setup flag
 func TestSpinCommand_SetupWithBaseImageValidation(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
-	cmd := NewSpinCommand(mockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -169,7 +169,7 @@ func TestSpinCommand_SetupWithBaseImageValidation(t *testing.T) {
 // TestSpinCommand_SetupMutuallyExclusiveFlags tests that --base-image and --dockerfile are mutually exclusive with --setup
 func TestSpinCommand_SetupMutuallyExclusiveFlags(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
-	cmd := NewSpinCommand(mockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -194,7 +194,7 @@ func TestSpinCommand_InvalidRepoURL(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
 
 	mockProvider := new(provider.MockProvider)
-	cmd := NewSpinCommand(mockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
@@ -256,7 +256,7 @@ func TestSpinCommand_FlagCombinations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockProvider := new(provider.MockProvider)
-			cmd := NewSpinCommand(mockProvider)
+			cmd := NewSpinCommand(testFactory(mockProvider))
 
 			b := new(bytes.Buffer)
 			cmd.SetOut(b)
@@ -273,4 +273,79 @@ func TestSpinCommand_FlagCombinations(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSpinCommand_GCPFlagsWithDockerBackend tests that GCP flags error with docker backend
+func TestSpinCommand_GCPFlagsWithDockerBackend(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		errorMsg string
+	}{
+		{
+			name:     "project flag with docker backend",
+			args:     []string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--project", "my-proj"},
+			errorMsg: "--project requires --backend gcp",
+		},
+		{
+			name:     "zone flag with docker backend",
+			args:     []string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--zone", "us-central1-a"},
+			errorMsg: "--zone requires --backend gcp",
+		},
+		{
+			name:     "state-bucket flag with docker backend",
+			args:     []string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--state-bucket", "my-bucket"},
+			errorMsg: "--state-bucket requires --backend gcp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockProvider := new(provider.MockProvider)
+			cmd := NewSpinCommand(testFactory(mockProvider))
+
+			b := new(bytes.Buffer)
+			cmd.SetOut(b)
+			cmd.SetErr(b)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.Execute()
+
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errorMsg)
+		})
+	}
+}
+
+// TestSpinCommand_UnknownBackend tests that an unknown backend produces a clear error
+func TestSpinCommand_UnknownBackend(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--backend", "kubernetes"})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown backend")
+}
+
+// TestSpinCommand_DockerBackendExplicit tests explicit --backend docker works
+func TestSpinCommand_DockerBackendExplicit(t *testing.T) {
+	cmd := setupSpinCommandWithMocks(t)
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{"--image", "spinner:test", "--repo", "https://github.com/test/repo.git", "--backend", "docker"})
+
+	err := cmd.Execute()
+
+	assert.NoError(t, err)
 }
