@@ -31,7 +31,6 @@ func NewSpinCommand(f *provider.Factory) *cobra.Command {
 		spinRecreate      bool
 		spinSetup         bool
 		spinWatch         bool
-		backend           string
 	)
 
 	cmd := &cobra.Command{
@@ -85,14 +84,9 @@ EXAMPLES:
 			_ = viper.BindPFlag(flagDockerfile, cmd.Flags().Lookup(flagDockerfile))
 			_ = viper.BindPFlag(flagWatch, cmd.Flags().Lookup(flagWatch))
 
-			// Bind GCP flags to Viper
-			bindGCPFlags(cmd)
-
-			// Resolve backend (CLI > env > config > default "docker")
-			backend = resolveBackend(cmd)
-
-			// Validate cross-backend flags
-			if err := validateBackendFlags(cmd, backend); err != nil {
+			// Resolve and validate backend
+			backend, err := resolveAndValidateBackend(cmd)
+			if err != nil {
 				return err
 			}
 
@@ -114,20 +108,6 @@ EXAMPLES:
 				return fmt.Errorf("--repo flag is required")
 			}
 
-			// Docker-specific setup flag validation
-			if backend == provider.BackendDocker {
-				if err := validateDockerFlags(cmd); err != nil {
-					return err
-				}
-			}
-
-			// GCP-specific validation
-			if backend == provider.BackendGCP {
-				if err := validateRequiredGCPFlags(cmd); err != nil {
-					return err
-				}
-			}
-
 			// Create provider from factory
 			p, err := f.Create(backend)
 			if err != nil {
@@ -140,18 +120,7 @@ EXAMPLES:
 			if spinSetup {
 				setupName := strings.TrimPrefix(spinImage, "spinner:")
 
-				setupOptions := dockerSetupOptions()
-
-				if backend == provider.BackendGCP {
-					for k, v := range gcpOptionsFromViper() {
-						setupOptions[k] = v
-					}
-				}
-
-				if err := performSetup(ctx, p, provider.SetupConfig{
-					Name:    setupName,
-					Options: setupOptions,
-				}); err != nil {
+				if err := runSetup(ctx, p, backend, setupName); err != nil {
 					return err
 				}
 
@@ -278,7 +247,7 @@ EXAMPLES:
 	cmd.Flags().StringVar(&spinMaxIterations, flagMaxIterations, "", "Maximum iterations (optional, default: 100)")
 	cmd.Flags().BoolVar(&spinRecreate, flagRecreate, false, "Force recreation of existing instance (optional)")
 	cmd.Flags().BoolVar(&spinSetup, flagSetup, false, "Build/rebuild the environment before spinning (optional)")
-	cmd.Flags().StringVar(&backend, flagBackend, "", "Backend provider: docker, gcp (default: docker)")
+	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 	cmd.Flags().BoolVar(&spinWatch, flagWatch, false, "Enter watch mode after instance is ready (optional)")
 
 	// Docker backend flags

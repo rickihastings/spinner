@@ -25,8 +25,6 @@ func init() {
 // NewWatchCommand creates a new watch command with the given Factory.
 // This constructor enables dependency injection for testing.
 func NewWatchCommand(f *provider.Factory) *cobra.Command {
-	var backend string
-
 	cmd := &cobra.Command{
 		Use:   "watch <instance-name>",
 		Short: "Monitor instance logs and metrics in real-time",
@@ -55,38 +53,22 @@ EXAMPLES:
   spinner watch my-instance --backend gcp --project my-proj --zone us-central1-a --state-bucket my-bucket`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Bind GCP flags to Viper
-			bindGCPFlags(cmd)
-
-			// Resolve backend (CLI > env > config > default "docker")
-			backend = resolveBackend(cmd)
-
-			// Validate cross-backend flags
-			if err := validateBackendFlags(cmd, backend); err != nil {
+			backend, err := resolveAndValidateBackend(cmd)
+			if err != nil {
 				return err
 			}
 
-			// GCP-specific validation
-			if backend == provider.BackendGCP {
-				if err := validateRequiredGCPFlags(cmd); err != nil {
-					return err
-				}
-			}
-
-			// Create provider from factory
 			p, err := f.Create(backend)
 			if err != nil {
 				return err
 			}
 
-			containerName := args[0]
-
-			return PerformWatch(context.Background(), p, containerName)
+			return PerformWatch(context.Background(), p, args[0])
 		},
 	}
 
 	// General flags
-	cmd.Flags().StringVar(&backend, flagBackend, "", "Backend provider: docker, gcp (default: docker)")
+	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 
 	// GCP backend flags
 	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")

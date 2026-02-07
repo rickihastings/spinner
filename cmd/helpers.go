@@ -61,8 +61,13 @@ func isValidGitURL(url string) bool {
 		strings.HasPrefix(url, "git@")
 }
 
-// resolveBackend reads the --backend value from Viper (CLI > env > config > default).
-func resolveBackend(cmd *cobra.Command) string {
+// resolveAndValidateBackend resolves the backend from flags/config/env and runs
+// all backend-specific validation in one call. This replaces the repeated sequence
+// of bindGCPFlags + resolveBackend + validateBackendFlags + validateDockerFlags +
+// validateRequiredGCPFlags that was duplicated across setup, spin, and watch.
+func resolveAndValidateBackend(cmd *cobra.Command) (string, error) {
+	bindGCPFlags(cmd)
+
 	_ = viper.BindPFlag(flagBackend, cmd.Flags().Lookup(flagBackend))
 
 	backend := viper.GetString(flagBackend)
@@ -70,7 +75,46 @@ func resolveBackend(cmd *cobra.Command) string {
 		backend = provider.BackendDocker
 	}
 
-	return backend
+	if err := validateBackendFlags(cmd, backend); err != nil {
+		return "", err
+	}
+
+	if backend == provider.BackendDocker {
+		if err := validateDockerFlags(cmd); err != nil {
+			return "", err
+		}
+	}
+
+	if backend == provider.BackendGCP {
+		if err := validateRequiredGCPFlags(cmd); err != nil {
+			return "", err
+		}
+	}
+
+	return backend, nil
+}
+
+// buildSetupOptions builds the merged options map for environment setup,
+// combining Docker and GCP options based on the active backend.
+func buildSetupOptions(backend string) map[string]string {
+	options := dockerSetupOptions()
+
+	if backend == provider.BackendGCP {
+		for k, v := range gcpOptionsFromViper() {
+			options[k] = v
+		}
+	}
+
+	return options
+}
+
+// runSetup executes the full environment setup workflow for any backend.
+// Used by both the setup command and spin --setup.
+func runSetup(ctx context.Context, p provider.Provider, backend, name string) error {
+	return performSetup(ctx, p, provider.SetupConfig{
+		Name:    name,
+		Options: buildSetupOptions(backend),
+	})
 }
 
 // validateBackendFlags ensures no backend-specific CLI flags were passed for

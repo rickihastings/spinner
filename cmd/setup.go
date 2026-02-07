@@ -20,10 +20,7 @@ func init() {
 // NewSetupCommand creates a new setup command with the given Factory.
 // This constructor enables dependency injection for testing.
 func NewSetupCommand(f *provider.Factory) *cobra.Command {
-	var (
-		setupName string
-		backend   string
-	)
+	var setupName string
 
 	cmd := &cobra.Command{
 		Use:   "setup",
@@ -58,18 +55,12 @@ EXAMPLES:
 			_ = viper.BindPFlag(flagBaseImage, cmd.Flags().Lookup(flagBaseImage))
 			_ = viper.BindPFlag(flagDockerfile, cmd.Flags().Lookup(flagDockerfile))
 
-			// Bind GCP flags to Viper
-			bindGCPFlags(cmd)
-
-			// Resolve backend (CLI > env > config > default "docker")
-			backend = resolveBackend(cmd)
-
-			// Validate cross-backend flags
-			if err := validateBackendFlags(cmd, backend); err != nil {
+			// Resolve and validate backend
+			backend, err := resolveAndValidateBackend(cmd)
+			if err != nil {
 				return err
 			}
 
-			// Read values from Viper
 			setupName = viper.GetString(flagName)
 
 			if setupName == "" {
@@ -79,45 +70,18 @@ EXAMPLES:
 				return fmt.Errorf("missing required flag: --name")
 			}
 
-			// Docker-specific validation
-			if backend == provider.BackendDocker {
-				if err := validateDockerFlags(cmd); err != nil {
-					return err
-				}
-			}
-
-			// GCP-specific validation
-			if backend == provider.BackendGCP {
-				if err := validateRequiredGCPFlags(cmd); err != nil {
-					return err
-				}
-			}
-
-			// Build options map with all values; the provider picks what it needs
-			options := dockerSetupOptions()
-
-			if backend == provider.BackendGCP {
-				for k, v := range gcpOptionsFromViper() {
-					options[k] = v
-				}
-			}
-
-			// Create provider from factory
 			p, err := f.Create(backend)
 			if err != nil {
 				return err
 			}
 
-			return performSetup(context.Background(), p, provider.SetupConfig{
-				Name:    setupName,
-				Options: options,
-			})
+			return runSetup(context.Background(), p, backend, setupName)
 		},
 	}
 
 	// General flags
 	cmd.Flags().StringVar(&setupName, flagName, "", "Name for the environment (required)")
-	cmd.Flags().StringVar(&backend, flagBackend, "", "Backend provider: docker, gcp (default: docker)")
+	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 
 	// Docker backend flags
 	cmd.Flags().String(flagBaseImage, "", "Base Docker image (optional, default: ubuntu:22.04)")
