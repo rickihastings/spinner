@@ -63,13 +63,13 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 
 ## 5.0 GCS Log Streaming
 
-- [ ] 5.1 Create `internal/logs/gcs_sink.go` — `GCSSink` implementing `io.Writer`, buffers and flushes to GCS every 2s
-- [ ] 5.2 Create `internal/logs/gcs_sink_test.go` — unit tests for GCS sink
-- [ ] 5.3 Modify `internal/agent/claude/executor.go` — add `AdditionalWriter` field to executor config, use `io.MultiWriter` in TeeReader when set
-- [ ] 5.4 Modify `internal/exec/loop.go` — detect `SPINNER_LOG_BUCKET` env var, create GCSSink, pass to executor config as `AdditionalWriter`
-- [ ] 5.5 Create `internal/gcp/logs.go` — GCS-based log reader: `Logs()` downloads full object, `WatchLogs()` polls with byte offset + Range reads
-- [ ] 5.6 Create `internal/gcp/logs_test.go` — unit tests for GCS log reader with mock client
-- [ ] 5.7 Verify build and all tests pass (Docker unchanged, new GCS paths)
+- [x] 5.1 Create `internal/logs/gcs_sink.go` — `GCSSink` implementing `io.Writer`, buffers and flushes to GCS every 2s
+- [x] 5.2 Create `internal/logs/gcs_sink_test.go` — unit tests for GCS sink
+- [x] 5.3 Modify `internal/agent/claude/executor.go` — add `AdditionalWriter` field to executor config, use `io.MultiWriter` in TeeReader when set
+- [x] 5.4 Modify `internal/exec/loop.go` — detect `SPINNER_LOG_BUCKET` env var, create GCSSink, pass to executor config as `AdditionalWriter`
+- [x] 5.5 Create `internal/gcp/logs.go` — GCS-based log reader: `Logs()` downloads full object, `WatchLogs()` polls with byte offset + Range reads
+- [x] 5.6 Create `internal/gcp/logs_test.go` — unit tests for GCS log reader with mock client
+- [x] 5.7 Verify build and all tests pass (Docker unchanged, new GCS paths)
 
 ## 5.5 GCP Metrics
 

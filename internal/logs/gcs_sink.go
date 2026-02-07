@@ -1,0 +1,151 @@
+// Package logs provides log streaming utilities for Spinner backends.
+package logs
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"cloud.google.com/go/storage"
+)
+
+const (
+	// DefaultFlushInterval is the default interval between GCS flushes.
+	DefaultFlushInterval = 2 * time.Second
+)
+
+// ObjectWriter is the minimal interface needed for writing to GCS.
+// This enables dependency injection and testing without real GCS.
+type ObjectWriter interface {
+	WriteObject(ctx context.Context, bucket, object string, data []byte) error
+}
+
+// GCSSink implements io.Writer by buffering writes and periodically
+// flushing accumulated content to a GCS object. Each flush overwrites
+// the full object with all content received so far.
+type GCSSink struct {
+	writer   ObjectWriter
+	bucket   string
+	object   string
+	ctx      context.Context
+	cancel   context.CancelFunc
+	mu       sync.Mutex
+	buf      []byte
+	dirty    bool
+	wg       sync.WaitGroup
+	interval time.Duration
+}
+
+// NewGCSSink creates a new GCSSink that flushes to the given GCS bucket/object.
+// The sink starts a background goroutine that flushes every 2 seconds.
+// Call Close() to do a final flush and stop the background goroutine.
+func NewGCSSink(ctx context.Context, writer ObjectWriter, bucket, object string) *GCSSink {
+	sinkCtx, cancel := context.WithCancel(ctx)
+
+	s := &GCSSink{
+		writer:   writer,
+		bucket:   bucket,
+		object:   object,
+		ctx:      sinkCtx,
+		cancel:   cancel,
+		buf:      make([]byte, 0, 4096),
+		interval: DefaultFlushInterval,
+	}
+
+	s.wg.Add(1)
+	go s.flushLoop()
+
+	return s
+}
+
+// Write appends data to the internal buffer. It never blocks on GCS I/O.
+// Write is safe for concurrent use.
+func (s *GCSSink) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	s.buf = append(s.buf, p...)
+	s.dirty = true
+	s.mu.Unlock()
+
+	return len(p), nil
+}
+
+// Close performs a final flush and stops the background goroutine.
+func (s *GCSSink) Close() error {
+	s.cancel()
+	s.wg.Wait()
+
+	return s.flush()
+}
+
+// flush writes the buffered content to GCS if there is new data.
+func (s *GCSSink) flush() error {
+	s.mu.Lock()
+	if !s.dirty {
+		s.mu.Unlock()
+		return nil
+	}
+
+	// Copy the buffer so we can release the lock before the network call.
+	data := make([]byte, len(s.buf))
+	copy(data, s.buf)
+	s.dirty = false
+	s.mu.Unlock()
+
+	// Use a background context for the actual write since the sink context
+	// may be cancelled during Close(), and we still want the final flush
+	// to succeed.
+	return s.writer.WriteObject(context.Background(), s.bucket, s.object, data)
+}
+
+// flushLoop runs periodic flushes until the context is cancelled.
+func (s *GCSSink) flushLoop() {
+	defer s.wg.Done()
+
+	ticker := time.NewTicker(s.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			_ = s.flush()
+		}
+	}
+}
+
+// GCSObjectWriter adapts cloud.google.com/go/storage to the ObjectWriter interface.
+type GCSObjectWriter struct {
+	client *storage.Client
+}
+
+// NewGCSObjectWriter creates a new GCSObjectWriter using Application Default Credentials.
+func NewGCSObjectWriter(ctx context.Context) (*GCSObjectWriter, error) {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCS client: %w", err)
+	}
+
+	return &GCSObjectWriter{client: client}, nil
+}
+
+// WriteObject writes data to the given GCS bucket/object, overwriting if it exists.
+func (w *GCSObjectWriter) WriteObject(ctx context.Context, bucket, object string, data []byte) error {
+	writer := w.client.Bucket(bucket).Object(object).NewWriter(ctx)
+	if _, err := writer.Write(data); err != nil {
+		_ = writer.Close()
+		return fmt.Errorf("failed to write GCS object: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to close GCS writer: %w", err)
+	}
+
+	return nil
+}
+
+// Close releases the underlying GCS storage client.
+func (w *GCSObjectWriter) Close() error {
+	return w.client.Close()
+}
