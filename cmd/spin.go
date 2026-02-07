@@ -232,7 +232,7 @@ EXAMPLES:
 				fmt.Println()
 				fmt.Println("Entering watch mode...")
 
-				return PerformWatch(ctx, p, instance.Name)
+				return performWatch(ctx, p, instance.Name)
 			}
 
 			return nil

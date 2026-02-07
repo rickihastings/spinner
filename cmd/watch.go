@@ -63,7 +63,7 @@ EXAMPLES:
 				return err
 			}
 
-			return PerformWatch(context.Background(), p, args[0])
+			return performWatch(context.Background(), p, args[0])
 		},
 	}
 
@@ -150,10 +150,9 @@ func getImageID(containerName string) string {
 	return strings.TrimSpace(string(output))
 }
 
-// PerformWatch executes the watch workflow for an instance.
-// This is exported so it can be used by both the standalone watch command
-// and the spin command with --watch flag.
-func PerformWatch(ctx context.Context, p provider.Provider, containerName string) error {
+// performWatch executes the watch workflow for an instance.
+// Used by both the standalone watch command and spin --watch.
+func performWatch(ctx context.Context, p provider.Provider, containerName string) error {
 	// Check if instance exists using provider abstraction
 	status, err := p.Status(ctx, containerName)
 	if err != nil || status == provider.InstanceStatusNone {
