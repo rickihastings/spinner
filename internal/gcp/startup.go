@@ -63,3 +63,36 @@ func LoadBakeScriptFile(path string) (string, error) {
 
 	return string(data), nil
 }
+
+// LoadStartupScript reads the standard startup.sh template used inside containers/VMs.
+// This script handles repo cloning, branch checkout, and spinner exec invocation.
+func LoadStartupScript() (string, error) {
+	scriptPath, err := util.ResolveTemplatePath(filepath.Join("templates", "scripts", "startup.sh"))
+	if err != nil {
+		return "", fmt.Errorf("failed to find startup script: %w", err)
+	}
+
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read startup script: %w", err)
+	}
+
+	return string(data), nil
+}
+
+// LoadRuntimeScript reads the GCP runtime startup script template from
+// templates/scripts/gcp_runtime.sh. This script reads instance metadata,
+// sets environment variables, and delegates to startup.sh.
+func LoadRuntimeScript() (string, error) {
+	scriptPath, err := util.ResolveTemplatePath(filepath.Join("templates", "scripts", "gcp_runtime.sh"))
+	if err != nil {
+		return "", fmt.Errorf("failed to find runtime script: %w", err)
+	}
+
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read runtime script: %w", err)
+	}
+
+	return string(data), nil
+}
