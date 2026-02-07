@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
+
 	"github.com/rickihastings/spinner/internal/agent"
 	"github.com/rickihastings/spinner/internal/agent/claude"
 	"github.com/rickihastings/spinner/internal/logs"
@@ -29,6 +31,7 @@ var (
 	pushChangesFunc    = PushChanges
 	gcsSinkFactory     = defaultGCSSinkFactory
 	gcsObjectWriterNew = logs.NewGCSObjectWriter
+	isRunningOnGCE     = metadata.OnGCE
 )
 
 // Runner executes the main iteration loop.
@@ -186,9 +189,16 @@ func (r *Runner) Run(ctx context.Context) int {
 	return 1
 }
 
-// defaultGCSSinkFactory creates a GCS sink when SPINNER_LOG_BUCKET is set.
-// Returns (nil, nil) if the env var is not set or if initialization fails.
+// defaultGCSSinkFactory creates a GCS sink when running on a GCE VM with
+// SPINNER_LOG_BUCKET set. The metadata server is queried first to confirm
+// this is actually a GCP environment, preventing accidental activation when
+// the env var leaks into a non-GCP context (e.g. Docker).
+// Returns (nil, nil) if not on GCE, the env var is unset, or init fails.
 func defaultGCSSinkFactory(ctx context.Context) (*logs.GCSSink, func()) {
+	if !isRunningOnGCE() {
+		return nil, nil
+	}
+
 	bucket := os.Getenv("SPINNER_LOG_BUCKET")
 	if bucket == "" {
 		return nil, nil
