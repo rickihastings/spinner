@@ -13,20 +13,20 @@ import (
 
 // Parser parses streaming JSON output from the Claude CLI and emits structured events.
 type Parser struct {
-	// IncludeRaw includes the raw JSON line in emitted events when true.
-	IncludeRaw bool
+	// includeRaw includes the raw JSON line in emitted events when true.
+	includeRaw bool
 }
 
 // NewParser creates a new Parser with default settings.
 func NewParser() *Parser {
 	return &Parser{
-		IncludeRaw: false,
+		includeRaw: false,
 	}
 }
 
 // Parse reads lines from the reader, parses JSON messages, and emits events on the returned channel.
 // The channel is closed when the reader is exhausted or the context is cancelled.
-// Errors during parsing are emitted as EventTypeError events rather than stopping the parser.
+// Errors during parsing are emitted as eventTypeError events rather than stopping the parser.
 func (p *Parser) Parse(ctx context.Context, reader io.Reader) <-chan agent.Event {
 	events := make(chan agent.Event, 100)
 
@@ -62,10 +62,10 @@ func (p *Parser) Parse(ctx context.Context, reader io.Reader) <-chan agent.Event
 
 		if err := scanner.Err(); err != nil {
 			event := &agent.Event{
-				Type:      EventTypeError,
+				Type:      eventTypeError,
 				Timestamp: time.Now(),
-				Data: ErrorData{
-					Type:    ErrorTypeScanner,
+				Data: errorData{
+					Type:    errorTypeScanner,
 					Message: err.Error(),
 				},
 			}
@@ -87,7 +87,7 @@ func (p *Parser) ParseLine(line string) *agent.Event {
 }
 
 func (p *Parser) parseLine(line string) *agent.Event {
-	var raw RawMessage
+	var raw rawMessage
 	if err := json.Unmarshal([]byte(line), &raw); err != nil {
 		// Skip non-JSON lines silently
 		return nil
@@ -97,20 +97,20 @@ func (p *Parser) parseLine(line string) *agent.Event {
 		Timestamp: time.Now(),
 	}
 
-	if p.IncludeRaw {
+	if p.includeRaw {
 		event.Raw = line
 	}
 
 	switch raw.Type {
-	case RawMessageTypeSystem:
+	case rawMessageTypeSystem:
 		return p.parseSystemMessage(event, &raw)
-	case RawMessageTypeAssistant, RawMessageTypeMessage:
+	case rawMessageTypeAssistant, rawMessageTypeMessage:
 		return p.parseAssistantMessage(event, &raw)
-	case RawMessageTypeUser:
+	case rawMessageTypeUser:
 		return p.parseUserMessage(event, &raw)
-	case RawMessageTypeResult:
+	case rawMessageTypeResult:
 		return p.parseResultMessage(event, &raw)
-	case RawMessageTypeError:
+	case rawMessageTypeError:
 		return p.parseErrorMessage(event, &raw)
 	default:
 		// Unknown or streaming message types, skip
@@ -118,8 +118,8 @@ func (p *Parser) parseLine(line string) *agent.Event {
 	}
 }
 
-func (p *Parser) parseSystemMessage(event *agent.Event, raw *RawMessage) *agent.Event {
-	if raw.Subtype == SubtypeInit {
+func (p *Parser) parseSystemMessage(event *agent.Event, raw *rawMessage) *agent.Event {
+	if raw.Subtype == subtypeInit {
 		event.Type = EventTypeSystemInit
 		event.Data = SystemInitData{
 			Model:       raw.Model,
@@ -136,34 +136,34 @@ func (p *Parser) parseSystemMessage(event *agent.Event, raw *RawMessage) *agent.
 	return nil
 }
 
-func (p *Parser) parseAssistantMessage(event *agent.Event, raw *RawMessage) *agent.Event {
+func (p *Parser) parseAssistantMessage(event *agent.Event, raw *rawMessage) *agent.Event {
 	if raw.Message == nil {
 		return nil
 	}
 
-	var msg MessageContent
+	var msg messageContent
 	if err := json.Unmarshal(raw.Message, &msg); err != nil {
 		return nil
 	}
 
-	event.Type = EventTypeAssistantMessage
-	event.Data = AssistantMessageData(msg)
+	event.Type = eventTypeAssistantMessage
+	event.Data = assistantMessageData(msg)
 
 	return event
 }
 
-func (p *Parser) parseUserMessage(event *agent.Event, raw *RawMessage) *agent.Event {
+func (p *Parser) parseUserMessage(event *agent.Event, raw *rawMessage) *agent.Event {
 	if raw.Message == nil {
 		return nil
 	}
 
-	var msg MessageContent
+	var msg messageContent
 	if err := json.Unmarshal(raw.Message, &msg); err != nil {
 		return nil
 	}
 
-	event.Type = EventTypeUserMessage
-	event.Data = UserMessageData{
+	event.Type = eventTypeUserMessage
+	event.Data = userMessageData{
 		Role:    msg.Role,
 		Content: msg.Content,
 	}
@@ -171,9 +171,9 @@ func (p *Parser) parseUserMessage(event *agent.Event, raw *RawMessage) *agent.Ev
 	return event
 }
 
-func (p *Parser) parseResultMessage(event *agent.Event, raw *RawMessage) *agent.Event {
-	event.Type = EventTypeResult
-	event.Data = ResultData{
+func (p *Parser) parseResultMessage(event *agent.Event, raw *rawMessage) *agent.Event {
+	event.Type = eventTypeResult
+	event.Data = resultData{
 		Subtype:      raw.Subtype,
 		InputTokens:  raw.InputTokens,
 		OutputTokens: raw.OutputTokens,
@@ -186,29 +186,29 @@ func (p *Parser) parseResultMessage(event *agent.Event, raw *RawMessage) *agent.
 	return event
 }
 
-func (p *Parser) parseErrorMessage(event *agent.Event, raw *RawMessage) *agent.Event {
+func (p *Parser) parseErrorMessage(event *agent.Event, raw *rawMessage) *agent.Event {
 	if raw.Error == nil {
 		return nil
 	}
 
-	var errContent ErrorContent
+	var errContent errorContent
 	if err := json.Unmarshal(raw.Error, &errContent); err != nil {
 		return nil
 	}
 
-	event.Type = EventTypeError
-	event.Data = ErrorData(errContent)
+	event.Type = eventTypeError
+	event.Data = errorData(errContent)
 
 	return event
 }
 
-// ExtractText extracts all text content from a Claude assistant message event.
-func ExtractText(event *agent.Event) string {
-	if event.Type != EventTypeAssistantMessage {
+// extractText extracts all text content from a Claude assistant message event.
+func extractText(event *agent.Event) string {
+	if event.Type != eventTypeAssistantMessage {
 		return ""
 	}
 
-	data, ok := event.Data.(AssistantMessageData)
+	data, ok := event.Data.(assistantMessageData)
 	if !ok {
 		return ""
 	}
@@ -216,7 +216,7 @@ func ExtractText(event *agent.Event) string {
 	var texts []string
 
 	for _, block := range data.Content {
-		if block.Type == ContentBlockTypeText && block.Text != "" {
+		if block.Type == contentBlockTypeText && block.Text != "" {
 			texts = append(texts, block.Text)
 		}
 	}
@@ -224,22 +224,22 @@ func ExtractText(event *agent.Event) string {
 	return strings.Join(texts, "\n")
 }
 
-// ExtractToolUses extracts all tool use content blocks from a Claude assistant message event.
-func ExtractToolUses(event *agent.Event) []ToolUseData {
-	if event.Type != EventTypeAssistantMessage {
+// extractToolUses extracts all tool use content blocks from a Claude assistant message event.
+func extractToolUses(event *agent.Event) []toolUseData {
+	if event.Type != eventTypeAssistantMessage {
 		return nil
 	}
 
-	data, ok := event.Data.(AssistantMessageData)
+	data, ok := event.Data.(assistantMessageData)
 	if !ok {
 		return nil
 	}
 
-	var tools []ToolUseData
+	var tools []toolUseData
 
 	for _, block := range data.Content {
-		if block.Type == ContentBlockTypeToolUse {
-			tools = append(tools, ToolUseData{
+		if block.Type == contentBlockTypeToolUse {
+			tools = append(tools, toolUseData{
 				ID:    block.ID,
 				Name:  block.Name,
 				Input: block.Input,
@@ -250,35 +250,35 @@ func ExtractToolUses(event *agent.Event) []ToolUseData {
 	return tools
 }
 
-// IsRateLimitError checks if an event is a rate limit error.
-func IsRateLimitError(event *agent.Event) bool {
-	if event.Type != EventTypeError {
+// isRateLimitError checks if an event is a rate limit error.
+func isRateLimitError(event *agent.Event) bool {
+	if event.Type != eventTypeError {
 		return false
 	}
 
-	data, ok := event.Data.(ErrorData)
+	data, ok := event.Data.(errorData)
 	if !ok {
 		return false
 	}
 
-	return strings.Contains(data.Type, ErrorTypeRateLimit)
+	return strings.Contains(data.Type, errorTypeRateLimit)
 }
 
-// IsAuthError checks if an event is an authentication error.
-func IsAuthError(event *agent.Event) bool {
-	if event.Type != EventTypeError {
+// isAuthError checks if an event is an authentication error.
+func isAuthError(event *agent.Event) bool {
+	if event.Type != eventTypeError {
 		return false
 	}
 
-	data, ok := event.Data.(ErrorData)
+	data, ok := event.Data.(errorData)
 	if !ok {
 		return false
 	}
 
-	return strings.Contains(data.Type, ErrorTypeAuthentication)
+	return strings.Contains(data.Type, errorTypeAuthentication)
 }
 
-// ContainsText checks if a Claude assistant message contains the specified text.
-func ContainsText(event *agent.Event, text string) bool {
-	return strings.Contains(ExtractText(event), text)
+// containsText checks if a Claude assistant message contains the specified text.
+func containsText(event *agent.Event, text string) bool {
+	return strings.Contains(extractText(event), text)
 }

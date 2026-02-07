@@ -6,11 +6,11 @@ import (
 	"os/exec"
 )
 
-// PushChanges attempts to push changes to the remote repository.
+// pushChanges attempts to push changes to the remote repository.
 // It first tries `git push`, and if that fails (e.g., no upstream branch),
 // it tries `git push -u origin <branch>` to set the tracking branch.
 // Returns error only for logging purposes - push failures are non-blocking.
-func PushChanges(ctx context.Context, branch string) error {
+func pushChanges(ctx context.Context, branch string) error {
 	// Try simple push first
 	cmd := exec.CommandContext(ctx, "git", "push")
 	if err := cmd.Run(); err == nil {

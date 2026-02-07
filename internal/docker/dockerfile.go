@@ -8,13 +8,13 @@ import (
 	"github.com/rickihastings/spinner/internal/util"
 )
 
-// DockerfileConfig contains configuration for generating a Dockerfile.
-type DockerfileConfig struct {
+// dockerfileConfig contains configuration for generating a Dockerfile.
+type dockerfileConfig struct {
 	BaseImage string
 }
 
-// GenerateDockerfile generates a Dockerfile from a template with the given configuration.
-func GenerateDockerfile(config DockerfileConfig) (string, error) {
+// generateDockerfile generates a Dockerfile from a template with the given configuration.
+func generateDockerfile(config dockerfileConfig) (string, error) {
 	templatePath, err := util.ResolveTemplatePath(filepath.Join("templates", "docker", "extending.template"))
 	if err != nil {
 		return "", err

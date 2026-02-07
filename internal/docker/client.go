@@ -109,7 +109,7 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	// Generate the final Dockerfile
 	dockerfilePath := filepath.Join(buildContextDir, "Dockerfile")
 
-	dockerfileContent, err := GenerateDockerfile(DockerfileConfig{BaseImage: baseImage})
+	dockerfileContent, err := generateDockerfile(dockerfileConfig{BaseImage: baseImage})
 	if err != nil {
 		return fmt.Errorf("failed to generate Dockerfile: %w", err)
 	}

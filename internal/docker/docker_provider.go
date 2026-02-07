@@ -43,7 +43,7 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 // InstanceName returns the deterministic container name for the given config.
 // Options: "image" (Docker image name).
 func (p *Provider) InstanceName(config provider.CreateConfig) string {
-	return GenerateContainerName(SpinConfig{
+	return generateContainerName(spinConfig{
 		Image:  config.Options["image"],
 		Repo:   config.Repo,
 		Branch: config.Branch,
@@ -67,7 +67,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 
 	hasNpmrc := p.detectNpmrc()
 
-	spinConfig := SpinConfig{
+	sc := spinConfig{
 		Image:         image,
 		Repo:          config.Repo,
 		Prompt:        config.Prompt,
@@ -75,7 +75,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		MaxIterations: config.MaxIterations,
 	}
 
-	args, err := BuildDockerRunCommand(spinConfig, containerName, hasNpmrc)
+	args, err := buildDockerRunCommand(sc, containerName, hasNpmrc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build run command: %w", err)
 	}
@@ -182,13 +182,13 @@ func (p *Provider) Status(ctx context.Context, name string) (provider.InstanceSt
 // WatchLogs implements provider.Provider.WatchLogs using docker.LogWatcher.
 func (p *Provider) WatchLogs(ctx context.Context, name string, tailLines int, ch chan<- string) error {
 	// Create LogWatcher with nil parser (raw mode)
-	logWatcher, err := NewLogWatcher(name, nil)
+	logWatcher, err := newLogWatcher(name, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create log watcher: %w", err)
 	}
 
 	// Tail existing lines
-	existingLines, err := logWatcher.TailExistingLines(ctx, tailLines)
+	existingLines, err := logWatcher.tailExistingLines(ctx, tailLines)
 	if err != nil {
 		return fmt.Errorf("failed to tail logs: %w", err)
 	}
@@ -203,7 +203,7 @@ func (p *Provider) WatchLogs(ctx context.Context, name string, tailLines int, ch
 	}
 
 	// Watch for new lines
-	return logWatcher.WatchLines(ctx, ch)
+	return logWatcher.watchLines(ctx, ch)
 }
 
 // WatchMetrics implements provider.Provider.WatchMetrics for Docker containers.

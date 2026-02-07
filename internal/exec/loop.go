@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	// RateLimitWaitSeconds is how long to wait when rate limited (61 minutes)
-	RateLimitWaitSeconds = 3660
+	// rateLimitWaitSeconds is how long to wait when rate limited (61 minutes)
+	rateLimitWaitSeconds = 3660
 )
 
 // Function variables for testing
@@ -23,7 +23,7 @@ var (
 			LogPath: logPath,
 		})
 	}
-	pushChangesFunc = PushChanges
+	pushChangesFunc = pushChanges
 )
 
 // Runner executes the main iteration loop.
@@ -51,8 +51,8 @@ func (r *Runner) Run(ctx context.Context) int {
 	// Set initial state
 	r.state.Branch = r.config.Branch
 
-	r.state.Status = StatusRunning
-	if err := SaveState(r.statePath, r.state); err != nil {
+	r.state.Status = statusRunning
+	if err := saveState(r.statePath, r.state); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to save initial state: %v\n", err)
 	}
 
@@ -62,9 +62,9 @@ func (r *Runner) Run(ctx context.Context) int {
 		case <-ctx.Done():
 			fmt.Println("\n⚠️  Loop interrupted by user (Ctrl+C)")
 
-			r.state.Status = StatusError
+			r.state.Status = statusError
 			r.state.ErrorMessage = "interrupted by user"
-			_ = SaveState(r.statePath, r.state)
+			_ = saveState(r.statePath, r.state)
 
 			return 130
 		default:
@@ -73,7 +73,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		fmt.Printf("\n🔁 Iteration %d/%d\n", r.state.Iteration, r.config.MaxIterations)
 
 		// Save state before iteration
-		if err := SaveState(r.statePath, r.state); err != nil {
+		if err := saveState(r.statePath, r.state); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to save state: %v\n", err)
 		}
 
@@ -90,9 +90,9 @@ func (r *Runner) Run(ctx context.Context) int {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error running Claude: %v\n", err)
 
-			r.state.Status = StatusError
+			r.state.Status = statusError
 			r.state.ErrorMessage = err.Error()
-			_ = SaveState(r.statePath, r.state)
+			_ = saveState(r.statePath, r.state)
 
 			return 1
 		}
@@ -113,9 +113,9 @@ func (r *Runner) Run(ctx context.Context) int {
 		if result.AuthError {
 			fmt.Println("\n\n❌ Authentication error detected - please run /login")
 
-			r.state.Status = StatusAuthError
+			r.state.Status = statusAuthError
 			r.state.ErrorMessage = result.ErrorMessage
-			_ = SaveState(r.statePath, r.state)
+			_ = saveState(r.statePath, r.state)
 
 			return 1
 		}
@@ -124,23 +124,23 @@ func (r *Runner) Run(ctx context.Context) int {
 		if result.Completed {
 			fmt.Println("\n\n🎯 ALL TASKS COMPLETE.")
 
-			r.state.Status = StatusCompleted
+			r.state.Status = statusCompleted
 			r.state.CompletedAt = time.Now()
-			_ = SaveState(r.statePath, r.state)
+			_ = saveState(r.statePath, r.state)
 
 			return 0
 		}
 
 		// Check for rate limiting
 		if result.RateLimited {
-			r.state.Status = StatusRateLimited
+			r.state.Status = statusRateLimited
 			r.state.ErrorMessage = result.ErrorMessage
-			_ = SaveState(r.statePath, r.state)
+			_ = saveState(r.statePath, r.state)
 
 			waitForRateLimit(ctx)
 
 			// Reset status and don't increment iteration (redo this iteration)
-			r.state.Status = StatusRunning
+			r.state.Status = statusRunning
 			r.state.ErrorMessage = ""
 			r.state.Iteration--
 
@@ -151,9 +151,9 @@ func (r *Runner) Run(ctx context.Context) int {
 		if result.Error != nil {
 			fmt.Fprintf(os.Stderr, "\n⚠️  Error during iteration: %v\n", result.Error)
 
-			r.state.Status = StatusError
+			r.state.Status = statusError
 			r.state.ErrorMessage = result.ErrorMessage
-			_ = SaveState(r.statePath, r.state)
+			_ = saveState(r.statePath, r.state)
 			// Continue to next iteration instead of exiting
 		}
 
@@ -162,9 +162,9 @@ func (r *Runner) Run(ctx context.Context) int {
 
 	// Max iterations reached
 	fmt.Printf("\n⚠️  Max iterations (%d) reached\n", r.config.MaxIterations)
-	r.state.Status = StatusError
+	r.state.Status = statusError
 	r.state.ErrorMessage = "max iterations reached"
-	_ = SaveState(r.statePath, r.state)
+	_ = saveState(r.statePath, r.state)
 
 	return 1
 }
@@ -173,7 +173,7 @@ func (r *Runner) Run(ctx context.Context) int {
 func waitForRateLimit(ctx context.Context) {
 	fmt.Println("\n⚠️  Rate limit detected - waiting 61 minutes...")
 
-	remaining := RateLimitWaitSeconds
+	remaining := rateLimitWaitSeconds
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()

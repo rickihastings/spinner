@@ -528,9 +528,9 @@ func formatMemoryValue(used uint64) string {
 	}
 }
 
-// SetTestMode enables test mode, which skips TUI startup
-// This should only be called from tests
-func (ui *WatchUI) SetTestMode(enabled bool) {
+// setTestMode enables test mode, which skips TUI startup.
+// This should only be called from tests within this package.
+func (ui *WatchUI) setTestMode(enabled bool) {
 	ui.testMode = enabled
 }
 

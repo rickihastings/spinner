@@ -225,7 +225,7 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				fmt.Println()
 				fmt.Println("Entering watch mode...")
 
-				return PerformWatch(ctx, p, instance.Name)
+				return performWatch(ctx, p, instance.Name)
 			}
 
 			return nil

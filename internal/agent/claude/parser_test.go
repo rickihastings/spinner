@@ -52,13 +52,13 @@ func TestParser_ParseAssistantMessage(t *testing.T) {
 		t.Fatal("expected event, got nil")
 	}
 
-	if event.Type != EventTypeAssistantMessage {
-		t.Errorf("expected type %s, got %s", EventTypeAssistantMessage, event.Type)
+	if event.Type != eventTypeAssistantMessage {
+		t.Errorf("expected type %s, got %s", eventTypeAssistantMessage, event.Type)
 	}
 
-	data, ok := event.Data.(AssistantMessageData)
+	data, ok := event.Data.(assistantMessageData)
 	if !ok {
-		t.Fatal("expected AssistantMessageData")
+		t.Fatal("expected assistantMessageData")
 	}
 
 	if data.Role != "assistant" {
@@ -93,8 +93,8 @@ func TestParser_ParseMessageType(t *testing.T) {
 		t.Fatal("expected event, got nil")
 	}
 
-	if event.Type != EventTypeAssistantMessage {
-		t.Errorf("expected type %s, got %s", EventTypeAssistantMessage, event.Type)
+	if event.Type != eventTypeAssistantMessage {
+		t.Errorf("expected type %s, got %s", eventTypeAssistantMessage, event.Type)
 	}
 }
 
@@ -108,13 +108,13 @@ func TestParser_ParseUserMessage(t *testing.T) {
 		t.Fatal("expected event, got nil")
 	}
 
-	if event.Type != EventTypeUserMessage {
-		t.Errorf("expected type %s, got %s", EventTypeUserMessage, event.Type)
+	if event.Type != eventTypeUserMessage {
+		t.Errorf("expected type %s, got %s", eventTypeUserMessage, event.Type)
 	}
 
-	data, ok := event.Data.(UserMessageData)
+	data, ok := event.Data.(userMessageData)
 	if !ok {
-		t.Fatal("expected UserMessageData")
+		t.Fatal("expected userMessageData")
 	}
 
 	if data.Role != "user" {
@@ -140,9 +140,9 @@ func TestParser_ParseToolUse(t *testing.T) {
 		t.Fatal("expected event, got nil")
 	}
 
-	data, ok := event.Data.(AssistantMessageData)
+	data, ok := event.Data.(assistantMessageData)
 	if !ok {
-		t.Fatal("expected AssistantMessageData")
+		t.Fatal("expected assistantMessageData")
 	}
 
 	if len(data.Content) != 1 {
@@ -183,13 +183,13 @@ func TestParser_ParseErrorMessage(t *testing.T) {
 		t.Fatal("expected event, got nil")
 	}
 
-	if event.Type != EventTypeError {
-		t.Errorf("expected type %s, got %s", EventTypeError, event.Type)
+	if event.Type != eventTypeError {
+		t.Errorf("expected type %s, got %s", eventTypeError, event.Type)
 	}
 
-	data, ok := event.Data.(ErrorData)
+	data, ok := event.Data.(errorData)
 	if !ok {
-		t.Fatal("expected ErrorData")
+		t.Fatal("expected errorData")
 	}
 
 	if data.Type != "rate_limit_error" {
@@ -211,13 +211,13 @@ func TestParser_ParseResultMessage(t *testing.T) {
 		t.Fatal("expected event, got nil")
 	}
 
-	if event.Type != EventTypeResult {
-		t.Errorf("expected type %s, got %s", EventTypeResult, event.Type)
+	if event.Type != eventTypeResult {
+		t.Errorf("expected type %s, got %s", eventTypeResult, event.Type)
 	}
 
-	data, ok := event.Data.(ResultData)
+	data, ok := event.Data.(resultData)
 	if !ok {
-		t.Fatal("expected ResultData")
+		t.Fatal("expected resultData")
 	}
 
 	if data.Subtype != "success" {
@@ -267,7 +267,7 @@ func TestParser_IncludeRaw(t *testing.T) {
 	jsonStr := `{"type":"system","subtype":"init","model":"test"}`
 
 	parser := NewParser()
-	parser.IncludeRaw = true
+	parser.includeRaw = true
 	event := parser.ParseLine(jsonStr)
 
 	if event == nil {
@@ -302,12 +302,12 @@ func TestParser_Parse_Stream(t *testing.T) {
 		t.Errorf("expected first event type %s, got %s", EventTypeSystemInit, collected[0].Type)
 	}
 
-	if collected[1].Type != EventTypeAssistantMessage {
-		t.Errorf("expected second event type %s, got %s", EventTypeAssistantMessage, collected[1].Type)
+	if collected[1].Type != eventTypeAssistantMessage {
+		t.Errorf("expected second event type %s, got %s", eventTypeAssistantMessage, collected[1].Type)
 	}
 
-	if collected[2].Type != EventTypeResult {
-		t.Errorf("expected third event type %s, got %s", EventTypeResult, collected[2].Type)
+	if collected[2].Type != eventTypeResult {
+		t.Errorf("expected third event type %s, got %s", eventTypeResult, collected[2].Type)
 	}
 }
 
@@ -336,9 +336,9 @@ func TestParser_Parse_ContextCancellation(t *testing.T) {
 
 func TestExtractText(t *testing.T) {
 	event := &agent.Event{
-		Type: EventTypeAssistantMessage,
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
+		Type: eventTypeAssistantMessage,
+		Data: assistantMessageData{
+			Content: []contentBlock{
 				{Type: "text", Text: "First"},
 				{Type: "tool_use", Name: "Read"},
 				{Type: "text", Text: "Second"},
@@ -346,7 +346,7 @@ func TestExtractText(t *testing.T) {
 		},
 	}
 
-	text := ExtractText(event)
+	text := extractText(event)
 	expected := "First\nSecond"
 
 	if text != expected {
@@ -356,11 +356,11 @@ func TestExtractText(t *testing.T) {
 
 func TestExtractText_NonAssistant(t *testing.T) {
 	event := &agent.Event{
-		Type: EventTypeUserMessage,
-		Data: UserMessageData{},
+		Type: eventTypeUserMessage,
+		Data: userMessageData{},
 	}
 
-	text := ExtractText(event)
+	text := extractText(event)
 	if text != "" {
 		t.Errorf("expected empty string, got '%s'", text)
 	}
@@ -368,9 +368,9 @@ func TestExtractText_NonAssistant(t *testing.T) {
 
 func TestExtractToolUses(t *testing.T) {
 	event := &agent.Event{
-		Type: EventTypeAssistantMessage,
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
+		Type: eventTypeAssistantMessage,
+		Data: assistantMessageData{
+			Content: []contentBlock{
 				{Type: "text", Text: "Hello"},
 				{Type: "tool_use", ID: "tool1", Name: "Read", Input: json.RawMessage(`{"path":"/a"}`)},
 				{Type: "tool_use", ID: "tool2", Name: "Write", Input: json.RawMessage(`{"path":"/b"}`)},
@@ -378,7 +378,7 @@ func TestExtractToolUses(t *testing.T) {
 		},
 	}
 
-	tools := ExtractToolUses(event)
+	tools := extractToolUses(event)
 
 	if len(tools) != 2 {
 		t.Fatalf("expected 2 tools, got %d", len(tools))
@@ -402,32 +402,32 @@ func TestIsRateLimitError(t *testing.T) {
 		{
 			name: "rate_limit_error",
 			event: agent.Event{
-				Type: EventTypeError,
-				Data: ErrorData{Type: "rate_limit_error", Message: "Rate limit exceeded"},
+				Type: eventTypeError,
+				Data: errorData{Type: "rate_limit_error", Message: "Rate limit exceeded"},
 			},
 			expected: true,
 		},
 		{
 			name: "api_rate_limit",
 			event: agent.Event{
-				Type: EventTypeError,
-				Data: ErrorData{Type: "api_rate_limit", Message: "Too many requests"},
+				Type: eventTypeError,
+				Data: errorData{Type: "api_rate_limit", Message: "Too many requests"},
 			},
 			expected: true,
 		},
 		{
 			name: "other_error",
 			event: agent.Event{
-				Type: EventTypeError,
-				Data: ErrorData{Type: "api_error", Message: "Something wrong"},
+				Type: eventTypeError,
+				Data: errorData{Type: "api_error", Message: "Something wrong"},
 			},
 			expected: false,
 		},
 		{
 			name: "non_error_event",
 			event: agent.Event{
-				Type: EventTypeAssistantMessage,
-				Data: AssistantMessageData{},
+				Type: eventTypeAssistantMessage,
+				Data: assistantMessageData{},
 			},
 			expected: false,
 		},
@@ -435,7 +435,7 @@ func TestIsRateLimitError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsRateLimitError(&tt.event)
+			result := isRateLimitError(&tt.event)
 			if result != tt.expected {
 				t.Errorf("expected %v, got %v", tt.expected, result)
 			}
@@ -452,24 +452,24 @@ func TestIsAuthError(t *testing.T) {
 		{
 			name: "authentication_error",
 			event: agent.Event{
-				Type: EventTypeError,
-				Data: ErrorData{Type: "authentication_error", Message: "Invalid API key"},
+				Type: eventTypeError,
+				Data: errorData{Type: "authentication_error", Message: "Invalid API key"},
 			},
 			expected: true,
 		},
 		{
 			name: "other_error",
 			event: agent.Event{
-				Type: EventTypeError,
-				Data: ErrorData{Type: "api_error", Message: "Something wrong"},
+				Type: eventTypeError,
+				Data: errorData{Type: "api_error", Message: "Something wrong"},
 			},
 			expected: false,
 		},
 		{
 			name: "non_error_event",
 			event: agent.Event{
-				Type: EventTypeAssistantMessage,
-				Data: AssistantMessageData{},
+				Type: eventTypeAssistantMessage,
+				Data: assistantMessageData{},
 			},
 			expected: false,
 		},
@@ -477,7 +477,7 @@ func TestIsAuthError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IsAuthError(&tt.event)
+			result := isAuthError(&tt.event)
 			if result != tt.expected {
 				t.Errorf("expected %v, got %v", tt.expected, result)
 			}
@@ -487,19 +487,19 @@ func TestIsAuthError(t *testing.T) {
 
 func TestContainsText(t *testing.T) {
 	event := &agent.Event{
-		Type: EventTypeAssistantMessage,
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
+		Type: eventTypeAssistantMessage,
+		Data: assistantMessageData{
+			Content: []contentBlock{
 				{Type: "text", Text: "Task completed ~~ FEATURE_COMPLETED ~~ done"},
 			},
 		},
 	}
 
-	if !ContainsText(event, "~~ FEATURE_COMPLETED ~~") {
+	if !containsText(event, "~~ FEATURE_COMPLETED ~~") {
 		t.Error("expected to contain completion signal")
 	}
 
-	if ContainsText(event, "not present") {
+	if containsText(event, "not present") {
 		t.Error("expected not to contain 'not present'")
 	}
 }
@@ -514,9 +514,9 @@ func TestParser_ParseMultipleContentBlocks(t *testing.T) {
 		t.Fatal("expected event, got nil")
 	}
 
-	data, ok := event.Data.(AssistantMessageData)
+	data, ok := event.Data.(assistantMessageData)
 	if !ok {
-		t.Fatal("expected AssistantMessageData")
+		t.Fatal("expected assistantMessageData")
 	}
 
 	if len(data.Content) != 3 {

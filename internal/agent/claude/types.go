@@ -8,43 +8,43 @@ import (
 // Event type constants for Claude CLI output.
 const (
 	EventTypeSystemInit       = "system_init"
-	EventTypeAssistantMessage = "assistant_message"
-	EventTypeUserMessage      = "user_message"
-	EventTypeResult           = "result"
-	EventTypeError            = "error"
+	eventTypeAssistantMessage = "assistant_message"
+	eventTypeUserMessage      = "user_message"
+	eventTypeResult           = "result"
+	eventTypeError            = "error"
 )
 
 // Raw message type constants (JSON "type" field values).
 const (
-	RawMessageTypeSystem    = "system"
-	RawMessageTypeAssistant = "assistant"
-	RawMessageTypeMessage   = "message" // Alias for assistant
-	RawMessageTypeUser      = "user"
-	RawMessageTypeResult    = "result"
-	RawMessageTypeError     = "error"
+	rawMessageTypeSystem    = "system"
+	rawMessageTypeAssistant = "assistant"
+	rawMessageTypeMessage   = "message" // Alias for assistant
+	rawMessageTypeUser      = "user"
+	rawMessageTypeResult    = "result"
+	rawMessageTypeError     = "error"
 )
 
-// SubtypeInit Message subtype constants.
+// subtypeInit Message subtype constants.
 const (
-	SubtypeInit = "init"
+	subtypeInit = "init"
 )
 
 // Content block type constants.
 const (
-	ContentBlockTypeText    = "text"
-	ContentBlockTypeToolUse = "tool_use"
+	contentBlockTypeText    = "text"
+	contentBlockTypeToolUse = "tool_use"
 )
 
 // Error type constants.
 const (
-	ErrorTypeRateLimit      = "rate_limit"
-	ErrorTypeAuthentication = "authentication"
-	ErrorTypeCommand        = "command_error"
-	ErrorTypeScanner        = "scanner_error"
+	errorTypeRateLimit      = "rate_limit"
+	errorTypeAuthentication = "authentication"
+	errorTypeCommand        = "command_error"
+	errorTypeScanner        = "scanner_error"
 )
 
-// ErrorData contains data from a Claude error event.
-type ErrorData struct {
+// errorData contains data from a Claude error event.
+type errorData struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
 }
@@ -59,29 +59,29 @@ type SystemInitData struct {
 	ProjectPath string `json:"project_path,omitempty"`
 }
 
-// ToolUseData contains data from a tool use content block.
-type ToolUseData struct {
+// toolUseData contains data from a tool use content block.
+type toolUseData struct {
 	ID    string          `json:"id"`
 	Name  string          `json:"name"`
 	Input json.RawMessage `json:"input"`
 }
 
-// AssistantMessageData contains data from a Claude assistant message.
-type AssistantMessageData struct {
+// assistantMessageData contains data from a Claude assistant message.
+type assistantMessageData struct {
 	Role       string         `json:"role"`
-	Content    []ContentBlock `json:"content"`
+	Content    []contentBlock `json:"content"`
 	StopReason string         `json:"stop_reason,omitempty"`
 	Model      string         `json:"model,omitempty"`
 }
 
-// UserMessageData contains data from a user message (tool results).
-type UserMessageData struct {
+// userMessageData contains data from a user message (tool results).
+type userMessageData struct {
 	Role    string         `json:"role"`
-	Content []ContentBlock `json:"content"`
+	Content []contentBlock `json:"content"`
 }
 
-// ContentBlock represents a single content block in a Claude message.
-type ContentBlock struct {
+// contentBlock represents a single content block in a Claude message.
+type contentBlock struct {
 	Type      string          `json:"type"`
 	Text      string          `json:"text,omitempty"`
 	ID        string          `json:"id,omitempty"`
@@ -92,8 +92,8 @@ type ContentBlock struct {
 	IsError   bool            `json:"is_error,omitempty"`
 }
 
-// ResultData contains data from a Claude result event.
-type ResultData struct {
+// resultData contains data from a Claude result event.
+type resultData struct {
 	Subtype      string `json:"subtype"` // "success" or "error"
 	InputTokens  int    `json:"input_tokens,omitempty"`
 	OutputTokens int    `json:"output_tokens,omitempty"`
@@ -103,9 +103,9 @@ type ResultData struct {
 	IsError      bool   `json:"is_error"`
 }
 
-// RawMessage represents a raw JSON message from the Claude CLI stream.
+// rawMessage represents a raw JSON message from the Claude CLI stream.
 // This is used for initial parsing before converting to typed events.
-type RawMessage struct {
+type rawMessage struct {
 	Type    string          `json:"type"`
 	Subtype string          `json:"subtype,omitempty"`
 	Message json.RawMessage `json:"message,omitempty"`
@@ -127,16 +127,16 @@ type RawMessage struct {
 	IsError      bool   `json:"is_error,omitempty"`
 }
 
-// MessageContent represents the content field in Claude assistant/user messages.
-type MessageContent struct {
+// messageContent represents the content field in Claude assistant/user messages.
+type messageContent struct {
 	Role       string         `json:"role"`
-	Content    []ContentBlock `json:"content"`
+	Content    []contentBlock `json:"content"`
 	StopReason string         `json:"stop_reason,omitempty"`
 	Model      string         `json:"model,omitempty"`
 }
 
-// ErrorContent represents the error field in Claude error messages.
-type ErrorContent struct {
+// errorContent represents the error field in Claude error messages.
+type errorContent struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
 }

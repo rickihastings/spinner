@@ -41,32 +41,69 @@ func CheckEnvironmentVariables() error {
 
 ## Go Standards
 
+### Export Visibility Policy
+
+**Principle: Only export what is part of the package's public API. Keep internal implementation details unexported.**
+
+- **Export** types, functions, and constants that are used by other packages (cross-package API)
+- **Unexport** everything that is only used within the defining package, even in `internal/` packages
+- When adding a new function or type, ask: "Does another package need to call/reference this?" If not, keep it lowercase
+- Interface types in exported function signatures should be exported to avoid lint warnings
+- Types used as fields/params/returns in exported interface methods must also be exported
+
+**What to export:**
+- Constructors called from other packages (e.g., `NewDockerProvider`, `NewParser`)
+- Interface types used in cross-package function signatures (e.g., `Client`, `Provider`)
+- Types that appear in exported interface method signatures (e.g., `ContainerResult`, `BuildConfig`)
+- Struct types returned by exported constructors (e.g., `Provider`, `Parser`, `Executor`)
+- Constants/types consumed by other packages (e.g., `EventTypeSystemInit`, `SystemInitData`)
+
+**What to unexport:**
+- Helper functions only called within the same package (e.g., `generateContainerName`, `buildDockerRunCommand`)
+- Internal config/data structs not referenced outside the package (e.g., `spinConfig`, `dockerfileConfig`)
+- Constants only used within the defining package (e.g., `rateLimitWaitSeconds`, `completionSignal`)
+- Implementation-detail types (e.g., `rawMessage`, `errorData`, `eventCollector`)
+- Test-only helpers like `setTestMode`
+
+**Example:**
+```go
+// ✅ Good: exported because cmd/ calls it
+func NewDockerProvider(client Client) *Provider { ... }
+
+// ✅ Good: unexported because only used within docker package
+func generateContainerName(config spinConfig) string { ... }
+
+// ❌ Bad: exported but only used within the package
+func BuildDockerRunCommand(config SpinConfig, ...) ([]string, error) { ... }
+```
+
 ### Type Safety and Conventions
 
 - Use explicit types for function parameters and return values
 - Define structs for complex data structures
-- Export types (capitalize first letter) that are used across packages
+- Export types that are used across packages; unexport types used only within the defining package
 - Use Go's error handling patterns (return error as last value)
 - Follow Go naming conventions (MixedCaps, not snake_case)
 
 ### Struct Conventions
 
 ```go
-// Configuration structs (input)
-type SpinConfig struct {
-    Image         string
+// Exported config struct (used across packages, e.g. in provider.Provider interface)
+type CreateConfig struct {
     Repo          string
-    Prompt        string // optional fields use pointer (*string) or check for empty string
+    Prompt        string
     Branch        string
-    MaxIterations int
-    Recreate      bool
+    MaxIterations string
+    Options       map[string]string
 }
 
-// Result structs (output)
-type ValidationResult struct {
-    Valid    bool
-    Error    string
-    Warnings []string
+// Unexported config struct (only used within this package)
+type spinConfig struct {
+    Image         string
+    Repo          string
+    Prompt        string
+    Branch        string
+    MaxIterations string
 }
 ```
 
@@ -104,9 +141,8 @@ func DoSomething() error {
 
 Example:
 ```go
-// GenerateContainerName creates a deterministic container name from the image, repo, and branch.
-// The name is sanitized to meet Docker naming requirements (lowercase alphanumeric and hyphens).
-func GenerateContainerName(image, repo, branch string) string {
+// NewDockerProvider creates a new Provider backed by the given Client.
+func NewDockerProvider(client Client) *Provider {
     // implementation
 }
 ```

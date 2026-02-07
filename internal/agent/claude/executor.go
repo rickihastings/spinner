@@ -14,8 +14,8 @@ import (
 	"github.com/rickihastings/spinner/internal/agent"
 )
 
-// CompletionSignal is the text that indicates task completion.
-const CompletionSignal = "~~ FEATURE_COMPLETED ~~"
+// completionSignal is the text that indicates task completion.
+const completionSignal = "~~ FEATURE_COMPLETED ~~"
 
 // ExecutorConfig contains configuration for creating a Claude executor.
 type ExecutorConfig struct {
@@ -37,11 +37,11 @@ type Executor struct {
 	config *ExecutorConfig
 	parser *Parser
 
-	// CompletionSignal is the text that indicates task completion.
-	CompletionSignal string
+	// completionSignal is the text that indicates task completion.
+	completionSignal string
 
-	// CommandArgs are additional arguments to pass to the Claude CLI.
-	CommandArgs []string
+	// commandArgs are additional arguments to pass to the Claude CLI.
+	commandArgs []string
 }
 
 // NewExecutor creates a new Claude Executor with the given configuration.
@@ -51,13 +51,13 @@ func NewExecutor(config *ExecutorConfig) *Executor {
 	}
 
 	parser := NewParser()
-	parser.IncludeRaw = config.IncludeRaw
+	parser.includeRaw = config.IncludeRaw
 
 	return &Executor{
 		config:           config,
 		parser:           parser,
-		CompletionSignal: CompletionSignal,
-		CommandArgs:      []string{},
+		completionSignal: completionSignal,
+		commandArgs:      []string{},
 	}
 }
 
@@ -68,7 +68,7 @@ func (e *Executor) Execute(ctx context.Context, prompt string) (<-chan agent.Eve
 		"--dangerously-skip-permissions",
 		"--output-format=stream-json",
 		"--verbose",
-	}, e.CommandArgs...)
+	}, e.commandArgs...)
 
 	cmd := exec.CommandContext(ctx, "claude", args...)
 
@@ -151,9 +151,9 @@ func (e *Executor) Execute(ctx context.Context, prompt string) (<-chan agent.Eve
 			// Emit error event if command failed
 			if ctx.Err() == nil { // Don't emit error if context was cancelled
 				events <- agent.Event{
-					Type: EventTypeError,
-					Data: ErrorData{
-						Type:    ErrorTypeCommand,
+					Type: eventTypeError,
+					Data: errorData{
+						Type:    errorTypeCommand,
 						Message: err.Error(),
 					},
 				}
@@ -176,24 +176,24 @@ func (e *Executor) ExecuteAndCollect(ctx context.Context, prompt string) (*agent
 
 	for event := range events {
 		switch event.Type {
-		case EventTypeError:
-			data, ok := event.Data.(ErrorData)
+		case eventTypeError:
+			data, ok := event.Data.(errorData)
 			if !ok {
 				continue
 			}
 
 			result.ErrorMessage = data.Message
 
-			if IsRateLimitError(&event) {
+			if isRateLimitError(&event) {
 				result.RateLimited = true
-			} else if IsAuthError(&event) {
+			} else if isAuthError(&event) {
 				result.AuthError = true
-			} else if data.Type != ErrorTypeCommand {
+			} else if data.Type != errorTypeCommand {
 				result.Error = fmt.Errorf("claude error: %s", data.Message)
 			}
 
-		case EventTypeAssistantMessage:
-			if ContainsText(&event, e.CompletionSignal) {
+		case eventTypeAssistantMessage:
+			if containsText(&event, e.completionSignal) {
 				result.Completed = true
 			}
 		}
@@ -202,42 +202,42 @@ func (e *Executor) ExecuteAndCollect(ctx context.Context, prompt string) (*agent
 	return result, nil
 }
 
-// EventCollector collects events from a channel for later processing.
-type EventCollector struct {
-	events []agent.Event
-	mu     sync.Mutex
+// eventCollector collects events from a channel for later processing.
+type eventCollector struct {
+	collected []agent.Event
+	mu        sync.Mutex
 }
 
-// NewEventCollector creates a new EventCollector.
-func NewEventCollector() *EventCollector {
-	return &EventCollector{
-		events: make([]agent.Event, 0),
+// newEventCollector creates a new eventCollector.
+func newEventCollector() *eventCollector {
+	return &eventCollector{
+		collected: make([]agent.Event, 0),
 	}
 }
 
-// Collect reads all events from the channel and stores them.
+// collect reads all events from the channel and stores them.
 // Returns when the channel is closed.
-func (c *EventCollector) Collect(events <-chan agent.Event) {
-	for event := range events {
+func (c *eventCollector) collect(ch <-chan agent.Event) {
+	for event := range ch {
 		c.mu.Lock()
-		c.events = append(c.events, event)
+		c.collected = append(c.collected, event)
 		c.mu.Unlock()
 	}
 }
 
-// Events returns all collected events.
-func (c *EventCollector) Events() []agent.Event {
+// events returns all collected events.
+func (c *eventCollector) events() []agent.Event {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	result := make([]agent.Event, len(c.events))
-	copy(result, c.events)
+	result := make([]agent.Event, len(c.collected))
+	copy(result, c.collected)
 
 	return result
 }
 
-// Filter returns events matching the given types.
-func (c *EventCollector) Filter(types ...string) []agent.Event {
+// filter returns events matching the given types.
+func (c *eventCollector) filter(types ...string) []agent.Event {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -249,7 +249,7 @@ func (c *EventCollector) Filter(types ...string) []agent.Event {
 
 	var result []agent.Event
 
-	for _, event := range c.events {
+	for _, event := range c.collected {
 		if typeSet[event.Type] {
 			result = append(result, event)
 		}
@@ -258,13 +258,13 @@ func (c *EventCollector) Filter(types ...string) []agent.Event {
 	return result
 }
 
-// HasError returns true if any error events were collected.
-func (c *EventCollector) HasError() bool {
+// hasError returns true if any error events were collected.
+func (c *eventCollector) hasError() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	for _, event := range c.events {
-		if event.Type == EventTypeError {
+	for _, event := range c.collected {
+		if event.Type == eventTypeError {
 			return true
 		}
 	}
@@ -272,16 +272,16 @@ func (c *EventCollector) HasError() bool {
 	return false
 }
 
-// GetAllText returns all text content from Claude assistant messages.
-func (c *EventCollector) GetAllText() string {
+// getAllText returns all text content from Claude assistant messages.
+func (c *eventCollector) getAllText() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	var texts []string
 
-	for _, event := range c.events {
-		if event.Type == EventTypeAssistantMessage {
-			text := ExtractText(&event)
+	for _, event := range c.collected {
+		if event.Type == eventTypeAssistantMessage {
+			text := extractText(&event)
 			if text != "" {
 				texts = append(texts, text)
 			}
@@ -291,16 +291,16 @@ func (c *EventCollector) GetAllText() string {
 	return strings.Join(texts, "\n")
 }
 
-// GetAllToolUses returns all tool uses from Claude assistant messages.
-func (c *EventCollector) GetAllToolUses() []ToolUseData {
+// getAllToolUses returns all tool uses from Claude assistant messages.
+func (c *eventCollector) getAllToolUses() []toolUseData {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	var tools []ToolUseData
+	var tools []toolUseData
 
-	for _, event := range c.events {
-		if event.Type == EventTypeAssistantMessage {
-			tools = append(tools, ExtractToolUses(&event)...)
+	for _, event := range c.collected {
+		if event.Type == eventTypeAssistantMessage {
+			tools = append(tools, extractToolUses(&event)...)
 		}
 	}
 

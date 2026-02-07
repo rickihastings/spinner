@@ -52,13 +52,13 @@ func TestTailExistingLogs_ParsesLines(t *testing.T) {
 		},
 	}
 
-	lw := &LogWatcher{
+	lw := &logWatcher{
 		containerName: "test-container",
 		logsDir:       logsDir,
 		parser:        mock,
 	}
 
-	events, err := lw.TailExistingLogs(context.Background(), 10)
+	events, err := lw.tailExistingLogs(context.Background(), 10)
 	require.NoError(t, err)
 	assert.Len(t, events, 3)
 	assert.Equal(t, "system_init", events[0].Type)
@@ -78,14 +78,14 @@ func TestTailExistingLogs_NonExistentFile(t *testing.T) {
 		responses: map[string]*agent.Event{},
 	}
 
-	lw := &LogWatcher{
+	lw := &logWatcher{
 		containerName: "test-container",
 		logsDir:       logsDir,
 		parser:        mock,
 	}
 
 	ctx := context.Background()
-	events, err := lw.TailExistingLogs(ctx, 10)
+	events, err := lw.tailExistingLogs(ctx, 10)
 
 	// Should return nil events and no error when file doesn't exist
 	assert.NoError(t, err)
@@ -109,14 +109,14 @@ func TestTailExistingLogs_EmptyFile(t *testing.T) {
 		responses: map[string]*agent.Event{},
 	}
 
-	lw := &LogWatcher{
+	lw := &logWatcher{
 		containerName: "test-container",
 		logsDir:       logsDir,
 		parser:        mock,
 	}
 
 	ctx := context.Background()
-	events, err := lw.TailExistingLogs(ctx, 10)
+	events, err := lw.tailExistingLogs(ctx, 10)
 
 	require.NoError(t, err)
 	assert.Empty(t, events, "Should return empty events for empty file")
@@ -152,14 +152,14 @@ func TestTailExistingLogs_MixedContent(t *testing.T) {
 		},
 	}
 
-	lw := &LogWatcher{
+	lw := &logWatcher{
 		containerName: "test-container",
 		logsDir:       logsDir,
 		parser:        mock,
 	}
 
 	ctx := context.Background()
-	events, err := lw.TailExistingLogs(ctx, 100)
+	events, err := lw.tailExistingLogs(ctx, 100)
 	require.NoError(t, err)
 
 	// Should only return the 3 parseable events, not the plain text lines
@@ -189,13 +189,13 @@ func TestTailExistingLogs_RingBufferKeepsLastN(t *testing.T) {
 		},
 	}
 
-	lw := &LogWatcher{
+	lw := &logWatcher{
 		containerName: "test",
 		logsDir:       logsDir,
 		parser:        mock,
 	}
 
-	events, err := lw.TailExistingLogs(context.Background(), 2)
+	events, err := lw.tailExistingLogs(context.Background(), 2)
 	require.NoError(t, err)
 
 	// Only last 2 lines were parsed

@@ -19,16 +19,16 @@ func TestFormatter_ColorCodesUseResetTag(t *testing.T) {
 			Data:      SystemInitData{Model: "claude-sonnet-4"},
 		},
 		{
-			Type:      EventTypeAssistantMessage,
+			Type:      eventTypeAssistantMessage,
 			Timestamp: time.Now(),
-			Data: AssistantMessageData{
-				Content: []ContentBlock{{Type: "text", Text: "Test"}},
+			Data: assistantMessageData{
+				Content: []contentBlock{{Type: "text", Text: "Test"}},
 			},
 		},
 		{
-			Type:      EventTypeResult,
+			Type:      eventTypeResult,
 			Timestamp: time.Now(),
-			Data: ResultData{
+			Data: resultData{
 				IsError: false,
 			},
 		},
@@ -48,10 +48,10 @@ func TestFormatter_DoesNotExposeRawJSON(t *testing.T) {
 	f := NewFormatter()
 
 	event := agent.Event{
-		Type:      EventTypeAssistantMessage,
+		Type:      eventTypeAssistantMessage,
 		Timestamp: time.Now(),
-		Data: AssistantMessageData{
-			Content: []ContentBlock{{Type: "text", Text: "Hello world"}},
+		Data: assistantMessageData{
+			Content: []contentBlock{{Type: "text", Text: "Hello world"}},
 		},
 	}
 
@@ -68,11 +68,11 @@ func TestFormatter_HidesToolUseMessages(t *testing.T) {
 	f := NewFormatter()
 
 	event := agent.Event{
-		Type:      EventTypeAssistantMessage,
+		Type:      eventTypeAssistantMessage,
 		Timestamp: time.Now(),
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
-				{Type: ContentBlockTypeToolUse, ID: "tool_1", Name: "Read"},
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeToolUse, ID: "tool_1", Name: "Read"},
 			},
 		},
 	}
@@ -86,11 +86,11 @@ func TestFormatter_HidesToolResultMessages(t *testing.T) {
 	f := NewFormatter()
 
 	event := agent.Event{
-		Type:      EventTypeUserMessage,
+		Type:      eventTypeUserMessage,
 		Timestamp: time.Now(),
-		Data: UserMessageData{
+		Data: userMessageData{
 			Role:    "user",
-			Content: []ContentBlock{{Type: "tool_result", Content: "file contents"}},
+			Content: []contentBlock{{Type: "tool_result", Content: "file contents"}},
 		},
 	}
 
@@ -103,12 +103,12 @@ func TestFormatter_ShowsAssistantMessageWithTextAndToolUse(t *testing.T) {
 	f := NewFormatter()
 
 	event := agent.Event{
-		Type:      EventTypeAssistantMessage,
+		Type:      eventTypeAssistantMessage,
 		Timestamp: time.Now(),
-		Data: AssistantMessageData{
-			Content: []ContentBlock{
-				{Type: ContentBlockTypeText, Text: "Let me read the file"},
-				{Type: ContentBlockTypeToolUse, ID: "tool_1", Name: "Read"},
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeText, Text: "Let me read the file"},
+				{Type: contentBlockTypeToolUse, ID: "tool_1", Name: "Read"},
 			},
 		},
 	}

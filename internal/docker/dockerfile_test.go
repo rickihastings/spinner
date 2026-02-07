@@ -9,11 +9,11 @@ import (
 
 // TestGenerateDockerfile_DefaultBaseImage tests Dockerfile generation with default base image
 func TestGenerateDockerfile_DefaultBaseImage(t *testing.T) {
-	config := DockerfileConfig{
+	config := dockerfileConfig{
 		BaseImage: "ubuntu:22.04",
 	}
 
-	content, err := GenerateDockerfile(config)
+	content, err := generateDockerfile(config)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, content)
@@ -22,11 +22,11 @@ func TestGenerateDockerfile_DefaultBaseImage(t *testing.T) {
 
 // TestGenerateDockerfile_CustomBaseImage tests Dockerfile generation with custom base image
 func TestGenerateDockerfile_CustomBaseImage(t *testing.T) {
-	config := DockerfileConfig{
+	config := dockerfileConfig{
 		BaseImage: "node:20",
 	}
 
-	content, err := GenerateDockerfile(config)
+	content, err := generateDockerfile(config)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, content)
@@ -49,11 +49,11 @@ func TestGenerateDockerfile_TemplateNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	config := DockerfileConfig{
+	config := dockerfileConfig{
 		BaseImage: "ubuntu:22.04",
 	}
 
-	_, err = GenerateDockerfile(config)
+	_, err = generateDockerfile(config)
 
 	assert.Error(t, err)
 }

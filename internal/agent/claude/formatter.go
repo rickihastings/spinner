@@ -32,19 +32,19 @@ func (f *Formatter) FormatEvent(event *agent.Event) (string, bool) {
 	switch event.Type {
 	case EventTypeSystemInit:
 		return formatSystemInitEvent(timestamp, event), true
-	case EventTypeAssistantMessage:
+	case eventTypeAssistantMessage:
 		// Skip tool-use-only messages
 		if isToolUseOnly(event) {
 			return "", false
 		}
 
 		return formatAssistantEvent(timestamp, event), true
-	case EventTypeUserMessage:
+	case eventTypeUserMessage:
 		// Skip tool result messages
 		return "", false
-	case EventTypeResult:
+	case eventTypeResult:
 		return formatResultEvent(timestamp, event), true
-	case EventTypeError:
+	case eventTypeError:
 		return formatErrorEvent(timestamp, event), true
 	default:
 		return "", false
@@ -65,7 +65,7 @@ func formatSystemInitEvent(timestamp string, event *agent.Event) string {
 }
 
 func isToolUseOnly(event *agent.Event) bool {
-	data, ok := event.Data.(AssistantMessageData)
+	data, ok := event.Data.(assistantMessageData)
 	if !ok {
 		return false
 	}
@@ -74,9 +74,9 @@ func isToolUseOnly(event *agent.Event) bool {
 	hasToolUse := false
 
 	for _, block := range data.Content {
-		if block.Type == ContentBlockTypeText && block.Text != "" {
+		if block.Type == contentBlockTypeText && block.Text != "" {
 			hasText = true
-		} else if block.Type == ContentBlockTypeToolUse {
+		} else if block.Type == contentBlockTypeToolUse {
 			hasToolUse = true
 		}
 	}
@@ -86,7 +86,7 @@ func isToolUseOnly(event *agent.Event) bool {
 }
 
 func formatAssistantEvent(timestamp string, event *agent.Event) string {
-	data, ok := event.Data.(AssistantMessageData)
+	data, ok := event.Data.(assistantMessageData)
 	if !ok {
 		return fmt.Sprintf("[darkgray]%s[-] [lightblue]Assistant:[-] [gray](message)[-]", timestamp)
 	}
@@ -95,7 +95,7 @@ func formatAssistantEvent(timestamp string, event *agent.Event) string {
 	var texts []string
 
 	for _, block := range data.Content {
-		if block.Type == ContentBlockTypeText && block.Text != "" {
+		if block.Type == contentBlockTypeText && block.Text != "" {
 			texts = append(texts, block.Text)
 		}
 	}
@@ -125,7 +125,7 @@ func formatAssistantEvent(timestamp string, event *agent.Event) string {
 }
 
 func formatResultEvent(timestamp string, event *agent.Event) string {
-	data, ok := event.Data.(ResultData)
+	data, ok := event.Data.(resultData)
 	if !ok {
 		return fmt.Sprintf("[darkgray]%s[-] [cyan]Result:[-] [gray](unknown)[-]", timestamp)
 	}
@@ -140,7 +140,7 @@ func formatResultEvent(timestamp string, event *agent.Event) string {
 }
 
 func formatErrorEvent(timestamp string, event *agent.Event) string {
-	data, ok := event.Data.(ErrorData)
+	data, ok := event.Data.(errorData)
 	if !ok {
 		return fmt.Sprintf("[darkgray]%s[-] [red]Error:[-] [gray](unknown error)[-]", timestamp)
 	}

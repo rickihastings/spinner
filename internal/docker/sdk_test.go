@@ -24,7 +24,7 @@ func TestSDKClient_Close_NilClient(t *testing.T) {
 }
 
 func TestDefaultLogStreamOptions(t *testing.T) {
-	opts := DefaultLogStreamOptions()
+	opts := defaultLogStreamOptions()
 
 	assert.False(t, opts.Follow)
 	assert.False(t, opts.Timestamps)
@@ -36,34 +36,34 @@ func TestDefaultLogStreamOptions(t *testing.T) {
 func TestBuildEvent_IsError(t *testing.T) {
 	tests := []struct {
 		name     string
-		event    BuildEvent
+		event    buildEvent
 		expected bool
 	}{
 		{
 			name:     "no error",
-			event:    BuildEvent{Stream: "Step 1/3 : FROM ubuntu"},
+			event:    buildEvent{Stream: "Step 1/3 : FROM ubuntu"},
 			expected: false,
 		},
 		{
 			name:     "error string set",
-			event:    BuildEvent{Error: "build failed"},
+			event:    buildEvent{Error: "build failed"},
 			expected: true,
 		},
 		{
 			name:     "error detail set",
-			event:    BuildEvent{ErrorDetail: &BuildErrorDetail{Code: 1, Message: "failed"}},
+			event:    buildEvent{ErrorDetail: &buildErrorDetail{Code: 1, Message: "failed"}},
 			expected: true,
 		},
 		{
 			name:     "both error and detail set",
-			event:    BuildEvent{Error: "error", ErrorDetail: &BuildErrorDetail{Code: 1}},
+			event:    buildEvent{Error: "error", ErrorDetail: &buildErrorDetail{Code: 1}},
 			expected: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.event.IsError())
+			assert.Equal(t, tt.expected, tt.event.isError())
 		})
 	}
 }
@@ -117,7 +117,7 @@ func TestStreamContainerLogs_MockClient(t *testing.T) {
 
 	close(events)
 
-	opts := DefaultLogStreamOptions()
+	opts := defaultLogStreamOptions()
 	mockClient.On("StreamContainerLogs", ctx, "test-container", opts).Return((<-chan LogEvent)(events), nil)
 
 	resultChan, err := mockClient.StreamContainerLogs(ctx, "test-container", opts)

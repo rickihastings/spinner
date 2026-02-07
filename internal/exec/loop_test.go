@@ -32,7 +32,7 @@ func TestNewRunner(t *testing.T) {
 	}
 
 	state := &State{
-		Status:    StatusRunning,
+		Status:    statusRunning,
 		Iteration: 0,
 	}
 
@@ -66,7 +66,7 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 	}
 
 	state := &State{
-		Status:    StatusRunning,
+		Status:    statusRunning,
 		Iteration: 0,
 	}
 
@@ -106,7 +106,7 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 	}
 
 	// State should reflect max iterations error
-	if state.Status != StatusError {
+	if state.Status != statusError {
 		t.Errorf("Expected status error, got %s", state.Status)
 	}
 
@@ -120,7 +120,7 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 		t.Fatalf("Failed to load state: %v", err)
 	}
 
-	if loadedState.Status != StatusError {
+	if loadedState.Status != statusError {
 		t.Errorf("Expected saved status error, got %s", loadedState.Status)
 	}
 }
@@ -137,7 +137,7 @@ func TestRunner_Run_Completion(t *testing.T) {
 	}
 
 	state := &State{
-		Status:    StatusRunning,
+		Status:    statusRunning,
 		Iteration: 0,
 	}
 
@@ -172,7 +172,7 @@ func TestRunner_Run_Completion(t *testing.T) {
 		t.Errorf("Expected exit code 0, got %d", exitCode)
 	}
 
-	if state.Status != StatusCompleted {
+	if state.Status != statusCompleted {
 		t.Errorf("Expected status completed, got %s", state.Status)
 	}
 
@@ -193,7 +193,7 @@ func TestRunner_Run_AuthError(t *testing.T) {
 	}
 
 	state := &State{
-		Status:    StatusRunning,
+		Status:    statusRunning,
 		Iteration: 0,
 	}
 
@@ -228,7 +228,7 @@ func TestRunner_Run_AuthError(t *testing.T) {
 		t.Errorf("Expected exit code 1, got %d", exitCode)
 	}
 
-	if state.Status != StatusAuthError {
+	if state.Status != statusAuthError {
 		t.Errorf("Expected status auth_error, got %s", state.Status)
 	}
 
@@ -253,7 +253,7 @@ func TestRunner_Run_RateLimit(t *testing.T) {
 	}
 
 	state := &State{
-		Status:    StatusRunning,
+		Status:    statusRunning,
 		Iteration: 0,
 	}
 
@@ -317,7 +317,7 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 	}
 
 	state := &State{
-		Status:    StatusRunning,
+		Status:    statusRunning,
 		Iteration: 0,
 	}
 
@@ -352,7 +352,7 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 		t.Errorf("Expected exit code 130, got %d", exitCode)
 	}
 
-	if state.Status != StatusError {
+	if state.Status != statusError {
 		t.Errorf("Expected status error, got %s", state.Status)
 	}
 
