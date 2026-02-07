@@ -438,6 +438,7 @@ func TestProviderLogs_ReadsFromGCS(t *testing.T) {
 
 	data, _ := io.ReadAll(reader)
 	assert.Equal(t, "iteration 1 output\n", string(data))
+
 	_ = reader.Close()
 
 	mockClient.AssertExpectations(t)

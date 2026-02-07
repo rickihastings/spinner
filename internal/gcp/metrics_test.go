@@ -305,6 +305,7 @@ func TestCollectGCPMetrics_APIError(t *testing.T) {
 
 func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 	client := new(MockGCPClient)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -450,6 +451,7 @@ func TestStreamGCPMetrics_ContextCancellation(t *testing.T) {
 func TestProviderWatchMetrics_Delegates(t *testing.T) {
 	client := new(MockGCPClient)
 	p := newTestProvider(client)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
