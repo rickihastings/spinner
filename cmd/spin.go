@@ -6,23 +6,22 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rickihastings/spinner/internal/docker"
 	"github.com/rickihastings/spinner/internal/prerequisites"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// spinCmd is the production spin command using Provider
-var spinCmd = NewSpinCommand(docker.NewDockerProvider(docker.NewRealDockerClient()))
+// spinCmd is the production spin command using the default provider factory.
+var spinCmd = NewSpinCommand(defaultFactory)
 
 func init() {
 	rootCmd.AddCommand(spinCmd)
 }
 
-// NewSpinCommand creates a new spin command with the given Provider.
+// NewSpinCommand creates a new spin command with the given Factory.
 // This constructor enables dependency injection for testing.
-func NewSpinCommand(p provider.Provider) *cobra.Command {
+func NewSpinCommand(f *provider.Factory) *cobra.Command {
 	var (
 		spinImage         string
 		spinRepo          string
@@ -31,73 +30,75 @@ func NewSpinCommand(p provider.Provider) *cobra.Command {
 		spinMaxIterations string
 		spinRecreate      bool
 		spinSetup         bool
-		spinBaseImage     string
-		spinDockerfile    string
 		spinWatch         bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "spin",
-		Short: "Spin up a development container from a pre-built image",
-		Long: `Spin up a development container from a pre-built image
+		Short: "Spin up an instance from a pre-built environment",
+		Long: `Spin up an instance from a pre-built environment
 
-SPIN OPTIONS:
-  --image <image>            Docker image to use (required)
+GENERAL FLAGS:
+  --image <image>            Environment image to use (required)
   --repo <repo>              Git repository URL (required)
   --prompt <prompt>          Task prompt for autonomous execution (optional)
   --branch <branch>          Git branch to checkout (optional)
-  --max-iterations <num>     Maximum iterations for autonomous execution (optional, default: 100)
-  --recreate                 Force recreation of existing container (optional)
-  --watch                    Enter watch mode after container is ready (optional)
+  --max-iterations <num>     Maximum iterations (optional, default: 100)
+  --recreate                 Force recreation of existing instance (optional)
+  --watch                    Enter watch mode after instance is ready (optional)
+  --backend <backend>        Backend provider: docker, gcp (default: docker)
 
 SETUP OPTIONS (use with --setup flag):
-  --setup                    Build/rebuild the Docker image before spinning (optional)
-  --base-image <image>       Base Docker image (optional, default: ubuntu:22.04, requires --setup)
-  --dockerfile <path>        Path to custom Dockerfile (optional, requires --setup, mutually exclusive with --base-image)
+  --setup                    Build/rebuild the environment before spinning (optional)
+  --base-image <image>       Base Docker image (Docker backend, requires --setup)
+  --dockerfile <path>        Path to custom Dockerfile (Docker backend, requires --setup)
+
+GCP BACKEND FLAGS:
+  --project <project>        GCP project ID (required for GCP)
+  --zone <zone>              GCP zone (required for GCP)
+  --machine-type <type>      VM machine type (default: e2-standard-2)
+  --disk-size <gb>           Boot disk size in GB (default: 30)
+  --state-bucket <bucket>    GCS bucket for state persistence (required for GCP)
 
 EXAMPLES:
-  # Basic spin with existing image
+  # Docker (default)
   spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git
+  spinner spin --setup --image my-env --repo git@github.com:octocat/Hello-World.git --prompt "Fix the bug"
 
-  # Spin with setup (builds image first)
-  spinner spin --setup --image my-env --repo git@github.com:octocat/Hello-World.git
+  # GCP
+  spinner spin --backend gcp --image my-env --repo git@github.com:octocat/Hello-World.git \
+    --project my-proj --zone us-central1-a --state-bucket my-bucket --prompt "Fix the bug"
 
-  # Setup with custom base image
-  spinner spin --setup --image my-env --base-image node:20-bullseye --repo git@github.com:octocat/Hello-World.git
-
-  # Setup with custom Dockerfile
-  spinner spin --setup --image my-env --dockerfile ./Dockerfile.custom --repo git@github.com:octocat/Hello-World.git
-
-  # Other spin options work with setup
-  spinner spin --setup --image my-env --repo git@github.com:octocat/Hello-World.git --prompt "Implement feature X"
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --recreate
-
-  # Watch mode after spinning
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git --watch
-
-Note: When --setup is used, the image is always rebuilt (no caching). The --image value becomes the setup name.`,
+  # With .spinner.json config, GCP flags can be omitted:
+  spinner spin --image my-env --repo git@github.com:octocat/Hello-World.git --prompt "Fix the bug"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = viper.BindPFlag("image", cmd.Flags().Lookup("image"))
-			_ = viper.BindPFlag("repo", cmd.Flags().Lookup("repo"))
-			_ = viper.BindPFlag("prompt", cmd.Flags().Lookup("prompt"))
-			_ = viper.BindPFlag("branch", cmd.Flags().Lookup("branch"))
-			_ = viper.BindPFlag("max-iterations", cmd.Flags().Lookup("max-iterations"))
-			_ = viper.BindPFlag("recreate", cmd.Flags().Lookup("recreate"))
-			_ = viper.BindPFlag("setup", cmd.Flags().Lookup("setup"))
-			_ = viper.BindPFlag("base-image", cmd.Flags().Lookup("base-image"))
-			_ = viper.BindPFlag("dockerfile", cmd.Flags().Lookup("dockerfile"))
-			_ = viper.BindPFlag("watch", cmd.Flags().Lookup("watch"))
+			// Bind general flags to Viper
+			_ = viper.BindPFlag(flagImage, cmd.Flags().Lookup(flagImage))
+			_ = viper.BindPFlag(flagRepo, cmd.Flags().Lookup(flagRepo))
+			_ = viper.BindPFlag(flagPrompt, cmd.Flags().Lookup(flagPrompt))
+			_ = viper.BindPFlag(flagBranch, cmd.Flags().Lookup(flagBranch))
+			_ = viper.BindPFlag(flagMaxIterations, cmd.Flags().Lookup(flagMaxIterations))
+			_ = viper.BindPFlag(flagRecreate, cmd.Flags().Lookup(flagRecreate))
+			_ = viper.BindPFlag(flagSetup, cmd.Flags().Lookup(flagSetup))
+			_ = viper.BindPFlag(flagBaseImage, cmd.Flags().Lookup(flagBaseImage))
+			_ = viper.BindPFlag(flagDockerfile, cmd.Flags().Lookup(flagDockerfile))
+			_ = viper.BindPFlag(flagWatch, cmd.Flags().Lookup(flagWatch))
 
-			spinImage = viper.GetString("image")
-			spinRepo = viper.GetString("repo")
-			spinPrompt = viper.GetString("prompt")
-			spinBranch = viper.GetString("branch")
-			spinMaxIterations = viper.GetString("max-iterations")
-			spinRecreate = viper.GetBool("recreate")
-			spinSetup = viper.GetBool("setup")
-			spinBaseImage = viper.GetString("base-image")
-			spinDockerfile = viper.GetString("dockerfile")
-			spinWatch = viper.GetBool("watch")
+			// Resolve and validate backend
+			backend, err := resolveAndValidateBackend(cmd)
+			if err != nil {
+				return err
+			}
+
+			// Read values from Viper
+			spinImage = viper.GetString(flagImage)
+			spinRepo = viper.GetString(flagRepo)
+			spinPrompt = viper.GetString(flagPrompt)
+			spinBranch = viper.GetString(flagBranch)
+			spinMaxIterations = viper.GetString(flagMaxIterations)
+			spinRecreate = viper.GetBool(flagRecreate)
+			spinSetup = viper.GetBool(flagSetup)
+			spinWatch = viper.GetBool(flagWatch)
 
 			if spinImage == "" {
 				return fmt.Errorf("--image flag is required")
@@ -107,21 +108,10 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				return fmt.Errorf("--repo flag is required")
 			}
 
-			if !spinSetup && spinBaseImage != "" {
-				fmt.Fprintln(os.Stderr, "Error: --base-image requires --setup flag")
-				return fmt.Errorf("--base-image requires --setup flag")
-			}
-
-			if !spinSetup && spinDockerfile != "" {
-				fmt.Fprintln(os.Stderr, "Error: --dockerfile requires --setup flag")
-				return fmt.Errorf("--dockerfile requires --setup flag")
-			}
-
-			if spinSetup && spinBaseImage != "" && spinDockerfile != "" {
-				fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
-				fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
-
-				return fmt.Errorf("mutually exclusive flags provided")
+			// Create provider from factory
+			p, err := f.Create(backend)
+			if err != nil {
+				return err
 			}
 
 			ctx := context.Background()
@@ -130,14 +120,13 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 			if spinSetup {
 				setupName := strings.TrimPrefix(spinImage, "spinner:")
 
-				if err := performSetup(ctx, p, provider.SetupConfig{
-					Name:    setupName,
-					Options: map[string]string{"base-image": spinBaseImage, "dockerfile": spinDockerfile},
-				}); err != nil {
+				if err := runSetup(ctx, p, backend, setupName); err != nil {
 					return err
 				}
 
-				spinImage = "spinner:" + setupName
+				if backend == provider.BackendDocker {
+					spinImage = "spinner:" + setupName
+				}
 			}
 
 			// Validate prerequisites
@@ -155,12 +144,20 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 
 			fmt.Println("✓ Prerequisites validated")
 
+			createOptions := map[string]string{flagImage: spinImage}
+
+			if backend == provider.BackendGCP {
+				for k, v := range gcpOptionsFromViper() {
+					createOptions[k] = v
+				}
+			}
+
 			createConfig := provider.CreateConfig{
 				Repo:          spinRepo,
 				Prompt:        spinPrompt,
 				Branch:        spinBranch,
 				MaxIterations: spinMaxIterations,
-				Options:       map[string]string{"image": spinImage},
+				Options:       createOptions,
 			}
 
 			name := p.InstanceName(createConfig)
@@ -214,11 +211,21 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 				fmt.Println("Note: Reusing existing instance. Use --recreate flag to force recreation.")
 			}
 
-			// Display instance management commands
+			// Display backend-specific management commands
 			fmt.Println()
-			fmt.Printf("To access: docker exec -it %s bash\n", instance.Name)
-			fmt.Printf("To stop: docker stop %s\n", instance.Name)
-			fmt.Printf("To remove: docker rm %s\n", instance.Name)
+
+			if backend == provider.BackendGCP {
+				gcpProject := viper.GetString(flagProject)
+				gcpZone := viper.GetString(flagZone)
+
+				fmt.Printf("To access: gcloud compute ssh %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
+				fmt.Printf("To stop:   gcloud compute instances stop %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
+				fmt.Printf("To remove: gcloud compute instances delete %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
+			} else {
+				fmt.Printf("To access: docker exec -it %s bash\n", instance.Name)
+				fmt.Printf("To stop: docker stop %s\n", instance.Name)
+				fmt.Printf("To remove: docker rm %s\n", instance.Name)
+			}
 
 			// Enter watch mode if --watch flag is set
 			if spinWatch {
@@ -232,16 +239,27 @@ Note: When --setup is used, the image is always rebuilt (no caching). The --imag
 		},
 	}
 
-	cmd.Flags().StringVar(&spinImage, "image", "", "Docker image to use (required)")
-	cmd.Flags().StringVar(&spinRepo, "repo", "", "Git repository URL (required)")
-	cmd.Flags().StringVar(&spinPrompt, "prompt", "", "Task prompt for autonomous execution (optional)")
-	cmd.Flags().StringVar(&spinBranch, "branch", "", "Git branch to checkout (optional)")
-	cmd.Flags().StringVar(&spinMaxIterations, "max-iterations", "", "Maximum iterations for autonomous execution (optional, default: 100)")
-	cmd.Flags().BoolVar(&spinRecreate, "recreate", false, "Force recreation of existing container (optional)")
-	cmd.Flags().BoolVar(&spinSetup, "setup", false, "Build/rebuild the Docker image before spinning (optional)")
-	cmd.Flags().StringVar(&spinBaseImage, "base-image", "", "Base Docker image (optional, default: ubuntu:22.04, requires --setup)")
-	cmd.Flags().StringVar(&spinDockerfile, "dockerfile", "", "Path to custom Dockerfile (optional, requires --setup)")
-	cmd.Flags().BoolVar(&spinWatch, "watch", false, "Enter watch mode after container is ready (optional)")
+	// General flags
+	cmd.Flags().StringVar(&spinImage, flagImage, "", "Environment image to use (required)")
+	cmd.Flags().StringVar(&spinRepo, flagRepo, "", "Git repository URL (required)")
+	cmd.Flags().StringVar(&spinPrompt, flagPrompt, "", "Task prompt for autonomous execution (optional)")
+	cmd.Flags().StringVar(&spinBranch, flagBranch, "", "Git branch to checkout (optional)")
+	cmd.Flags().StringVar(&spinMaxIterations, flagMaxIterations, "", "Maximum iterations (optional, default: 100)")
+	cmd.Flags().BoolVar(&spinRecreate, flagRecreate, false, "Force recreation of existing instance (optional)")
+	cmd.Flags().BoolVar(&spinSetup, flagSetup, false, "Build/rebuild the environment before spinning (optional)")
+	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
+	cmd.Flags().BoolVar(&spinWatch, flagWatch, false, "Enter watch mode after instance is ready (optional)")
+
+	// Docker backend flags
+	cmd.Flags().String(flagBaseImage, "", "Base Docker image (Docker backend, requires --setup)")
+	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile (Docker backend, requires --setup)")
+
+	// GCP backend flags
+	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
+	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
+	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
+	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
+	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
 
 	return cmd
 }

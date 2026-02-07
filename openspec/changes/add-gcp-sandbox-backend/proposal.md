@@ -29,7 +29,7 @@ A complete GCP Compute Engine provider implementing the `provider.Provider` inte
 - **GCPClient interface** — SDK-based abstraction (mirrors Docker's two-layer pattern) with mock for testing
 - **Authentication** — Application Default Credentials (ADC) for zero-config auth in GCP environments
 - **Setup** — Bakes a custom GCE image by launching a temp VM, installing tooling (git, gh, claude-code, spinner),
-  then creating a machine image from the disk
+  optionally running a user-provided bake script (`--bake-script`), then creating a machine image from the disk
 - **Create** — Launches a VM instance from the baked image with runtime metadata (repo, prompt, branch, tokens)
 - **Start/Stop/Restart/Remove** — Full VM lifecycle management via Compute Engine Instances API
 - **Logs** — GCS-based log streaming; exec syncs `raw.log` to GCS via reused `LogWatcher`; control plane polls GCS
@@ -42,11 +42,17 @@ A complete GCP Compute Engine provider implementing the `provider.Provider` inte
 
 - **ADDED** `--backend` flag (default: `"docker"`) to select which provider handles setup
 - **ADDED** GCP-specific setup options: `--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`
+- **ADDED** `--bake-script <path>` — path to a custom shell script that runs inside the default bake script
+  during GCP image baking. The core tooling (git, gh, claude-code, spinner) is always installed first, then the
+  user's script runs, then the VM shuts down. This mirrors Docker's `--dockerfile` customization pattern,
+  letting users install additional dependencies (e.g., Node.js, Python, project-specific tools) without
+  replacing the essential base setup
 
 ### Modified Capability: `cli-spin`
 
 - **ADDED** `--backend` flag (default: `"docker"`) to select which provider handles spin
 - **ADDED** GCP-specific spin options: `--project`, `--zone`, `--machine-type`, `--disk-size`, `--state-bucket`
+- **ADDED** `--bake-script <path>` — same as setup; used when `--setup` flag is combined with spin
 
 ### New Internal Package: Provider Factory
 
