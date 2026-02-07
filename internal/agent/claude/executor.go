@@ -30,6 +30,10 @@ type ExecutorConfig struct {
 
 	// IncludeRaw includes raw JSON lines in events when true.
 	IncludeRaw bool
+
+	// AdditionalWriter receives a copy of the raw stdout stream alongside
+	// the log file. Used by the GCP backend to stream logs to GCS.
+	AdditionalWriter io.Writer
 }
 
 // Executor executes Claude CLI commands and implements agent.Executor.
@@ -119,10 +123,20 @@ func (e *Executor) Execute(ctx context.Context, prompt string) (<-chan agent.Eve
 			}
 		}()
 
-		// Create a reader that also writes to log file if configured
+		// Create a reader that also writes to log file and/or additional writer
 		var reader io.Reader = stdout
+
+		var writers []io.Writer
 		if logFile != nil {
-			reader = io.TeeReader(stdout, logFile)
+			writers = append(writers, logFile)
+		}
+
+		if e.config.AdditionalWriter != nil {
+			writers = append(writers, e.config.AdditionalWriter)
+		}
+
+		if len(writers) > 0 {
+			reader = io.TeeReader(stdout, io.MultiWriter(writers...))
 		}
 
 		// Parse stdout and forward events

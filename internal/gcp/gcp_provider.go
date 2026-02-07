@@ -216,9 +216,13 @@ func (p *Provider) Remove(ctx context.Context, name string) error {
 	return p.client.DeleteInstance(ctx, p.project, p.zone, name)
 }
 
-// Logs returns the VM's log output from GCS.
-func (p *Provider) Logs(_ context.Context, _ string) (io.ReadCloser, error) {
-	return nil, fmt.Errorf("gcp: Logs not yet implemented (see slice 5.0)")
+// Logs returns the VM's full log output from GCS.
+func (p *Provider) Logs(ctx context.Context, name string) (io.ReadCloser, error) {
+	if p.bucket == "" {
+		return nil, fmt.Errorf("gcp: no state bucket configured; cannot read logs")
+	}
+
+	return readLogs(ctx, p.client, p.bucket, name)
 }
 
 // Status returns the current lifecycle status of a VM instance.
@@ -237,9 +241,13 @@ func (p *Provider) Status(ctx context.Context, name string) (provider.InstanceSt
 	return MapVMStatus(instance.GetStatus()), nil
 }
 
-// WatchLogs streams log lines from GCS.
-func (p *Provider) WatchLogs(_ context.Context, _ string, _ int, _ chan<- string) error {
-	return fmt.Errorf("gcp: WatchLogs not yet implemented (see slice 5.0)")
+// WatchLogs streams log lines from GCS by polling for new content.
+func (p *Provider) WatchLogs(ctx context.Context, name string, _ int, ch chan<- string) error {
+	if p.bucket == "" {
+		return fmt.Errorf("gcp: no state bucket configured; cannot stream logs")
+	}
+
+	return watchLogs(ctx, p.client, p.bucket, name, ch)
 }
 
 // WatchMetrics streams resource metrics from Cloud Monitoring.

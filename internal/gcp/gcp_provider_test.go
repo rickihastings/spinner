@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
 
 	"cloud.google.com/go/compute/apiv1/computepb"
@@ -423,24 +424,42 @@ func TestIsNotFoundError(t *testing.T) {
 	}
 }
 
-func TestProviderLogsNotImplemented(t *testing.T) {
+func TestProviderLogs_ReadsFromGCS(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	reader, err := p.Logs(context.Background(), "test-vm")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
-	assert.Nil(t, reader)
+	ctx := context.Background()
+	logData := []byte("iteration 1 output\n")
+	mockClient.On("ReadObject", ctx, "test-bucket", "test-vm/logs/raw.log").Return(logData, nil)
+
+	reader, err := p.Logs(ctx, "test-vm")
+	assert.NoError(t, err)
+	assert.NotNil(t, reader)
+
+	data, _ := io.ReadAll(reader)
+	assert.Equal(t, "iteration 1 output\n", string(data))
+	_ = reader.Close()
+
+	mockClient.AssertExpectations(t)
 }
 
-func TestProviderWatchLogsNotImplemented(t *testing.T) {
+func TestProviderLogs_NoBucket(t *testing.T) {
 	mockClient := &MockGCPClient{}
-	p := newTestProvider(mockClient)
+	p := NewGCPProvider(mockClient, "proj", "zone", "")
+
+	_, err := p.Logs(context.Background(), "test-vm")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no state bucket")
+}
+
+func TestProviderWatchLogs_NoBucket(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := NewGCPProvider(mockClient, "proj", "zone", "")
 
 	ch := make(chan string)
 	err := p.WatchLogs(context.Background(), "test-vm", 10, ch)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
+	assert.Contains(t, err.Error(), "no state bucket")
 }
 
 func TestProviderWatchMetricsNotImplemented(t *testing.T) {

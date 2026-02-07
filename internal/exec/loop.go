@@ -3,12 +3,16 @@ package exec
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
+
 	"github.com/rickihastings/spinner/internal/agent"
 	"github.com/rickihastings/spinner/internal/agent/claude"
+	"github.com/rickihastings/spinner/internal/logs"
 )
 
 const (
@@ -18,12 +22,16 @@ const (
 
 // Function variables for testing
 var (
-	executorFactory = func(logPath string) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
 		return claude.NewExecutor(&claude.ExecutorConfig{
-			LogPath: logPath,
+			LogPath:          logPath,
+			AdditionalWriter: additionalWriter,
 		})
 	}
-	pushChangesFunc = PushChanges
+	pushChangesFunc    = PushChanges
+	gcsSinkFactory     = defaultGCSSinkFactory
+	gcsObjectWriterNew = logs.NewGCSObjectWriter
+	isRunningOnGCE     = metadata.OnGCE
 )
 
 // Runner executes the main iteration loop.
@@ -56,6 +64,18 @@ func (r *Runner) Run(ctx context.Context) int {
 		fmt.Fprintf(os.Stderr, "Warning: failed to save initial state: %v\n", err)
 	}
 
+	// Create GCS log sink if running inside a GCP VM with a log bucket configured.
+	// Use io.Writer type to avoid Go's interface nil pitfall: a nil *GCSSink
+	// stored in an io.Writer interface would not compare equal to nil.
+	var additionalWriter io.Writer
+
+	sink, cleanup := gcsSinkFactory(ctx)
+	if sink != nil {
+		additionalWriter = sink
+
+		defer cleanup()
+	}
+
 	for r.state.Iteration = 1; r.state.Iteration <= r.config.MaxIterations; r.state.Iteration++ {
 		// Check for context cancellation
 		select {
@@ -84,7 +104,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		}
 
 		// Run Claude
-		executor := executorFactory(logPath)
+		executor := executorFactory(logPath, additionalWriter)
 
 		result, err := executor.ExecuteAndCollect(ctx, r.config.Prompt)
 		if err != nil {
@@ -167,6 +187,46 @@ func (r *Runner) Run(ctx context.Context) int {
 	_ = SaveState(r.statePath, r.state)
 
 	return 1
+}
+
+// defaultGCSSinkFactory creates a GCS sink when running on a GCE VM with
+// SPINNER_LOG_BUCKET set. The metadata server is queried first to confirm
+// this is actually a GCP environment, preventing accidental activation when
+// the env var leaks into a non-GCP context (e.g. Docker).
+// Returns (nil, nil) if not on GCE, the env var is unset, or init fails.
+func defaultGCSSinkFactory(ctx context.Context) (*logs.GCSSink, func()) {
+	if !isRunningOnGCE() {
+		return nil, nil
+	}
+
+	bucket := os.Getenv("SPINNER_LOG_BUCKET")
+	if bucket == "" {
+		return nil, nil
+	}
+
+	instanceName := os.Getenv("SPINNER_INSTANCE_NAME")
+	if instanceName == "" {
+		fmt.Fprintf(os.Stderr, "Warning: SPINNER_LOG_BUCKET set but SPINNER_INSTANCE_NAME empty, skipping GCS log sink\n")
+		return nil, nil
+	}
+
+	objectWriter, err := gcsObjectWriterNew(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to create GCS client for log streaming: %v\n", err)
+		return nil, nil
+	}
+
+	object := instanceName + "/logs/raw.log"
+	sink := logs.NewGCSSink(ctx, objectWriter, bucket, object)
+
+	fmt.Printf("GCS log streaming enabled: gs://%s/%s\n", bucket, object)
+
+	cleanup := func() {
+		_ = sink.Close()
+		_ = objectWriter.Close()
+	}
+
+	return sink, cleanup
 }
 
 // waitForRateLimit waits for the rate limit period with a countdown.
