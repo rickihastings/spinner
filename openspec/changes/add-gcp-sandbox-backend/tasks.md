@@ -25,13 +25,13 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 
 ## 2.0 GCP Client Interface & Authentication
 
-- [ ] 2.1 Create `internal/gcp/types.go` — GCP-specific types: `InstanceConfig`, `ImageConfig`, `SerialPortOutput`, `MetricsQuery`, `MetricPoint`, `VMStatus`
-- [ ] 2.2 Create `internal/gcp/client.go` — `Client` interface with all GCP operations; `RealGCPClient` struct with SDK client fields
-- [ ] 2.3 Implement `NewRealGCPClient(ctx, project)` — initialize all SDK clients with ADC authentication
-- [ ] 2.4 Create `internal/gcp/mock_client.go` — testify mock implementing `Client` interface
-- [ ] 2.5 Create `internal/gcp/client_test.go` — unit tests for client initialization and error handling
-- [ ] 2.6 Add GCP SDK dependencies to `go.mod`: `cloud.google.com/go/compute`, `cloud.google.com/go/storage`, `cloud.google.com/go/logging`, `cloud.google.com/go/monitoring`
-- [ ] 2.7 Verify build succeeds with new dependencies
+- [x] 2.1 Create `internal/gcp/types.go` — GCP-specific types: `InstanceConfig`, `ImageConfig`, `SerialPortOutput`, `MetricsQuery`, `MetricPoint`, `VMStatus`
+- [x] 2.2 Create `internal/gcp/client.go` — `Client` interface with all GCP operations; `RealGCPClient` struct with SDK client fields
+- [x] 2.3 Implement `NewRealGCPClient(ctx, project)` — initialize all SDK clients with ADC authentication
+- [x] 2.4 Create `internal/gcp/mock_client.go` — testify mock implementing `Client` interface
+- [x] 2.5 Create `internal/gcp/client_test.go` — unit tests for client initialization and error handling
+- [x] 2.6 Add GCP SDK dependencies to `go.mod`: `cloud.google.com/go/compute`, `cloud.google.com/go/storage`, `cloud.google.com/go/monitoring`
+- [x] 2.7 Verify build succeeds with new dependencies
 
 ## 3.0 GCP Setup — Image Baking
 
