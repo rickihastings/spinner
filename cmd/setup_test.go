@@ -10,17 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// testFactory wraps a MockProvider into a Factory with the "docker" backend.
-func testFactory(mockProv *provider.MockProvider) *provider.Factory {
-	f := provider.NewFactory()
-
-	f.Register(provider.BackendDocker, func() (provider.Provider, error) {
-		return mockProv, nil
-	})
-
-	return f
-}
-
 // TestSetupCommand_MissingNameFlag tests that the setup command returns an error when --name is missing
 func TestSetupCommand_MissingNameFlag(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
@@ -290,21 +279,6 @@ func TestSetupCommand_UnknownBackend(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown backend")
 	assert.Contains(t, err.Error(), "docker")
-}
-
-// testGCPFactory creates a Factory with both docker and gcp backends using mocks.
-func testGCPFactory(mockProv *provider.MockProvider) *provider.Factory {
-	f := provider.NewFactory()
-
-	f.Register(provider.BackendDocker, func() (provider.Provider, error) {
-		return mockProv, nil
-	})
-
-	f.Register(provider.BackendGCP, func() (provider.Provider, error) {
-		return mockProv, nil
-	})
-
-	return f
 }
 
 // TestSetupCommand_BakeScriptFileNotFound tests that --bake-script errors when file doesn't exist

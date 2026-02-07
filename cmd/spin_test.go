@@ -6,24 +6,9 @@ import (
 	"testing"
 
 	"github.com/rickihastings/spinner/internal/provider"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-func setupSpinCommandWithMocks(t *testing.T) *cobra.Command {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	mockProvider := new(provider.MockProvider)
-	mockProvider.On("InstanceName", mock.Anything).Return("test-container")
-	mockProvider.On("Status", mock.Anything, "test-container").Return(provider.InstanceStatusNone, nil)
-	mockProvider.On("Create", mock.Anything, mock.Anything).Return(
-		&provider.Instance{Name: "test-container", Status: provider.InstanceStatusRunning}, nil,
-	)
-
-	return NewSpinCommand(testFactory(mockProvider))
-}
 
 // TestSpinCommand_MissingImageFlag tests that spin command fails when --image flag is missing
 func TestSpinCommand_MissingImageFlag(t *testing.T) {
