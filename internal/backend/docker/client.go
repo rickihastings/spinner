@@ -136,29 +136,39 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 		}
 	}
 
-	// Build spinner CLI binary for linux/amd64 (keep exec for go build as per spec)
-	spinnerBinaryPath := filepath.Join(buildContextDir, "spinner")
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-o", spinnerBinaryPath)
+	// Check if we're in development mode (local binary exists)
+	// This happens when running from source after ./scripts/dev-setup.sh
+	destPath := filepath.Join(buildContextDir, "spinner")
+	localBuildDetected := false
 
-	// Find project root to ensure go build runs from the correct directory
 	projectRoot, err := util.FindProjectRoot()
-	if err != nil {
-		return fmt.Errorf("failed to find project root: %w", err)
+	if err == nil {
+		localBinaryPath := filepath.Join(projectRoot, "dist", "spinner-linux-amd64")
+		if _, statErr := os.Stat(localBinaryPath); statErr == nil {
+			// Local binary exists - use it automatically
+			fmt.Println("🔧 Local development binary detected, using dist/spinner-linux-amd64...")
+
+			if err := copyFile(localBinaryPath, destPath); err != nil {
+				return fmt.Errorf("failed to copy local binary: %w", err)
+			}
+
+			// Set LOCAL_BUILD for the Dockerfile
+			os.Setenv("LOCAL_BUILD", "true")
+			localBuildDetected = true
+			fmt.Println("✓ Using local binary for Docker image")
+		}
 	}
 
-	buildCmd.Dir = projectRoot
-
-	buildCmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=amd64")
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
-
-	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("failed to build spinner binary: %w", err)
+	// If no local build, create empty placeholder file so COPY doesn't fail
+	if !localBuildDetected {
+		if err := os.WriteFile(destPath, []byte(""), 0644); err != nil {
+			return fmt.Errorf("failed to create placeholder spinner file: %w", err)
+		}
 	}
 
 	// Build the final image using SDK
 	imageName := fmt.Sprintf("spinner:%s", config.Name)
-	if err := c.buildImageFromContext(ctx, cli, buildContextDir, imageName); err != nil {
+	if err := c.buildImageFromContext(ctx, cli, buildContextDir, imageName, baseImage); err != nil {
 		return fmt.Errorf("failed to build Docker image: %w", err)
 	}
 
@@ -170,16 +180,17 @@ func (c *RealDockerClient) buildUserDockerfile(ctx context.Context, cli *client.
 	contextDir := filepath.Dir(dockerfilePath)
 	dockerfileName := filepath.Base(dockerfilePath)
 
-	return c.buildImageWithOptions(ctx, cli, contextDir, dockerfileName, tag)
+	// User dockerfiles don't need baseImage since they define their own FROM
+	return c.buildImageWithOptions(ctx, cli, contextDir, dockerfileName, tag, "")
 }
 
 // buildImageFromContext builds a Docker image from a build context directory using the SDK.
-func (c *RealDockerClient) buildImageFromContext(ctx context.Context, cli *client.Client, contextDir, tag string) error {
-	return c.buildImageWithOptions(ctx, cli, contextDir, "Dockerfile", tag)
+func (c *RealDockerClient) buildImageFromContext(ctx context.Context, cli *client.Client, contextDir, tag, baseImage string) error {
+	return c.buildImageWithOptions(ctx, cli, contextDir, "Dockerfile", tag, baseImage)
 }
 
 // buildImageWithOptions is the shared implementation for building Docker images.
-func (c *RealDockerClient) buildImageWithOptions(ctx context.Context, cli *client.Client, contextDir, dockerfileName, tag string) error {
+func (c *RealDockerClient) buildImageWithOptions(ctx context.Context, cli *client.Client, contextDir, dockerfileName, tag, baseImage string) error {
 	tarReader, err := createBuildContextTar(contextDir)
 	if err != nil {
 		return fmt.Errorf("failed to create build context tar: %w", err)
@@ -189,6 +200,10 @@ func (c *RealDockerClient) buildImageWithOptions(ctx context.Context, cli *clien
 		Tags:       []string{tag},
 		Dockerfile: dockerfileName,
 		Remove:     true,
+		BuildArgs: map[string]*string{
+			"LOCAL_BUILD": getEnvPtr("LOCAL_BUILD"),
+			"BASE_IMAGE":  &baseImage,
+		},
 	}
 
 	response, err := cli.ImageBuild(ctx, tarReader, buildOptions)
@@ -575,4 +590,13 @@ func (c *RealDockerClient) streamLogs(ctx context.Context, reader io.Reader, eve
 			Message:   string(payload),
 		}
 	}
+}
+
+// getEnvPtr returns a pointer to an environment variable value, or nil if not set
+func getEnvPtr(key string) *string {
+	val := os.Getenv(key)
+	if val == "" {
+		return nil
+	}
+	return &val
 }

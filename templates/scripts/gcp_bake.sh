@@ -32,22 +32,20 @@ echo "spinner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 echo "Installing Claude Code CLI..."
 su - spinner -c 'curl -fsSL https://claude.ai/install.sh | bash'
 
-# Download spinner binary from latest GitHub Release
-echo "Installing spinner binary..."
-SPINNER_VERSION=$(curl -sf https://api.github.com/repos/rickihastings/spinner/releases/latest \
-    | jq -r '.tag_name')
+# Download and install spinner binary
+# Get LOCAL_BUILD and STATE_BUCKET from instance metadata
+export LOCAL_BUILD=$(curl -sf -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/LOCAL_BUILD" || echo "")
+export STATE_BUCKET=$(curl -sf -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/STATE_BUCKET" || echo "")
 
-if [ -z "$SPINNER_VERSION" ] || [ "$SPINNER_VERSION" = "null" ]; then
-    echo "Warning: Could not detect latest spinner release, skipping binary install"
-else
-    VERSION_NUM="${SPINNER_VERSION#v}"
-    curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_${VERSION_NUM}_linux_amd64.tar.gz" \
-        -o /tmp/spinner.tar.gz
-    tar -xzf /tmp/spinner.tar.gz -C /usr/local/bin spinner
-    chmod +x /usr/local/bin/spinner
-    rm /tmp/spinner.tar.gz
-    echo "Installed spinner ${SPINNER_VERSION}"
-fi
+# Download and run the shared install script
+curl -sf -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/spinner-install-script" \
+    > /tmp/install_spinner.sh
+chmod +x /tmp/install_spinner.sh
+/tmp/install_spinner.sh
+rm /tmp/install_spinner.sh
 
 # Set up workspace directory
 echo "Setting up workspace..."

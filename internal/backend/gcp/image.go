@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -25,6 +26,9 @@ type bakeConfig struct {
 
 	// StartupScript is the bake script content (from LoadBakeScript).
 	StartupScript string
+
+	// StateBucket is the GCS bucket for state persistence (used for local dev binary upload).
+	StateBucket string
 
 	// ExtraMetadata holds additional metadata key-value pairs for the bake VM
 	// (e.g., startup-script-runtime containing the startup.sh content).
@@ -68,6 +72,8 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 
 	metadata := map[string]string{
 		"startup-script": config.StartupScript,
+		"LOCAL_BUILD":    os.Getenv("LOCAL_BUILD"),
+		"STATE_BUCKET":   config.StateBucket,
 	}
 	for k, v := range config.ExtraMetadata {
 		metadata[k] = v

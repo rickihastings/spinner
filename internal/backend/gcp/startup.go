@@ -96,3 +96,19 @@ func loadRuntimeScript() (string, error) {
 
 	return string(data), nil
 }
+
+// loadInstallSpinnerScript reads the shared install_spinner.sh script.
+// This script handles binary installation from either GitHub releases or local dev.
+func loadInstallSpinnerScript() (string, error) {
+	scriptPath, err := util.ResolveTemplatePath(filepath.Join("templates", "scripts", "install_spinner.sh"))
+	if err != nil {
+		return "", fmt.Errorf("failed to find install script: %w", err)
+	}
+
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read install script: %w", err)
+	}
+
+	return string(data), nil
+}

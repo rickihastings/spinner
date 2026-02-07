@@ -28,10 +28,13 @@ RUN command -v claude > /dev/null 2>&1 || \
     (curl -fsSL https://claude.ai/install.sh | bash)
 ENV PATH=/home/spinner/.local/bin:${PATH}
 
-# Copy spinner CLI binary
+# Install spinner binary
 USER root
-COPY spinner /usr/local/bin/spinner
-RUN chmod +x /usr/local/bin/spinner
+ARG LOCAL_BUILD
+ENV LOCAL_BUILD=${LOCAL_BUILD}
+COPY spinner /tmp/spinner
+COPY templates/scripts/install_spinner.sh /tmp/install_spinner.sh
+RUN chmod +x /tmp/install_spinner.sh && /tmp/install_spinner.sh && rm /tmp/install_spinner.sh
 
 # Copy and set up startup script
 COPY templates/scripts/startup.sh /usr/local/bin/startup.sh
