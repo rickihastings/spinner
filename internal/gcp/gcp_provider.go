@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/rickihastings/spinner/internal/provider"
 )
@@ -69,6 +71,13 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 		return fmt.Errorf("failed to load bake script: %w", err)
 	}
 
+	// Load the standard startup.sh so it can be embedded in the baked image.
+	// The bake script reads this from metadata and installs it at /usr/local/bin/startup.sh.
+	startupScript, err := LoadStartupScript()
+	if err != nil {
+		return fmt.Errorf("failed to load startup script: %w", err)
+	}
+
 	return BakeImage(ctx, p.client, BakeConfig{
 		ImageName:     config.Name,
 		Project:       project,
@@ -76,38 +85,134 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 		MachineType:   machineType,
 		DiskSizeGB:    diskSizeGB,
 		StartupScript: bakeScript,
+		ExtraMetadata: map[string]string{
+			"startup-script-runtime": startupScript,
+		},
 	})
 }
 
 // InstanceName returns the deterministic VM instance name for the given config.
 // GCP instance names: lowercase, max 63 chars, [a-z]([-a-z0-9]*[a-z0-9])?.
-func (p *Provider) InstanceName(_ provider.CreateConfig) string {
-	return ""
+func (p *Provider) InstanceName(config provider.CreateConfig) string {
+	image := config.Options["image"]
+	return GenerateInstanceName(image, config.Repo, config.Branch)
 }
 
 // Create creates and starts a new VM instance from a baked image.
-func (p *Provider) Create(_ context.Context, _ provider.CreateConfig) (*provider.Instance, error) {
-	return nil, fmt.Errorf("gcp: Create not yet implemented (see slice 4.0)")
+// Options: "image", "project", "zone", "machine-type", "disk-size", "state-bucket".
+func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*provider.Instance, error) {
+	image := config.Options["image"]
+	name := p.InstanceName(config)
+
+	// Verify the baked image exists
+	_, err := p.client.GetImage(ctx, p.project, image)
+	if err != nil {
+		return nil, fmt.Errorf("image '%s' not found in project '%s' — run setup first: %w", image, p.project, err)
+	}
+
+	// Load runtime startup script
+	runtimeScript, err := LoadRuntimeScript()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load runtime script: %w", err)
+	}
+
+	machineType := config.Options["machine-type"]
+	if machineType == "" {
+		machineType = "e2-standard-2"
+	}
+
+	var diskSizeGB int64 = 30
+	if ds := config.Options["disk-size"]; ds != "" {
+		parsed, parseErr := strconv.ParseInt(ds, 10, 64)
+		if parseErr == nil && parsed > 0 {
+			diskSizeGB = parsed
+		}
+	}
+
+	maxIterations := config.MaxIterations
+	if maxIterations == "" {
+		maxIterations = "100"
+	}
+
+	metadata := map[string]string{
+		"startup-script":       runtimeScript,
+		"REPO_URL":             config.Repo,
+		"PROMPT":               config.Prompt,
+		"BRANCH":               config.Branch,
+		"MAX_ITERATIONS":       maxIterations,
+		"GITHUB_TOKEN":         os.Getenv("GITHUB_TOKEN"),
+		"CLAUDE_CODE_OAUTH_TOKEN": os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"),
+		"SPINNER_INSTANCE_NAME":   name,
+	}
+
+	if p.bucket != "" {
+		metadata["SPINNER_LOG_BUCKET"] = p.bucket
+		metadata["SPINNER_STATE_BUCKET"] = p.bucket
+	}
+
+	labels := map[string]string{
+		"spinner-managed": "true",
+		"spinner-image":   SanitizeLabel(image),
+		"spinner-repo":    SanitizeLabel(extractRepoName(config.Repo)),
+	}
+
+	err = p.client.CreateInstance(ctx, InstanceConfig{
+		Name:         name,
+		Project:      p.project,
+		Zone:         p.zone,
+		MachineType:  machineType,
+		ImageProject: p.project,
+		ImageName:    image,
+		DiskSizeGB:   diskSizeGB,
+		Network:      "default",
+		ExternalIP:   true,
+		Metadata:     metadata,
+		Labels:       labels,
+		Scopes: []string{
+			"https://www.googleapis.com/auth/devstorage.read_write",
+			"https://www.googleapis.com/auth/logging.write",
+			"https://www.googleapis.com/auth/monitoring.write",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create instance: %w", err)
+	}
+
+	return &provider.Instance{
+		Name:   name,
+		Status: provider.InstanceStatusRunning,
+	}, nil
 }
 
 // Start starts a stopped VM instance.
-func (p *Provider) Start(_ context.Context, _ string) (*provider.Instance, error) {
-	return nil, fmt.Errorf("gcp: Start not yet implemented (see slice 4.0)")
+func (p *Provider) Start(ctx context.Context, name string) (*provider.Instance, error) {
+	if err := p.client.StartInstance(ctx, p.project, p.zone, name); err != nil {
+		return nil, fmt.Errorf("failed to start instance: %w", err)
+	}
+
+	return &provider.Instance{
+		Name:   name,
+		Status: provider.InstanceStatusRunning,
+	}, nil
 }
 
 // Restart stops then starts a VM instance.
-func (p *Provider) Restart(_ context.Context, _ string) (*provider.Instance, error) {
-	return nil, fmt.Errorf("gcp: Restart not yet implemented (see slice 4.0)")
+func (p *Provider) Restart(ctx context.Context, name string) (*provider.Instance, error) {
+	if err := p.Stop(ctx, name); err != nil {
+		return nil, err
+	}
+
+	return p.Start(ctx, name)
 }
 
 // Stop stops a running VM instance.
-func (p *Provider) Stop(_ context.Context, _ string) error {
-	return fmt.Errorf("gcp: Stop not yet implemented (see slice 4.0)")
+func (p *Provider) Stop(ctx context.Context, name string) error {
+	return p.client.StopInstance(ctx, p.project, p.zone, name)
 }
 
-// Remove deletes a VM instance.
-func (p *Provider) Remove(_ context.Context, _ string) error {
-	return fmt.Errorf("gcp: Remove not yet implemented (see slice 4.0)")
+// Remove deletes a VM instance and its boot disk.
+func (p *Provider) Remove(ctx context.Context, name string) error {
+	return p.client.DeleteInstance(ctx, p.project, p.zone, name)
 }
 
 // Logs returns the VM's log output from GCS.
@@ -116,8 +221,19 @@ func (p *Provider) Logs(_ context.Context, _ string) (io.ReadCloser, error) {
 }
 
 // Status returns the current lifecycle status of a VM instance.
-func (p *Provider) Status(_ context.Context, _ string) (provider.InstanceStatus, error) {
-	return provider.InstanceStatusNone, fmt.Errorf("gcp: Status not yet implemented (see slice 4.0)")
+func (p *Provider) Status(ctx context.Context, name string) (provider.InstanceStatus, error) {
+	instance, err := p.client.GetInstance(ctx, p.project, p.zone, name)
+	if err != nil {
+		// If the instance doesn't exist, return None (not an error).
+		// GCP SDK wraps 404s in an error; check the message.
+		if isNotFoundError(err) {
+			return provider.InstanceStatusNone, nil
+		}
+
+		return provider.InstanceStatusNone, fmt.Errorf("failed to get instance status: %w", err)
+	}
+
+	return MapVMStatus(instance.GetStatus()), nil
 }
 
 // WatchLogs streams log lines from GCS.
@@ -128,4 +244,17 @@ func (p *Provider) WatchLogs(_ context.Context, _ string, _ int, _ chan<- string
 // WatchMetrics streams resource metrics from Cloud Monitoring.
 func (p *Provider) WatchMetrics(_ context.Context, _ string, _ chan<- provider.ContainerMetrics) error {
 	return fmt.Errorf("gcp: WatchMetrics not yet implemented (see slice 5.5)")
+}
+
+// isNotFoundError checks whether a GCP API error indicates a resource was not found.
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := strings.ToLower(err.Error())
+
+	return strings.Contains(msg, "notfound") ||
+		strings.Contains(msg, "not found") ||
+		strings.Contains(msg, "404")
 }

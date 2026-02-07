@@ -25,6 +25,10 @@ type BakeConfig struct {
 
 	// StartupScript is the bake script content (from LoadBakeScript).
 	StartupScript string
+
+	// ExtraMetadata holds additional metadata key-value pairs for the bake VM
+	// (e.g., startup-script-runtime containing the startup.sh content).
+	ExtraMetadata map[string]string
 }
 
 const (
@@ -62,6 +66,13 @@ func BakeImage(ctx context.Context, client Client, config BakeConfig) error {
 	// Step 1: Create temporary bake VM
 	fmt.Printf("Creating temporary bake VM: %s\n", bakeVMName)
 
+	metadata := map[string]string{
+		"startup-script": config.StartupScript,
+	}
+	for k, v := range config.ExtraMetadata {
+		metadata[k] = v
+	}
+
 	err := client.CreateInstance(ctx, InstanceConfig{
 		Name:         bakeVMName,
 		Project:      config.Project,
@@ -72,9 +83,7 @@ func BakeImage(ctx context.Context, client Client, config BakeConfig) error {
 		DiskSizeGB:   config.DiskSizeGB,
 		Network:      "default",
 		ExternalIP:   true,
-		Metadata: map[string]string{
-			"startup-script": config.StartupScript,
-		},
+		Metadata:     metadata,
 		Labels: map[string]string{
 			"spinner-managed": "true",
 			"spinner-purpose": "bake",

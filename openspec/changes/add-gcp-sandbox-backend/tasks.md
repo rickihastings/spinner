@@ -50,16 +50,16 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 
 ## 4.0 GCP Instance Lifecycle
 
-- [ ] 4.1 Create `templates/scripts/gcp_runtime.sh` — runtime startup script that reads metadata, sets env vars, delegates to `startup.sh`
-- [ ] 4.2 Create `internal/gcp/instance.go` — VM instance operations: create, start, stop, reset, delete, get status
-- [ ] 4.3 Implement `Provider.Create()` — launch VM from baked image with metadata, wait for RUNNING state
-- [ ] 4.4 Implement `Provider.Start()`, `Provider.Stop()`, `Provider.Restart()`, `Provider.Remove()` — VM lifecycle via client
-- [ ] 4.5 Implement `Provider.Status()` — map GCP VM status to `provider.InstanceStatus`
-- [ ] 4.6 Implement `Provider.InstanceName()` — deterministic name generation for GCP (max 63 chars, lowercase)
-- [ ] 4.7 Create `internal/gcp/gcp_provider.go` — `Provider` struct, `NewGCPProvider()` constructor
-- [ ] 4.8 Create `internal/gcp/instance_test.go` — unit tests for all lifecycle operations with mock client
-- [ ] 4.9 Create `internal/gcp/gcp_provider_test.go` — provider-level tests
-- [ ] 4.10 Verify build and tests pass
+- [x] 4.1 Create `templates/scripts/gcp_runtime.sh` — runtime startup script that reads metadata, sets env vars, delegates to `startup.sh`
+- [x] 4.2 Create `internal/gcp/instance.go` — VM instance operations: create, start, stop, reset, delete, get status
+- [x] 4.3 Implement `Provider.Create()` — launch VM from baked image with metadata, wait for RUNNING state
+- [x] 4.4 Implement `Provider.Start()`, `Provider.Stop()`, `Provider.Restart()`, `Provider.Remove()` — VM lifecycle via client
+- [x] 4.5 Implement `Provider.Status()` — map GCP VM status to `provider.InstanceStatus`
+- [x] 4.6 Implement `Provider.InstanceName()` — deterministic name generation for GCP (max 63 chars, lowercase)
+- [x] 4.7 Create `internal/gcp/gcp_provider.go` — `Provider` struct, `NewGCPProvider()` constructor
+- [x] 4.8 Create `internal/gcp/instance_test.go` — unit tests for all lifecycle operations with mock client
+- [x] 4.9 Create `internal/gcp/gcp_provider_test.go` — provider-level tests
+- [x] 4.10 Verify build and tests pass
 
 ## 5.0 GCS Log Streaming
 

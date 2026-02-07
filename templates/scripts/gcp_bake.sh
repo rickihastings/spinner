@@ -57,6 +57,13 @@ chown spinner:spinner /home/spinner/workspace
 # Set up log and state directories
 mkdir -p /home/spinner/logs /home/spinner/state
 chown spinner:spinner /home/spinner/logs /home/spinner/state
+
+# Install startup.sh (passed via metadata during bake)
+echo "Installing startup script..."
+curl -sf -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script-runtime" \
+    > /usr/local/bin/startup.sh
+chmod +x /usr/local/bin/startup.sh
 {{if .BakeScript}}
 # --- Custom bake script (injected via --bake-script flag) ---
 echo "Running custom bake script..."
