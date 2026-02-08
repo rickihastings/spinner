@@ -2,9 +2,10 @@
 
 ## Summary
 
-Add a `spinner destroy <instance-name>` command that forcefully removes an instance regardless of its current state
-(running, stopped, or exited). This is a dedicated destructive operation abstracted behind the existing
-`Provider.Remove()` method, working identically across Docker and GCP backends.
+Add a `spinner destroy <instance-name>...` command that forcefully removes one or more instances regardless of their
+current state (running, stopped, or exited), including cleanup of the host-side state directory
+(`~/.spinner/<instance-name>/`). Update the `spin` command output to reference `spinner destroy` instead of
+backend-specific removal commands.
 
 ## Motivation
 
@@ -14,30 +15,27 @@ Currently, the only way to remove an instance is:
 2. Manually running backend-specific commands (`docker rm -f`, `gcloud compute instances delete`)
 
 Users need a first-class CLI command to tear down instances they no longer need without re-creating them or dropping
-down to backend-specific tooling. The `spin` command already prints "To remove: docker rm ..." in its output,
+down to backend-specific tooling. The `spin` command currently prints "To remove: docker rm ..." in its output,
 indicating this is a recognized user workflow that deserves direct CLI support.
 
 ## What Changes
 
 - **New capability**: `cli-destroy` — a new Cobra command at `cmd/destroy.go`
+- **Modified capability**: `cli-spin` — update management instructions to reference `spinner destroy`
 - **No provider changes**: `Provider.Remove()` already exists and is implemented for both Docker and GCP backends
-- **No breaking changes**: This is purely additive
+- **No breaking changes**: This is purely additive (the spin output change is cosmetic)
+
+## Decisions
+
+1. **State directory cleanup**: Automatically remove `~/.spinner/<instance-name>/` (state + logs) on destroy.
+   Clean slate by default.
+2. **Multiple instances**: Accept one or more names (`spinner destroy foo bar baz`). Iterate through all,
+   report per-instance success/failure, continue on individual failures.
+3. **No confirmation prompt**: Consistent with existing patterns (`spin --recreate` removes without asking).
+4. **Spin output update**: Replace backend-specific "To remove:" instructions with `spinner destroy <name>`.
 
 ## Impact
 
-- **Affected specs**: None modified. New `cli-destroy` spec added.
-- **Affected code**: `cmd/destroy.go` (new), `cmd/destroy_test.go` (new)
+- **Affected specs**: `cli-spin` (modified — management instructions), `cli-destroy` (new)
+- **Affected code**: `cmd/destroy.go` (new), `cmd/destroy_test.go` (new), `cmd/spin.go` (modified output)
 - **Risk**: Low — uses existing `Provider.Remove()` with no changes to the provider interface
-
-## Open Questions for Discussion
-
-1. **State directory cleanup**: When destroying an instance, should the host-side state directory
-   (`~/.spinner/<instance-name>/state/`) also be removed? Or preserved for potential reuse if the user re-spins
-   the same config? Recommendation: **preserve by default**, add `--clean` flag to opt into state removal.
-
-2. **Confirmation prompt**: The current codebase pattern (e.g., `spin --recreate`) performs destructive operations
-   without confirmation. Recommendation: **no prompt** — consistent with existing patterns. Users invoke `destroy`
-   intentionally.
-
-3. **Multiple instances**: Should `destroy` accept multiple names (`spinner destroy foo bar`)? Recommendation:
-   **single instance only** for v1 — keeps it simple, can be extended later.
