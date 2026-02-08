@@ -93,3 +93,13 @@ func (m *MockProvider) WatchMetrics(ctx context.Context, name string, ch chan<- 
 	args := m.Called(ctx, name, ch)
 	return args.Error(0)
 }
+
+// GetInstanceMetadata mocks the GetInstanceMetadata method.
+func (m *MockProvider) GetInstanceMetadata(ctx context.Context, name string) (*InstanceMetadata, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(*InstanceMetadata), args.Error(1)
+}

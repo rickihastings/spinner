@@ -75,6 +75,27 @@ type Instance struct {
 	Status InstanceStatus
 }
 
+// InstanceMetadata holds backend-specific metadata about an instance.
+// Used by the watch UI to display instance information.
+type InstanceMetadata struct {
+	// Backend is the provider type (e.g., "docker", "gcp")
+	Backend string
+
+	// InstanceID is the unique identifier for the instance
+	// (container ID for Docker, VM name for GCP)
+	InstanceID string
+
+	// ImageID is the image identifier
+	// (image ID for Docker, disk/image name for GCP)
+	ImageID string
+
+	// Agent is the AI model being used (if available from environment)
+	Agent string
+
+	// MaxIterations is the configured iteration limit (if available from environment)
+	MaxIterations int
+}
+
 // Provider is the backend-agnostic interface for managing isolated execution
 // environments. Each backend (Docker, VMs, cloud instances) implements this
 // interface independently. The rest of the system depends only on Provider.
@@ -122,4 +143,9 @@ type Provider interface {
 	// Closes the channel when the stream ends or context is cancelled.
 	// Returns an error if the instance doesn't exist or metrics cannot be collected.
 	WatchMetrics(ctx context.Context, name string, ch chan<- ContainerMetrics) error
+
+	// GetInstanceMetadata returns backend-specific metadata about an instance.
+	// Used by the watch UI to display instance information.
+	// Returns nil metadata if the instance doesn't exist or metadata cannot be retrieved.
+	GetInstanceMetadata(ctx context.Context, name string) (*InstanceMetadata, error)
 }

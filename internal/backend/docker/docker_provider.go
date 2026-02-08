@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/rickihastings/spinner/internal/provider"
 )
@@ -220,6 +222,81 @@ func (p *Provider) WatchMetrics(ctx context.Context, name string, ch chan<- prov
 
 	// Stream metrics using the helper function
 	return streamMetrics(ctx, cli, name, ch)
+}
+
+// GetInstanceMetadata returns metadata about a Docker container.
+func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provider.InstanceMetadata, error) {
+	// Check if container exists first
+	status, err := p.client.ContainerExists(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check container: %w", err)
+	}
+
+	if status == StatusNone {
+		return nil, fmt.Errorf("container not found: %s", name)
+	}
+
+	metadata := &provider.InstanceMetadata{
+		Backend:    "docker",
+		InstanceID: getDockerContainerID(name),
+		ImageID:    getDockerImageID(name),
+	}
+
+	// Try to get agent and max iterations from environment variables
+	// These are set in the container at creation time
+	if model := os.Getenv("ANTHROPIC_MODEL"); model != "" {
+		metadata.Agent = model
+	}
+
+	if maxIter := os.Getenv("MAX_ITERATIONS"); maxIter != "" {
+		if val, parseErr := fmt.Sscanf(maxIter, "%d", &metadata.MaxIterations); parseErr != nil || val != 1 {
+			_ = fmt.Errorf("failed to parse max iterations: %s", maxIter)
+		}
+	}
+
+	return metadata, nil
+}
+
+// getDockerContainerID gets the container ID for a given container name using docker inspect.
+func getDockerContainerID(containerName string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*1000000000) // 5 seconds
+	defer cancel()
+
+	cmd := fmt.Sprintf("docker inspect --format={{.Id}} %s", containerName)
+
+	result, err := execCommand(ctx, cmd)
+	if err != nil {
+		return ""
+	}
+
+	return result
+}
+
+// getDockerImageID gets the image ID for a given container name using docker inspect.
+func getDockerImageID(containerName string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*1000000000) // 5 seconds
+	defer cancel()
+
+	cmd := fmt.Sprintf("docker inspect --format={{.Image}} %s", containerName)
+
+	result, err := execCommand(ctx, cmd)
+	if err != nil {
+		return ""
+	}
+
+	return result
+}
+
+// execCommand executes a shell command and returns the output.
+func execCommand(ctx context.Context, command string) (string, error) {
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
 }
 
 // detectNpmrc checks whether ~/.npmrc exists on the host.

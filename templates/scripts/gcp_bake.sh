@@ -23,6 +23,25 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githu
 apt-get update
 apt-get install -y gh
 
+# Install Google Cloud Ops Agent for metrics and logging
+echo "Installing Google Cloud Ops Agent..."
+curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
+bash add-google-cloud-ops-agent-repo.sh --also-install
+rm add-google-cloud-ops-agent-repo.sh
+
+# Ensure the Ops Agent service is enabled and will start on boot
+echo "Enabling Ops Agent service..."
+systemctl enable google-cloud-ops-agent
+systemctl start google-cloud-ops-agent
+
+# Verify the agent is running
+if systemctl is-active --quiet google-cloud-ops-agent; then
+    echo "Ops Agent is running successfully"
+else
+    echo "Warning: Ops Agent failed to start"
+    systemctl status google-cloud-ops-agent || true
+fi
+
 # Create spinner user
 echo "Creating spinner user..."
 useradd -m -s /bin/bash spinner

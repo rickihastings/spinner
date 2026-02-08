@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/rickihastings/spinner/internal/version"
 	"github.com/spf13/cobra"
@@ -48,20 +49,23 @@ NOTES:
 }
 
 func init() {
-	// Set environment variable prefix
+	// Set environment variable prefix and enable automatic env var reading
 	viper.SetEnvPrefix("SPINNER")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
 	// Primary config: .spinner.json in repo root (committed, team-shared)
 	viper.SetConfigName(".spinner")
 	viper.SetConfigType("json")
 	viper.AddConfigPath(".")
+
 	_ = viper.ReadInConfig() // Ignore error if .spinner.json doesn't exist
 
 	// Secondary: .env file (not committed, local overrides)
 	// Viper only reads one config file, so load .env separately via MergeInConfig.
 	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
+
 	_ = viper.MergeInConfig() // Ignore error if .env doesn't exist
 }
 

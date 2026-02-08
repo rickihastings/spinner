@@ -144,6 +144,7 @@ func TestGCSSink_PeriodicFlush(t *testing.T) {
 	sink.ctx = sinkCtx
 	sink.cancel = cancel
 	sink.wg.Add(1)
+
 	go sink.flushLoop()
 
 	_, _ = sink.Write([]byte("first"))
@@ -185,6 +186,7 @@ func TestGCSSink_ConcurrentWrites(t *testing.T) {
 
 		go func() {
 			defer wg.Done()
+
 			_, _ = sink.Write([]byte("x"))
 		}()
 	}

@@ -23,7 +23,7 @@ const (
 // TestWatch_WithRunningContainer tests the watch command with a running container
 func TestWatch_WithRunningContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	binaryPath := testutil.BuildCLI(t)
+	binaryPath := testutil.GetBinaryPath()
 
 	// Setup test image and container
 	_, imageName := testutil.SetupTestImage(t)
@@ -80,7 +80,6 @@ func TestWatch_WithRunningContainer(t *testing.T) {
 // TestWatch_WithNonExistentContainer tests the watch command with a non-existent container
 func TestWatch_WithNonExistentContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Run watch command with a non-existent container
 	args := []string{"watch", "non-existent-container"}
@@ -88,14 +87,14 @@ func TestWatch_WithNonExistentContainer(t *testing.T) {
 	output := stdout + stderr
 
 	// Verify error message
-	assert.Contains(t, output, "Container 'non-existent-container' not found", "should show container not found error")
-	assert.Contains(t, output, "docker ps -a", "should suggest using docker ps")
+	assert.Contains(t, output, "Instance 'non-existent-container' not found", "should show instance not found error")
+	assert.Contains(t, output, "Check that the instance exists and the correct backend is selected", "should suggest checking instance and backend")
 }
 
 // TestWatch_WithStoppedContainer tests the watch command with a stopped container
 func TestWatch_WithStoppedContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	binaryPath := testutil.BuildCLI(t)
+	binaryPath := testutil.GetBinaryPath()
 
 	// Setup test image and container
 	_, imageName := testutil.SetupTestImage(t)
@@ -159,7 +158,7 @@ func TestWatch_WithStoppedContainer(t *testing.T) {
 // TestSpinWatch_FlagIntegration tests the --watch flag with spin command
 func TestSpinWatch_FlagIntegration(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	binaryPath := testutil.BuildCLI(t)
+	binaryPath := testutil.GetBinaryPath()
 
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
@@ -179,7 +178,7 @@ func TestSpinWatch_FlagIntegration(t *testing.T) {
 	var containerName string
 
 	for _, line := range strings.Split(outputStr, "\n") {
-		if strings.Contains(line, "Container created successfully:") {
+		if strings.Contains(line, "Instance created successfully:") {
 			parts := strings.Fields(line)
 			if len(parts) >= 4 {
 				containerName = parts[len(parts)-1]
@@ -213,7 +212,7 @@ func TestSpinWatch_FlagIntegration(t *testing.T) {
 // TestWatch_MissingLogDirectory tests the watch command when log directory doesn't exist
 func TestWatch_MissingLogDirectory(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	binaryPath := testutil.BuildCLI(t)
+	binaryPath := testutil.GetBinaryPath()
 
 	// Create a minimal container directly with Docker (bypassing spinner setup)
 	containerName := "test-watch-no-logs"
@@ -250,7 +249,6 @@ func TestWatch_MissingLogDirectory(t *testing.T) {
 // TestWatch_LogFormatting verifies that logs are formatted correctly, not displayed as raw JSON
 func TestWatch_LogFormatting(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image and container
 	_, imageName := testutil.SetupTestImage(t)
@@ -301,7 +299,6 @@ func TestWatch_LogFormatting(t *testing.T) {
 // TestWatch_NoEmptyTimestamps verifies that logs without proper timestamps don't show "00:00:00"
 func TestWatch_NoEmptyTimestamps(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image and container
 	_, imageName := testutil.SetupTestImage(t)
@@ -341,7 +338,6 @@ func TestWatch_NoEmptyTimestamps(t *testing.T) {
 // TestWatch_MetricsCollection verifies that metrics are collected from running containers
 func TestWatch_MetricsCollection(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image and container
 	_, imageName := testutil.SetupTestImage(t)
@@ -372,7 +368,6 @@ func TestWatch_MetricsCollection(t *testing.T) {
 // TestWatch_RealLogFile tests with actual spinner container logs
 func TestWatch_RealLogFile(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Check if there's a real log file we can test with
 	testDataPath := filepath.Join("..", "testdata", "raw.log")

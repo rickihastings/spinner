@@ -22,7 +22,6 @@ const (
 // TestSpin_SuccessfulContainerCreation tests successful container creation with valid flags
 func TestSpin_SuccessfulContainerCreation(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
@@ -47,7 +46,6 @@ func TestSpin_SuccessfulContainerCreation(t *testing.T) {
 // TestSpin_ContainerNaming tests that container is named deterministically based on image + repo
 func TestSpin_ContainerNaming(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image with a specific tag
 	imageTag := "test-env"
@@ -78,7 +76,6 @@ func TestSpin_ContainerNaming(t *testing.T) {
 // TestSpin_ContainerRunning tests that container is running after spin command completes
 func TestSpin_ContainerRunning(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
@@ -107,7 +104,6 @@ func TestSpin_ContainerRunning(t *testing.T) {
 // TestSpin_RepositoryCloned tests that repository is cloned into /home/spinner/workspace inside container
 func TestSpin_RepositoryCloned(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
@@ -138,7 +134,6 @@ func TestSpin_RepositoryCloned(t *testing.T) {
 // TestSpin_ContainerExec tests that container can be exec'd into with bash
 func TestSpin_ContainerExec(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
@@ -165,7 +160,6 @@ func TestSpin_ContainerExec(t *testing.T) {
 // TestSpin_NonExistentImage tests that non-existent Docker image exits with error
 func TestSpin_NonExistentImage(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Use a non-existent image name
 	nonExistentImage := "non-existent-image:latest"
@@ -185,7 +179,6 @@ func TestSpin_NonExistentImage(t *testing.T) {
 // TestSpin_PromptWithoutBranch tests that --prompt without --branch runs on default branch
 func TestSpin_PromptWithoutBranch(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
@@ -226,7 +219,6 @@ func TestSpin_PromptWithoutBranch(t *testing.T) {
 // TestSpin_BranchWithoutPrompt tests that --branch without --prompt creates idle container
 func TestSpin_BranchWithoutPrompt(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
@@ -264,7 +256,6 @@ func TestSpin_BranchWithoutPrompt(t *testing.T) {
 // TestSpin_ReuseRunningContainer tests that running container is reused
 func TestSpin_ReuseRunningContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image with a specific tag
 	imageTag := "test-env"
@@ -299,7 +290,6 @@ func TestSpin_ReuseRunningContainer(t *testing.T) {
 // TestSpin_RestartStoppedContainer tests that stopped container is restarted
 func TestSpin_RestartStoppedContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image with a specific tag
 	imageTag := "test-env"
@@ -342,7 +332,6 @@ func TestSpin_RestartStoppedContainer(t *testing.T) {
 // TestSpin_PrivateRepoClone tests that private repository can be cloned with GITHUB_TOKEN
 func TestSpin_PrivateRepoClone(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
@@ -371,7 +360,6 @@ func TestSpin_PrivateRepoClone(t *testing.T) {
 // TestSpin_DeterministicNamingWithBranch tests container naming with branch
 func TestSpin_DeterministicNamingWithBranch(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image with a specific tag
 	imageTag := "test-env"
@@ -403,7 +391,6 @@ func TestSpin_DeterministicNamingWithBranch(t *testing.T) {
 // TestSpin_NameSanitization tests that container names are properly sanitized
 func TestSpin_NameSanitization(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image with a specific tag
 	imageTag := "test-env"
@@ -441,7 +428,6 @@ func TestSpin_NameSanitization(t *testing.T) {
 // TestSpin_RecreateFlag tests that --recreate flag removes and recreates container
 func TestSpin_RecreateFlag(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	// Setup test image with a specific tag
 	imageTag := "test-env"
@@ -491,7 +477,6 @@ func TestSpin_RecreateFlag(t *testing.T) {
 // TestSpin_SetupWithBaseImage tests that --setup with --base-image builds and creates container
 func TestSpin_SetupWithBaseImage(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	imageTag := "setup-test"
 	imageName := "spinner:" + imageTag
@@ -538,7 +523,6 @@ func TestSpin_SetupWithBaseImage(t *testing.T) {
 // TestSpin_SetupWithDockerfile tests that --setup with --dockerfile uses custom Dockerfile
 func TestSpin_SetupWithDockerfile(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	imageTag := "dockerfile-test"
 	imageName := "spinner:" + imageTag
@@ -601,7 +585,6 @@ WORKDIR /workspace
 // TestSpin_SetupRebuildsExistingImage tests that --setup rebuilds image even if it exists
 func TestSpin_SetupRebuildsExistingImage(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
-	testutil.BuildCLI(t)
 
 	imageTag := "rebuild-test"
 	imageName := "spinner:" + imageTag

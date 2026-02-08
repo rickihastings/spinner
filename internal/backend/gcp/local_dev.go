@@ -22,6 +22,7 @@ func uploadLocalBinary(ctx context.Context, client Client, bucket string) error 
 
 	// Read the tarball created by dev-setup.sh
 	tarballPath := filepath.Join(projectRoot, "dist", "spinner-dev-linux-amd64.tar.gz")
+
 	data, err := os.ReadFile(tarballPath)
 	if err != nil {
 		return fmt.Errorf("failed to read dist/spinner-dev-linux-amd64.tar.gz\n"+
@@ -35,5 +36,6 @@ func uploadLocalBinary(ctx context.Context, client Client, bucket string) error 
 	}
 
 	fmt.Printf("✅ Uploaded local binary to gs://%s/%s\n", bucket, objectPath)
+
 	return nil
 }

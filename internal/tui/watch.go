@@ -2,7 +2,9 @@ package tui
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/rickihastings/spinner/internal/agent/claude"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rivo/tview"
+	"golang.org/x/term"
 )
 
 // WatchUI represents the TUI for watching container logs and metrics
@@ -48,6 +51,21 @@ type WatchContext struct {
 	ContainerID   string
 	ImageID       string
 	MaxIterations int
+}
+
+// isTestEnvironment detects if we're running in a test environment or without a terminal
+func isTestEnvironment() bool {
+	// Check if running under 'go test'
+	if flag.Lookup("test.v") != nil {
+		return true
+	}
+
+	// Check if stdout is not a terminal (headless environment)
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		return true
+	}
+
+	return false
 }
 
 // NewWatchUI creates a new watch UI instance
@@ -111,6 +129,7 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		imageID:       wctx.ImageID,
 		maxIterations: wctx.MaxIterations,
 		currentIter:   0,
+		testMode:      isTestEnvironment(), // Auto-detect test mode
 	}
 
 	// Set up keyboard handlers
@@ -491,8 +510,15 @@ func (ui *WatchUI) formatMemoryLine(m provider.ContainerMetrics) string {
 	var memStr string
 	if m.Error != nil {
 		memStr = "[red]Error[-]"
-	} else {
+	} else if m.MemoryUsed > 0 {
+		// Docker-style: show absolute memory usage
 		memStr = formatMemoryValue(m.MemoryUsed)
+	} else if m.MemoryPercent > 0 {
+		// GCP-style: show memory percentage (when Ops Agent is installed)
+		memStr = fmt.Sprintf("[cyan]%.1f%%[-]", m.MemoryPercent)
+	} else {
+		// Memory metrics not available (e.g., GCP VMs without Ops Agent)
+		memStr = "[darkgray]N/A[-]"
 	}
 
 	return fmt.Sprintf("Memory:     %s", memStr)

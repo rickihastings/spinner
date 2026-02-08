@@ -94,11 +94,11 @@ Archive naming: `spinner_{version}_{os}_{arch}.tar.gz` (e.g., `spinner_0.1.0_lin
 Mirrors the existing Docker integration tests in `tests/integration/`. Skipped when GCP is not available
 (no credentials / no project), same pattern as Docker tests skipping when Docker daemon is unavailable.
 
-- [ ] 7.1 Create `tests/testutil/gcp.go` — GCP test helpers: `SkipIfGCPNotAvailable(t)`, `GenerateTestInstanceName(t)`, VM cleanup helpers, GCS cleanup helpers
-- [ ] 7.2 Create `tests/integration/gcp_setup_test.go` — setup command with `--backend gcp`: image bake, custom machine type, custom disk size, bake failure cleanup
-- [ ] 7.3 Create `tests/integration/gcp_spin_test.go` — spin command with `--backend gcp`: VM creation, deterministic naming, container reuse/restart, recreate flag, repo cloning, branch handling
-- [ ] 7.4 Create `tests/integration/gcp_watch_test.go` — watch command with `--backend gcp`: GCS log streaming, metrics polling, log object polling before VM writes
-- [ ] 7.5 Create `tests/integration/gcp_lifecycle_test.go` — full lifecycle: setup → spin → watch → stop → start → remove; verify state persistence across stop/start via GCS
-- [ ] 7.6 Create `tests/integration/gcp_flags_test.go` — conditional flag validation: wrong-backend flags error, `.spinner.json` config loading, precedence chain (CLI > env > config > defaults)
-- [ ] 7.7 Create `tests/integration/gcp_cleanup_test.go` — resource cleanup: VM + disk deletion on remove, labels applied correctly, GCS state preserved after remove
-- [ ] 7.8 Verify all integration tests pass with `go test ./tests/integration/... -run GCP` and existing Docker tests still pass
+- [x] 7.1 Create `tests/testutil/gcp.go` — GCP test helpers: `SkipIfGCPNotAvailable(t)`, `GenerateTestInstanceName(t)`, VM cleanup helpers, GCS cleanup helpers
+- [x] 7.2 Create `tests/integration/gcp_setup_test.go` — setup command with `--backend gcp`: image bake, custom machine type, custom disk size, bake failure cleanup
+- [x] 7.3 Create `tests/integration/gcp_spin_test.go` — spin command with `--backend gcp`: VM creation, deterministic naming, container reuse/restart, recreate flag, repo cloning, branch handling
+- [x] 7.4 Create `tests/integration/gcp_watch_test.go` — watch command with `--backend gcp`: GCS log streaming, metrics polling, log object polling before VM writes
+- [x] 7.5 Create `tests/integration/gcp_lifecycle_test.go` — full lifecycle: setup → spin → watch → stop → start → remove; verify state persistence across stop/start via GCS
+- [x] 7.6 Create `tests/integration/gcp_flags_test.go` — conditional flag validation: wrong-backend flags error, `.spinner.json` config loading, precedence chain (CLI > env > config > defaults)
+- [x] 7.7 Create `tests/integration/gcp_cleanup_test.go` — resource cleanup: VM + disk deletion on remove, labels applied correctly, GCS state preserved after remove
+- [x] 7.8 Verify all integration tests pass with `go test ./tests/integration/... -run GCP` and existing Docker tests still pass

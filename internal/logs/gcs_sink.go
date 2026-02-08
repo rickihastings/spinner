@@ -51,6 +51,7 @@ func NewGCSSink(ctx context.Context, writer ObjectWriter, bucket, object string)
 	}
 
 	s.wg.Add(1)
+
 	go s.flushLoop()
 
 	return s
@@ -78,6 +79,7 @@ func (s *GCSSink) Close() error {
 // flush writes the buffered content to GCS if there is new data.
 func (s *GCSSink) flush() error {
 	s.mu.Lock()
+
 	if !s.dirty {
 		s.mu.Unlock()
 		return nil

@@ -153,8 +153,13 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 			}
 
 			// Set LOCAL_BUILD for the Dockerfile
-			os.Setenv("LOCAL_BUILD", "true")
+			err := os.Setenv("LOCAL_BUILD", "true")
+			if err != nil {
+				return fmt.Errorf("failed to set LOCAL_BUILD env var: %w", err)
+			}
+
 			localBuildDetected = true
+
 			fmt.Println("✓ Using local binary for Docker image")
 		}
 	}
@@ -598,5 +603,6 @@ func getEnvPtr(key string) *string {
 	if val == "" {
 		return nil
 	}
+
 	return &val
 }

@@ -14,23 +14,32 @@ import (
 // BinaryPath is the path to the compiled test binary
 var BinaryPath = "../../dist/spinner"
 
-// BuildCLI compiles the spinner binary for testing
-func BuildCLI(t *testing.T) string {
-	t.Helper()
+// getSharedBinaryPath is implemented in integration package to access the global binary path.
+var getSharedBinaryPath = func() string {
+	return ""
+}
 
-	// Get project root (two levels up from tests/testutil)
+// SetSharedBinaryAccessor allows the integration package to register its binary accessor.
+func SetSharedBinaryAccessor(accessor func() string) {
+	getSharedBinaryPath = accessor
+}
+
+// GetBinaryPath returns the path to the compiled spinner binary.
+// If TestMain has built a shared binary, it returns that path.
+// Otherwise, it falls back to the default BinaryPath.
+func GetBinaryPath() string {
+	// Check if we have a shared binary from TestMain
+	if sharedBinary := getSharedBinaryPath(); sharedBinary != "" {
+		return sharedBinary
+	}
+
+	// Fall back to default path (for unit tests or non-integration tests)
 	projectRoot, err := filepath.Abs("../..")
-	require.NoError(t, err, "failed to get project root")
+	if err != nil {
+		return BinaryPath
+	}
 
-	// Build the binary
-	outputPath := filepath.Join(projectRoot, "dist", "spinner")
-	cmd := exec.Command("go", "build", "-o", outputPath)
-	cmd.Dir = projectRoot
-
-	output, err := cmd.CombinedOutput()
-	require.NoError(t, err, "failed to build CLI binary: %s", string(output))
-
-	return outputPath
+	return filepath.Join(projectRoot, "dist", "spinner")
 }
 
 // RunCommand executes the spinner CLI with given arguments and returns output
@@ -53,12 +62,26 @@ func RunCommandWithEnv(t *testing.T, env map[string]string, args ...string) (std
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 
-	// Start with current environment
-	cmd.Env = os.Environ()
+	// Start with current environment, but filter out SPINNER_* vars
+	// to ensure tests run in isolation unless explicitly set
+	var filteredEnv []string
 
-	// Add custom environment variables
+	for _, e := range os.Environ() {
+		// Skip SPINNER_* variables unless they're being explicitly set
+		if len(e) >= 8 && e[:8] == "SPINNER_" {
+			continue
+		}
+
+		filteredEnv = append(filteredEnv, e)
+	}
+
+	cmd.Env = filteredEnv
+
+	// Add custom environment variables (including explicit SPINNER_* vars)
 	for key, value := range env {
-		cmd.Env = append(cmd.Env, key+"="+value)
+		if value != "" {
+			cmd.Env = append(cmd.Env, key+"="+value)
+		}
 	}
 
 	err = cmd.Run()

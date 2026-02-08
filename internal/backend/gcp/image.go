@@ -30,6 +30,10 @@ type bakeConfig struct {
 	// StateBucket is the GCS bucket for state persistence (used for local dev binary upload).
 	StateBucket string
 
+	// ConfigHash is a hash of the bake configuration (project+zone+bucket).
+	// Stored as an image label to enable config validation for image reuse.
+	ConfigHash string
+
 	// ExtraMetadata holds additional metadata key-value pairs for the bake VM
 	// (e.g., startup-script-runtime containing the startup.sh content).
 	ExtraMetadata map[string]string
@@ -39,8 +43,9 @@ const (
 	// bakeVMPrefix is the prefix for temporary bake VM names.
 	bakeVMPrefix = "spinner-bake-"
 
-	// bakeBaseImage is the base OS image for bake VMs.
-	bakeBaseImage = "ubuntu-2204-lts"
+	// bakeBaseImage is the base OS image family for bake VMs.
+	// Using image family format to always get the latest image in the family.
+	bakeBaseImage = "family/ubuntu-2204-lts"
 
 	// bakeBaseImageProject is the GCP project hosting the base OS image.
 	bakeBaseImageProject = "ubuntu-os-cloud"
@@ -131,14 +136,21 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 		config.Project, config.Zone, bakeVMName,
 	)
 
+	imageLabels := map[string]string{
+		"spinner-managed": "true",
+		"spinner-image":   config.ImageName,
+	}
+
+	// Add config hash label if provided (used for test image reuse validation)
+	if config.ConfigHash != "" {
+		imageLabels["spinner-config-hash"] = config.ConfigHash
+	}
+
 	err = client.CreateImage(ctx, config.Project, imageConfig{
 		Name:        config.ImageName,
 		SourceDisk:  sourceDisk,
 		Description: fmt.Sprintf("Spinner baked image: %s", config.ImageName),
-		Labels: map[string]string{
-			"spinner-managed": "true",
-			"spinner-image":   config.ImageName,
-		},
+		Labels:      imageLabels,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create image: %w", err)

@@ -71,3 +71,18 @@ su - spinner -c "cd /home/spinner/workspace && \
     export LOG_DIR='${LOG_DIR}' && \
     export STATE_DIR='${STATE_DIR}' && \
     /usr/local/bin/startup.sh"
+
+# Capture exit code
+EXIT_CODE=$?
+
+# If spinner exec completed successfully (exit 0), shutdown VM
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "Execution completed successfully. Stopping VM instance..."
+    # Give logs/state a moment to flush
+    sleep 2
+    # Initiate graceful shutdown
+    sudo poweroff
+fi
+
+# For non-zero exit codes, keep VM running for debugging
+exit $EXIT_CODE

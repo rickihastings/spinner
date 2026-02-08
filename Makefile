@@ -13,14 +13,26 @@ LDFLAGS := -s -w \
 build:
 	go build -ldflags "$(LDFLAGS)" -o dist/spinner
 
-# Run tests (builds first)
+# Run unit tests (builds first)
 test: build
-	go test ./...
+	go test ./internal/...
+
+# Run docker tests (builds first)
+test-docker: build
+	go test ./tests/integration/ -run Docker
+
+# Run gcp tests (builds first)
+test-gcp: build
+	go test ./tests/integration/ -run GCP -timeout 20m
 
 # Run linter
 lint:
 	go vet ./...
 	golangci-lint run
+
+# Run autofix for linting
+lint-fix:
+	golangci-lint run --fix
 
 # Format code
 format:

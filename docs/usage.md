@@ -69,9 +69,11 @@ export SPINNER_IMAGE=spinner:default
 
 ### Configuration File
 
-Spinner supports `.spinner.json` for team-shared defaults (commit to repo) and `.env` for local overrides (don't commit).
+Spinner supports `.spinner.json` for team-shared defaults (commit to repo) and `.env` for local overrides (don't
+commit).
 
 **`.spinner.json` example:**
+
 ```json
 {
   "backend": "gcp",
@@ -84,6 +86,7 @@ Spinner supports `.spinner.json` for team-shared defaults (commit to repo) and `
 ```
 
 **`.env` example:**
+
 ```env
 SPINNER_PROJECT=my-local-project
 SPINNER_ZONE=us-west1-a
@@ -103,22 +106,31 @@ Configuration values are applied in this order (highest to lowest priority):
 
 ### GCP Backend
 
+**Bootstrap Script:**
+
+Use `scripts/gcp-bootstrap.sh` to automatically provision the required GCP resources (GCS bucket, service account, IAM
+roles). Run the script with `--help` to see available options.
+
 **Authentication:**
+
 - `GOOGLE_APPLICATION_CREDENTIALS` - Path to service account JSON key file, OR
 - Run `gcloud auth application-default login`
 
 **Required flags (use SPINNER_ prefix for env vars):**
+
 - `SPINNER_BACKEND=gcp` - Enable GCP backend
 - `SPINNER_PROJECT` - GCP project ID
 - `SPINNER_ZONE` - GCP zone (e.g., us-central1-a)
 - `SPINNER_STATE_BUCKET` - GCS bucket for state persistence
 
 **Optional flags:**
+
 - `SPINNER_MACHINE_TYPE` - VM machine type (default: e2-standard-2)
 - `SPINNER_DISK_SIZE` - Boot disk size in GB (default: 30)
 - `SPINNER_BAKE_SCRIPT` - Path to custom bake script for image creation
 
 **Example:**
+
 ```bash
 # Set up authentication
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
@@ -139,13 +151,31 @@ export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
 ```
 
 **Required GCS bucket permissions:**
+
 - `storage.objects.create`
 - `storage.objects.get`
 - `storage.objects.delete`
 
 **Required GCP API permissions:**
+
 - Compute Engine API enabled
 - Service account with `roles/compute.instanceAdmin.v1` or equivalent
+
+**Metrics and Monitoring:**
+
+The GCP backend includes automatic installation of
+the [Google Cloud Ops Agent](https://cloud.google.com/stackdriver/docs/solutions/agents/ops-agent) during image baking.
+The Ops Agent provides:
+
+- **CPU Metrics**: Real-time CPU utilization (available in watch mode)
+- **Memory Metrics**: Real-time memory usage percentage (available in watch mode)
+- **System Metrics**: Additional metrics available in Cloud Monitoring console
+
+The Ops Agent is installed automatically during `spinner setup --backend gcp` and does not require any additional
+configuration. Memory and CPU metrics are displayed in the `spinner watch` TUI.
+
+If the Ops Agent fails to install or isn't running, the watch UI will display "N/A" for memory metrics while CPU metrics
+will continue to work using the standard Compute Engine metrics API.
 
 ## Development Workflow
 
@@ -335,3 +365,19 @@ View GCP state:
 ```bash
 gsutil cat gs://<state-bucket>/<instance-name>/state.json
 ```
+
+### Auto-Stop Behavior
+
+GCP VMs automatically stop when the agent completes successfully (detects `~~ FEATURE_COMPLETED ~~` signal). This prevents wasted compute resources and reduces costs.
+
+**Behavior:**
+- **Successful completion (exit 0):** VM stops automatically within 5 seconds
+- **Errors/rate limits (exit 1):** VM keeps running for debugging
+
+**To restart a stopped VM:**
+```bash
+gcloud compute instances start <instance-name> --zone <zone> --project <project>
+```
+
+**To access a stopped VM for debugging:**
+The VM is stopped, not deleted. Use `gcloud compute instances describe` to view final state, or restart it to examine logs and workspace.

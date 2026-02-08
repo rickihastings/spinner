@@ -191,6 +191,62 @@ func TestQueryCPUUtilization_Error(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
+func TestQueryMemoryUtilization_WithData(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{
+		{Value: 45.2},
+		{Value: 52.8},
+	}, nil)
+
+	memoryPercent, err := queryMemoryUtilization(ctx, client, "proj", "zone", "vm-1")
+	assert.NoError(t, err)
+	// Last point (52.8%)
+	assert.InDelta(t, 52.8, memoryPercent, 0.01)
+	client.AssertExpectations(t)
+}
+
+func TestQueryMemoryUtilization_NoData(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{}, nil)
+
+	memoryPercent, err := queryMemoryUtilization(ctx, client, "proj", "zone", "vm-1")
+	assert.NoError(t, err)
+	assert.Equal(t, 0.0, memoryPercent)
+	client.AssertExpectations(t)
+}
+
+func TestQueryMemoryUtilization_Error(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	// Memory metric error is non-fatal - returns 0 without error
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return(nil, fmt.Errorf("monitoring API error"))
+
+	memoryPercent, err := queryMemoryUtilization(ctx, client, "proj", "zone", "vm-1")
+	assert.NoError(t, err) // Error is silently ignored (Ops Agent not installed)
+	assert.Equal(t, 0.0, memoryPercent)
+	client.AssertExpectations(t)
+}
+
 func TestCollectGCPMetrics_RunningWithCPU(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
@@ -206,9 +262,17 @@ func TestCollectGCPMetrics_RunningWithCPU(t *testing.T) {
 		IntervalSeconds: metricsQueryIntervalSeconds,
 	}).Return([]metricPoint{{Value: 0.75}}, nil)
 
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{{Value: 60.0}}, nil)
+
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
 	assert.Equal(t, provider.StateRunning, metrics.State)
 	assert.InDelta(t, 75.0, metrics.CPUPercent, 0.01)
+	assert.InDelta(t, 60.0, metrics.MemoryPercent, 0.01)
 	assert.NoError(t, metrics.Error)
 	client.AssertExpectations(t)
 }
@@ -228,9 +292,17 @@ func TestCollectGCPMetrics_RunningNoCPUData(t *testing.T) {
 		IntervalSeconds: metricsQueryIntervalSeconds,
 	}).Return([]metricPoint{}, nil)
 
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{}, nil)
+
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
 	assert.Equal(t, provider.StateRunning, metrics.State)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
+	assert.Equal(t, 0.0, metrics.MemoryPercent)
 	assert.NoError(t, metrics.Error)
 	client.AssertExpectations(t)
 }
@@ -250,12 +322,19 @@ func TestCollectGCPMetrics_RunningCPUError(t *testing.T) {
 		IntervalSeconds: metricsQueryIntervalSeconds,
 	}).Return(nil, fmt.Errorf("monitoring unavailable"))
 
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{{Value: 45.0}}, nil)
+
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
 	assert.Equal(t, provider.StateRunning, metrics.State)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
-	// Error is set but non-fatal (state is Running, not Unknown)
-	assert.Error(t, metrics.Error)
-	assert.Contains(t, metrics.Error.Error(), "failed to query CPU metrics")
+	assert.InDelta(t, 45.0, metrics.MemoryPercent, 0.01)
+	// CPU errors are now non-fatal - no Error field set
+	assert.NoError(t, metrics.Error)
 	client.AssertExpectations(t)
 }
 
@@ -313,8 +392,20 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 	// First call for initial metrics
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil).Once()
-	client.On("QueryTimeSeries", mock.Anything, "proj", mock.Anything).
-		Return([]metricPoint{{Value: 0.42}}, nil).Once()
+	// CPU query
+	client.On("QueryTimeSeries", mock.Anything, "proj", metricsQuery{
+		MetricType:      cpuMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{{Value: 0.42}}, nil).Once()
+	// Memory query
+	client.On("QueryTimeSeries", mock.Anything, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{{Value: 55.0}}, nil).Once()
 
 	// Second call (ticker fires) — return stopped to exit the loop
 	terminated := "TERMINATED"
@@ -333,6 +424,7 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 	case m := <-ch:
 		assert.Equal(t, provider.StateRunning, m.State)
 		assert.InDelta(t, 42.0, m.CPUPercent, 0.01)
+		assert.InDelta(t, 55.0, m.MemoryPercent, 0.01)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for initial metrics")
 	}
@@ -423,8 +515,20 @@ func TestStreamGCPMetrics_ContextCancellation(t *testing.T) {
 	running := "RUNNING"
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
-	client.On("QueryTimeSeries", mock.Anything, "proj", mock.Anything).
-		Return([]metricPoint{{Value: 0.10}}, nil)
+	// CPU query
+	client.On("QueryTimeSeries", mock.Anything, "proj", metricsQuery{
+		MetricType:      cpuMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{{Value: 0.10}}, nil)
+	// Memory query
+	client.On("QueryTimeSeries", mock.Anything, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{{Value: 30.0}}, nil)
 
 	ch := make(chan provider.ContainerMetrics, 10)
 	done := make(chan error, 1)

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/rickihastings/spinner/internal/agent"
@@ -79,36 +78,21 @@ EXAMPLES:
 }
 
 // gatherWatchContext collects execution context for the watch UI
-func gatherWatchContext(_ context.Context, containerName string) tui.WatchContext {
-	wctx := tui.WatchContext{
-		Environment: "docker",
-	}
+func gatherWatchContext(ctx context.Context, p provider.Provider, instanceName string) tui.WatchContext {
+	wctx := tui.WatchContext{}
 
 	// Get git branch
 	if branch := getGitBranch(); branch != "" {
 		wctx.Branch = branch
 	}
 
-	// Get container ID
-	if containerID := getContainerID(containerName); containerID != "" {
-		wctx.ContainerID = containerID
-	}
-
-	// Get image ID
-	if imageID := getImageID(containerName); imageID != "" {
-		wctx.ImageID = imageID
-	}
-
-	// Get agent model from environment variable (set by container)
-	if model := os.Getenv("ANTHROPIC_MODEL"); model != "" {
-		wctx.Agent = model
-	}
-
-	// Get max iterations from environment variable (set by container)
-	if maxIter := os.Getenv("MAX_ITERATIONS"); maxIter != "" {
-		if val, err := strconv.Atoi(maxIter); err == nil {
-			wctx.MaxIterations = val
-		}
+	// Get instance metadata from provider
+	if metadata, err := p.GetInstanceMetadata(ctx, instanceName); err == nil && metadata != nil {
+		wctx.Environment = metadata.Backend
+		wctx.ContainerID = metadata.InstanceID
+		wctx.ImageID = metadata.ImageID
+		wctx.Agent = metadata.Agent
+		wctx.MaxIterations = metadata.MaxIterations
 	}
 
 	return wctx
@@ -117,30 +101,6 @@ func gatherWatchContext(_ context.Context, containerName string) tui.WatchContex
 // getGitBranch gets the current git branch name
 func getGitBranch() string {
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-
-	output, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(string(output))
-}
-
-// getContainerID gets the container ID for a given container name
-func getContainerID(containerName string) string {
-	cmd := exec.Command("docker", "inspect", "--format={{.Id}}", containerName)
-
-	output, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(string(output))
-}
-
-// getImageID gets the image ID for a given container name
-func getImageID(containerName string) string {
-	cmd := exec.Command("docker", "inspect", "--format={{.Image}}", containerName)
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -167,7 +127,7 @@ func performWatch(ctx context.Context, p provider.Provider, containerName string
 	formatter := claude.NewFormatter()
 
 	// Gather context information for the watch UI
-	uiContext := gatherWatchContext(ctx, containerName)
+	uiContext := gatherWatchContext(ctx, p, containerName)
 
 	// Create channels for logs and metrics
 	logCh := make(chan agent.Event, 100)

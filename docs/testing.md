@@ -6,11 +6,15 @@
 # Run all tests
 go test ./...
 
-# Unit tests only (fast, no Docker)
+# Unit tests only (fast, no Docker or GCP)
 go test -short ./...
 
-# Integration tests only (requires Docker)
+# Integration tests only (requires Docker, and GCP cloud)
 go test ./tests/integration/...
+
+# Backend-specific integration tests
+go test ./tests/integration/ -run Docker    # Docker backend only
+go test ./tests/integration/ -run GCP       # GCP backend only
 
 # With coverage
 go test -coverprofile=coverage.out ./...
@@ -31,10 +35,87 @@ go tool cover -html=coverage.out
 - Run: `go test -short ./...`
 
 **Integration Tests** (`tests/integration/*_test.go`):
-- Test CLI end-to-end with real Docker operations
-- Slower, requires Docker daemon
-- Run: `go test ./tests/integration/...`
+- Test CLI end-to-end with real backend operations
+- Slower, requires backend (Docker daemon or GCP credentials)
+- Run all: `go test ./tests/integration/...`
+- Run Docker tests: `go test ./tests/integration/ -run Docker`
+- Run GCP tests: `go test ./tests/integration/ -run GCP`
 - Skip in short mode automatically
+
+## Backend-Specific Testing
+
+Integration tests are organized by backend. Test file naming indicates which backend they test:
+
+**Docker Backend Tests:**
+- `setup_test.go`, `spin_test.go`, `watch_test.go`
+- Require Docker daemon running
+- Run: `go test ./tests/integration/ -run Docker` or `go test ./tests/integration/ -run "^Test(Setup|Spin|Watch)_"`
+
+**GCP Backend Tests:**
+- `gcp_setup_test.go`, `gcp_spin_test.go`, `gcp_watch_test.go`, etc.
+- Require GCP credentials and configuration
+- Run: `go test ./tests/integration/ -run GCP`
+- Set required env vars: `SPINNER_TEST_GCP_PROJECT`, `SPINNER_TEST_GCP_ZONE`, `SPINNER_TEST_GCP_BUCKET`
+
+**Running all integration tests:**
+```bash
+go test ./tests/integration/...
+```
+
+**Running only Docker tests:**
+```bash
+go test ./tests/integration/ -run Docker
+# Or match specific test patterns
+go test ./tests/integration/ -run "^Test(Setup|Spin|Watch)_"
+```
+
+**Running only GCP tests:**
+```bash
+export SPINNER_TEST_GCP_PROJECT=your-project
+export SPINNER_TEST_GCP_ZONE=europe-west2-a  # Must include zone letter (a/b/c)
+export SPINNER_TEST_GCP_BUCKET=your-bucket
+go test ./tests/integration/ -run GCP
+```
+
+### Optimizing GCP Test Image Reuse
+
+GCP integration tests use a shared image that takes 35+ minutes to bake. To avoid rebuilding on every test run:
+
+**Image Naming**: Images use deterministic names: `test-shared-v1-{hash}` where:
+- `v1` = version (increment on breaking changes)
+- `{hash}` = 8-char hash of config (project+zone+bucket)
+
+**Automatic Reuse**: The test suite automatically:
+- Checks if image with matching name and config exists
+- Reuses it if found (instant start)
+- Rebuilds only if missing or config changed
+
+**Environment Variables**:
+- `SPINNER_TEST_KEEP_IMAGE=1` - Persist image after tests (enable reuse)
+- `SPINNER_TEST_FORCE_REBUILD=1` - Force rebuild ignoring existing image
+
+**Example Workflow**:
+```bash
+# First run: create and keep image
+export SPINNER_TEST_KEEP_IMAGE=1
+go test ./tests/integration -run GCP  # 40 minutes
+
+# Later runs: instant reuse
+go test ./tests/integration -run GCP  # 5 minutes
+
+# Force rebuild (tool updates, base image changes)
+export SPINNER_TEST_FORCE_REBUILD=1
+go test ./tests/integration -run GCP
+```
+
+**Manual Cleanup**:
+```bash
+# List test images
+gcloud compute images list --project=YOUR_PROJECT --filter="name~test-shared"
+
+# Delete specific image
+gcloud compute images delete test-shared-v1-abc12345 --project=YOUR_PROJECT
+```
 
 ## Test Utilities
 
@@ -42,7 +123,7 @@ The `tests/testutil` package provides reusable helpers:
 
 **CLI Helpers** (`cli.go`):
 ```go
-BuildCLI(t)                                    // Build binary for testing
+GetBinaryPath()                                // Get path to shared binary
 RunCommand(t, args...)                         // Run command, capture output
 RunCommandExpectSuccess(t, args...)            // Run and expect success
 RunCommandExpectError(t, args...)              // Run and expect error
@@ -143,10 +224,10 @@ func TestSpin_ArgumentParsing(t *testing.T) {
 **Helper functions:**
 ```go
 // Create helpers for repeated setup patterns
+// Note: The CLI binary is built once in TestMain, no need to build it here
 func setupTestImage(t *testing.T) (imageTag, imageName string) {
     t.Helper()
     testutil.SkipIfDockerNotAvailable(t)
-    testutil.BuildCLI(t)
 
     imageTag = testutil.GenerateTestImageTag(t)
     imageName = "spinner:" + imageTag

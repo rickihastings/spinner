@@ -123,12 +123,12 @@ func CleanupTestSpinnerDirs() error {
 	return nil
 }
 
-// SetupTestImage builds the CLI, creates a test image with the given setup args, and sets up cleanup
+// SetupTestImage creates a test image with the given setup args and sets up cleanup.
+// The CLI binary is built once in TestMain and reused across all tests.
 func SetupTestImage(t *testing.T, setupArgs ...string) (imageTag string, imageName string) {
 	t.Helper()
 
 	SkipIfDockerNotAvailable(t)
-	BuildCLI(t)
 
 	imageTag = GenerateTestImageTag(t)
 	imageName = "spinner:" + imageTag

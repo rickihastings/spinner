@@ -372,3 +372,186 @@ func TestSpinCommand_DockerBackendExplicit(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+// TestSpinCommand_DockerFlagsWithGCPBackend tests that Docker flags error with GCP backend
+func TestSpinCommand_DockerFlagsWithGCPBackend(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		errorMsg string
+	}{
+		{
+			name: "base-image flag with GCP backend on setup",
+			args: []string{
+				"--setup",
+				"--image", "test",
+				"--repo", "https://github.com/test/repo.git",
+				"--backend", "gcp",
+				"--project", "p",
+				"--zone", "z",
+				"--state-bucket", "b",
+				"--base-image", "ubuntu:22.04",
+			},
+			errorMsg: "--base-image requires --backend docker",
+		},
+		{
+			name: "dockerfile flag with GCP backend on setup",
+			args: []string{
+				"--setup",
+				"--image", "test",
+				"--repo", "https://github.com/test/repo.git",
+				"--backend", "gcp",
+				"--project", "p",
+				"--zone", "z",
+				"--state-bucket", "b",
+				"--dockerfile", "/tmp/Dockerfile",
+			},
+			errorMsg: "--dockerfile requires --backend docker",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_TOKEN", "test-token")
+			t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+			mockProvider := new(provider.MockProvider)
+			cmd := NewSpinCommand(testGCPFactory(mockProvider))
+
+			b := new(bytes.Buffer)
+			cmd.SetOut(b)
+			cmd.SetErr(b)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.Execute()
+
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errorMsg)
+		})
+	}
+}
+
+// TestSpinCommand_MissingRequiredGCPFlags tests that required GCP flags produce errors
+func TestSpinCommand_MissingRequiredGCPFlags(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		errorMsg string
+	}{
+		{
+			name: "missing project",
+			args: []string{
+				"--image", "test",
+				"--repo", "https://github.com/test/repo.git",
+				"--backend", "gcp",
+				"--zone", "us-central1-a",
+				"--state-bucket", "bucket",
+			},
+			errorMsg: "--project is required for GCP backend",
+		},
+		{
+			name: "missing zone",
+			args: []string{
+				"--image", "test",
+				"--repo", "https://github.com/test/repo.git",
+				"--backend", "gcp",
+				"--project", "my-project",
+				"--state-bucket", "bucket",
+			},
+			errorMsg: "--zone is required for GCP backend",
+		},
+		{
+			name: "missing state-bucket",
+			args: []string{
+				"--image", "test",
+				"--repo", "https://github.com/test/repo.git",
+				"--backend", "gcp",
+				"--project", "my-project",
+				"--zone", "us-central1-a",
+			},
+			errorMsg: "--state-bucket is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_TOKEN", "test-token")
+			t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+			// Clear GCP env vars to ensure we're testing CLI validation
+			t.Setenv("SPINNER_PROJECT", "")
+			t.Setenv("SPINNER_ZONE", "")
+			t.Setenv("SPINNER_STATE_BUCKET", "")
+
+			mockProvider := new(provider.MockProvider)
+			cmd := NewSpinCommand(testGCPFactory(mockProvider))
+
+			b := new(bytes.Buffer)
+			cmd.SetOut(b)
+			cmd.SetErr(b)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.Execute()
+
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errorMsg)
+		})
+	}
+}
+
+// TestSpinCommand_BackendFromEnvVar tests that SPINNER_BACKEND env var is respected
+func TestSpinCommand_BackendFromEnvVar(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	t.Setenv("SPINNER_BACKEND", "gcp")
+	// Clear GCP config env vars so validation fails
+	t.Setenv("SPINNER_PROJECT", "")
+	t.Setenv("SPINNER_ZONE", "")
+	t.Setenv("SPINNER_STATE_BUCKET", "")
+
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(testGCPFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "test",
+		"--repo", "https://github.com/test/repo.git",
+	})
+
+	err := cmd.Execute()
+
+	// Should error about missing GCP flags because backend=gcp from env
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "--project is required")
+}
+
+// TestSpinCommand_CLIFlagOverridesEnvVar tests that CLI flag takes precedence over env var
+func TestSpinCommand_CLIFlagOverridesEnvVar(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	t.Setenv("SPINNER_BACKEND", "docker")
+	// Clear GCP config env vars so validation fails
+	t.Setenv("SPINNER_PROJECT", "")
+	t.Setenv("SPINNER_ZONE", "")
+	t.Setenv("SPINNER_STATE_BUCKET", "")
+
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(testGCPFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	// CLI specifies --backend gcp, should override env SPINNER_BACKEND=docker
+	cmd.SetArgs([]string{
+		"--image", "test",
+		"--repo", "https://github.com/test/repo.git",
+		"--backend", "gcp",
+	})
+
+	err := cmd.Execute()
+
+	// Should error about missing GCP flags because CLI --backend gcp overrides env
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "--project is required")
+}

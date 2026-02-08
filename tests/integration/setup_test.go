@@ -31,7 +31,6 @@ func TestSetup_BasicBuild(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testutil.SkipIfDockerNotAvailable(t)
-			testutil.BuildCLI(t)
 
 			imageTag := testutil.GenerateTestImageTag(t)
 			imageName := "spinner:" + imageTag

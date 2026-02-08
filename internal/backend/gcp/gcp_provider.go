@@ -97,15 +97,24 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 			if _, statErr := os.Stat(localTarball); statErr == nil {
 				// Local binary exists - upload it automatically
 				fmt.Println("🔧 Local development binary detected, uploading to GCS...")
+
 				if err := uploadLocalBinary(ctx, p.client, stateBucket); err != nil {
 					return fmt.Errorf("failed to upload local binary: %w", err)
 				}
+
 				// Set LOCAL_BUILD so bake VM knows to download from GCS
-				os.Setenv("LOCAL_BUILD", "true")
+				err := os.Setenv("LOCAL_BUILD", "true")
+				if err != nil {
+					return fmt.Errorf("failed to set LOCAL_BUILD env var: %w", err)
+				}
+
 				fmt.Println("✓ Local binary uploaded to state bucket")
 			}
 		}
 	}
+
+	// Read config hash from environment if provided (used by integration tests)
+	configHash := os.Getenv("SPINNER_CONFIG_HASH")
 
 	return bakeImage(ctx, p.client, bakeConfig{
 		ImageName:     config.Name,
@@ -115,9 +124,10 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 		DiskSizeGB:    diskSizeGB,
 		StartupScript: bakeScript,
 		StateBucket:   stateBucket,
+		ConfigHash:    configHash,
 		ExtraMetadata: map[string]string{
-			"startup-script-runtime":   startupScript,
-			"spinner-install-script":   installScript,
+			"startup-script-runtime": startupScript,
+			"spinner-install-script": installScript,
 		},
 	})
 }
@@ -285,6 +295,65 @@ func (p *Provider) WatchLogs(ctx context.Context, name string, _ int, ch chan<- 
 // Polls CPU utilization at 60-second intervals and maps VM state to ContainerMetrics.
 func (p *Provider) WatchMetrics(ctx context.Context, name string, ch chan<- provider.ContainerMetrics) error {
 	return streamGCPMetrics(ctx, p.client, p.project, p.zone, name, ch)
+}
+
+// GetInstanceMetadata returns metadata about a GCP VM instance.
+func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provider.InstanceMetadata, error) {
+	instance, err := p.client.GetInstance(ctx, p.project, p.zone, name)
+	if err != nil {
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("instance not found: %s", name)
+		}
+
+		return nil, fmt.Errorf("failed to get instance: %w", err)
+	}
+
+	metadata := &provider.InstanceMetadata{
+		Backend:    "gcp",
+		InstanceID: name, // For GCP, the instance name is the identifier
+	}
+
+	// Extract boot disk name as the "image" identifier
+	if len(instance.Disks) > 0 && instance.Disks[0] != nil {
+		// The boot disk source is a full URL like:
+		// https://www.googleapis.com/compute/v1/projects/PROJECT/zones/ZONE/disks/DISK_NAME
+		// Extract just the disk name
+		diskSource := instance.Disks[0].GetSource()
+		if diskSource != "" {
+			// Get the last part of the URL path
+			parts := strings.Split(diskSource, "/")
+			if len(parts) > 0 {
+				metadata.ImageID = parts[len(parts)-1]
+			}
+		}
+	}
+
+	// Try to get agent and max iterations from instance metadata
+	if instance.Metadata != nil && instance.Metadata.Items != nil {
+		for _, item := range instance.Metadata.Items {
+			if item == nil {
+				continue
+			}
+
+			key := item.GetKey()
+			value := item.GetValue()
+
+			switch key {
+			case "ANTHROPIC_MODEL":
+				if value != "" {
+					metadata.Agent = value
+				}
+			case "MAX_ITERATIONS":
+				if value != "" {
+					if val, parseErr := fmt.Sscanf(value, "%d", &metadata.MaxIterations); parseErr != nil || val != 1 {
+						_ = fmt.Errorf("failed to parse max iterations: %s", value)
+					}
+				}
+			}
+		}
+	}
+
+	return metadata, nil
 }
 
 // isNotFoundError checks whether a GCP API error indicates a resource was not found.
