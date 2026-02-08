@@ -278,6 +278,12 @@ docker rm <container-name>
 
 Or use `--recreate` on the next run to start fresh.
 
+## Guides
+
+For detailed walkthroughs, see the [guides](docs/guides/) directory:
+
+- **[Docker Sandbox Guide](docs/guides/docker.md)** — Setting up sandbox images, running interactive or autonomous containers, and monitoring progress with watch mode
+
 ## Development
 
 For contributing to Spinner itself, see the development documentation:
