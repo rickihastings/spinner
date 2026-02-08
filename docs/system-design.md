@@ -42,16 +42,16 @@ Provider configurations use `Options map[string]string` for backend-specific par
 
 ```go
 type SetupConfig struct {
-   Name    string            // Universal: environment name
-   Options map[string]string // Backend-specific (e.g., "base-image", "dockerfile")
+Name    string            // Universal: environment name
+Options map[string]string // Backend-specific (e.g., "base-image", "dockerfile")
 }
 
 type CreateConfig struct {
-   Repo          string // Universal fields
-   Prompt        string
-   Branch        string
-   MaxIterations int
-   Options       map[string]string // Backend-specific (e.g., "image")
+Repo          string // Universal fields
+Prompt        string
+Branch        string
+MaxIterations int
+Options       map[string]string // Backend-specific (e.g., "image")
 }
 ```
 
@@ -123,13 +123,13 @@ The command layer and execution logic operate on the Provider interface without 
 ```go
 // cmd/constructors.go
 func NewSpinCommand(p provider.Provider) *cobra.Command {
-   // Works with any Provider implementation
-   status, err := p.Status(ctx, name)
-   if err == nil && status == provider.Running {
-	   p.Start(ctx, name)
-   } else {
-	   p.Create(ctx, config)
-   }
+// Works with any Provider implementation
+status, err := p.Status(ctx, name)
+if err == nil && status == provider.Running {
+p.Start(ctx, name)
+} else {
+p.Create(ctx, config)
+}
 }
 ```
 
@@ -171,7 +171,7 @@ Commands receive providers via constructor injection:
 ```go
 // Production wiring (cmd/setup.go, cmd/spin.go)
 var setupCmd = NewSetupCommand(
-    docker.NewDockerProvider(docker.NewRealDockerClient())
+docker.NewDockerProvider(docker.NewRealDockerClient())
 )
 
 // Test wiring (cmd/*_test.go)
@@ -210,14 +210,14 @@ RealDockerClient / MockDockerClient
 
 ```go
 type DockerClient interface {
-   BuildImage(ctx context.Context, config BuildConfig) error
-   RunContainer(ctx context.Context, args []string, name string) error
-   ImageExists(ctx context.Context, image string) (bool, error)
-   ContainerExists(ctx context.Context, name string) (bool, ContainerStatus, error)
-   StartContainer(ctx context.Context, name string) error
-   StopContainer(ctx context.Context, name string) error
-   RemoveContainer(ctx context.Context, name string) error
-   LogsContainer(ctx context.Context, name string) (io.ReadCloser, error)
+BuildImage(ctx context.Context, config BuildConfig) error
+RunContainer(ctx context.Context, args []string, name string) error
+ImageExists(ctx context.Context, image string) (bool, error)
+ContainerExists(ctx context.Context, name string) (bool, ContainerStatus, error)
+StartContainer(ctx context.Context, name string) error
+StopContainer(ctx context.Context, name string) error
+RemoveContainer(ctx context.Context, name string) error
+LogsContainer(ctx context.Context, name string) (io.ReadCloser, error)
 }
 ```
 

@@ -1,8 +1,11 @@
 # Spinner
 
-Run Claude agents in sandboxed Docker containers, unsupervised. Built for autonomous agent loops where you want isolation, reproducibility, and hands-off execution.
+Run Claude agents in sandboxed Docker containers, unsupervised. Built for autonomous agent loops where you want
+isolation, reproducibility, and hands-off execution.
 
-Unlike opinionated agent frameworks, Spinner doesn't dictate how you structure your prompts, specs, or tasks—bring whatever workflow suits your project. And because you control the Docker environment through your own Dockerfile, you can build on any stack: Node, Python, Go, Rust, or anything else you need.
+Unlike opinionated agent frameworks, Spinner doesn't dictate how you structure your prompts, specs, or tasks—bring
+whatever workflow suits your project. And because you control the Docker environment through your own Dockerfile, you
+can build on any stack: Node, Python, Go, Rust, or anything else you need.
 
 ## Why Spinner?
 
@@ -104,7 +107,8 @@ The more context you provide upfront, the better the agent performs autonomously
 
 ### Minimize Context Window Bloat
 
-Long-running agents accumulate context, leading to degraded performance and hallucinations. Structure your tasks to keep context windows fresh:
+Long-running agents accumulate context, leading to degraded performance and hallucinations. Structure your tasks to keep
+context windows fresh:
 
 **Work in vertical slices.** Instruct your agent to complete tasks one at a time:
 
@@ -129,9 +133,12 @@ Configure your project with automated checks that run on each iteration:
 - **Type checking** (tsc, mypy)
 - **Tests** (unit → integration → e2e)
 
-When these checks fail, the agent must fix issues before proceeding. This "back pressure" forces correctness and naturally segments work into smaller context windows.
+When these checks fail, the agent must fix issues before proceeding. This "back pressure" forces correctness and
+naturally segments work into smaller context windows.
 
-Spinner automatically pushes changes after each iteration, so progress is preserved even if the agent needs to restart with a fresh context. The iteration loop is implemented in Go, providing robust state management, JSON parsing, and error handling for long-running autonomous tasks.
+Spinner automatically pushes changes after each iteration, so progress is preserved even if the agent needs to restart
+with a fresh context. The iteration loop is implemented in Go, providing robust state management, JSON parsing, and
+error handling for long-running autonomous tasks.
 
 ### Example Task Structure
 
@@ -180,15 +187,15 @@ Launch a container and optionally start an agent:
   [--watch]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--image` | Docker image from setup (required) |
-| `--repo` | Git repository URL (required) |
-| `--prompt` | Task for the agent; if omitted, container stays idle |
-| `--branch` | Git branch to checkout |
-| `--max-iterations` | Stop after N iterations (default: 100) |
-| `--recreate` | Force fresh container, removing any existing one |
-| `--watch` | Enter watch mode after container is ready |
+| Flag               | Description                                          |
+|--------------------|------------------------------------------------------|
+| `--image`          | Docker image from setup (required)                   |
+| `--repo`           | Git repository URL (required)                        |
+| `--prompt`         | Task for the agent; if omitted, container stays idle |
+| `--branch`         | Git branch to checkout                               |
+| `--max-iterations` | Stop after N iterations (default: 100)               |
+| `--recreate`       | Force fresh container, removing any existing one     |
+| `--watch`          | Enter watch mode after container is ready            |
 
 ### watch
 
@@ -199,6 +206,7 @@ Monitor a running container in real-time:
 ```
 
 Watch mode provides a terminal UI with:
+
 - Container status (running/stopped/exited)
 - CPU and memory usage metrics
 - Streaming container logs with structured formatting
@@ -206,6 +214,7 @@ Watch mode provides a terminal UI with:
 Use `q` or `Ctrl+C` to exit watch mode.
 
 **Example:**
+
 ```bash
 # Start a container and watch it
 ./dist/spinner spin --image default --repo https://github.com/user/repo --watch
@@ -226,9 +235,11 @@ This checks GitHub Releases for a newer version and updates the binary in place.
 
 ### exec
 
-Execute the autonomous iteration loop inside a Docker container. This command is automatically invoked by containers created with `spinner spin` and manages the agent execution lifecycle.
+Execute the autonomous iteration loop inside a Docker container. This command is automatically invoked by containers
+created with `spinner spin` and manages the agent execution lifecycle.
 
-**Note:** This command is designed to run inside Docker containers and reads all configuration from environment variables. You typically won't need to call it manually.
+**Note:** This command is designed to run inside Docker containers and reads all configuration from environment
+variables. You typically won't need to call it manually.
 
 **Environment Variables:**
 
@@ -240,7 +251,8 @@ Execute the autonomous iteration loop inside a Docker container. This command is
 
 **State Management:**
 
-The exec command persists iteration state to `${STATE_DIR}/state.json`, which is mounted from the host. This allows progress to survive container restarts and tracks:
+The exec command persists iteration state to `${STATE_DIR}/state.json`, which is mounted from the host. This allows
+progress to survive container restarts and tracks:
 
 - Current iteration count
 - Branch name

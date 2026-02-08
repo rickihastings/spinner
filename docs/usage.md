@@ -28,16 +28,19 @@ make install-hooks
 
 ## Environment Variable Configuration
 
-Spinner uses Viper to support environment variable configuration. All command-line flags can be overridden using environment variables with the `SPINNER_` prefix.
+Spinner uses Viper to support environment variable configuration. All command-line flags can be overridden using
+environment variables with the `SPINNER_` prefix.
 
 ### Supported Environment Variables
 
 **Setup Command:**
+
 - `SPINNER_NAME` - Override `--name` flag
 - `SPINNER_BASE_IMAGE` - Override `--base-image` flag
 - `SPINNER_DOCKERFILE` - Override `--dockerfile` flag
 
 **Spin Command:**
+
 - `SPINNER_IMAGE` - Override `--image` flag
 - `SPINNER_REPO` - Override `--repo` flag
 - `SPINNER_PROMPT` - Override `--prompt` flag
@@ -64,12 +67,85 @@ export SPINNER_IMAGE=spinner:default
 # Uses spinner:custom, not spinner:default
 ```
 
+### Configuration File
+
+Spinner supports `.spinner.json` for team-shared defaults (commit to repo) and `.env` for local overrides (don't commit).
+
+**`.spinner.json` example:**
+```json
+{
+  "backend": "gcp",
+  "project": "my-project",
+  "zone": "us-central1-a",
+  "state-bucket": "my-state-bucket",
+  "machine-type": "e2-standard-2",
+  "image": "my-default-image"
+}
+```
+
+**`.env` example:**
+```env
+SPINNER_PROJECT=my-local-project
+SPINNER_ZONE=us-west1-a
+```
+
+Place both files in the directory where you run `spinner` commands.
+
 ### Configuration Precedence
 
 Configuration values are applied in this order (highest to lowest priority):
+
 1. Command-line flags
-2. Environment variables
-3. Default values
+2. Environment variables (`SPINNER_*`)
+3. `.env` file
+4. `.spinner.json` file
+5. Default values
+
+### GCP Backend
+
+**Authentication:**
+- `GOOGLE_APPLICATION_CREDENTIALS` - Path to service account JSON key file, OR
+- Run `gcloud auth application-default login`
+
+**Required flags (use SPINNER_ prefix for env vars):**
+- `SPINNER_BACKEND=gcp` - Enable GCP backend
+- `SPINNER_PROJECT` - GCP project ID
+- `SPINNER_ZONE` - GCP zone (e.g., us-central1-a)
+- `SPINNER_STATE_BUCKET` - GCS bucket for state persistence
+
+**Optional flags:**
+- `SPINNER_MACHINE_TYPE` - VM machine type (default: e2-standard-2)
+- `SPINNER_DISK_SIZE` - Boot disk size in GB (default: 30)
+- `SPINNER_BAKE_SCRIPT` - Path to custom bake script for image creation
+
+**Example:**
+```bash
+# Set up authentication
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+
+# Configure GCP backend
+export SPINNER_BACKEND=gcp
+export SPINNER_PROJECT=my-project
+export SPINNER_ZONE=us-central1-a
+export SPINNER_STATE_BUCKET=my-state-bucket
+
+# Standard Spinner variables
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
+
+# Setup and spin (flags optional since env vars are set)
+./dist/spinner setup --name my-env
+./dist/spinner spin --image my-env --repo https://github.com/user/repo --prompt "task"
+```
+
+**Required GCS bucket permissions:**
+- `storage.objects.create`
+- `storage.objects.get`
+- `storage.objects.delete`
+
+**Required GCP API permissions:**
+- Compute Engine API enabled
+- Service account with `roles/compute.instanceAdmin.v1` or equivalent
 
 ## Development Workflow
 
@@ -182,11 +258,13 @@ These are tested, working examples for future reference:
 
 ## State Management
 
-Spinner maintains persistent state for each running container to track iteration progress and status. This state survives container restarts and allows you to resume work after interruptions.
+Spinner maintains persistent state for each running container to track iteration progress and status. This state
+survives container restarts and allows you to resume work after interruptions.
 
 ### State File Location
 
-State is stored in `${STATE_DIR}/state.json` where `STATE_DIR` defaults to `/state` inside the container. This directory is mounted from the host at `~/.spinner/<container-name>/state/` to ensure persistence.
+State is stored in `${STATE_DIR}/state.json` where `STATE_DIR` defaults to `/state` inside the container. This directory
+is mounted from the host at `~/.spinner/<container-name>/state/` to ensure persistence.
 
 ### State File Format
 
@@ -246,8 +324,10 @@ To start fresh with a new state, either:
 When using the GCP backend, state is persisted to Google Cloud Storage for durability across VM lifecycle events:
 
 - **Location:** `gs://{state-bucket}/{instance-name}/state.json`
-- **Download on boot:** The GCP runtime startup script checks for existing state in GCS and restores it before running `spinner exec`
-- **Upload after changes:** The exec loop syncs state to GCS after each state change (iteration start, completion, errors, rate limits)
+- **Download on boot:** The GCP runtime startup script checks for existing state in GCS and restores it before running
+  `spinner exec`
+- **Upload after changes:** The exec loop syncs state to GCS after each state change (iteration start, completion,
+  errors, rate limits)
 - **Fresh start:** If no state exists in GCS, the VM starts with default state
 
 View GCP state:
