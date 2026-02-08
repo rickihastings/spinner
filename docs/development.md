@@ -21,7 +21,8 @@ vim cmd/setup.go
     --zone us-central1-a
 ```
 
-**Note:** The setup command automatically detects if you're running from source (checks for `dist/spinner-linux-amd64`) and uses the local binary. No need to set `LOCAL_BUILD` environment variable manually.
+**Note:** The setup command automatically detects if you're running from source (checks for `dist/spinner-linux-amd64`)
+and uses the local binary. No need to set `LOCAL_BUILD` environment variable manually.
 
 ## How It Works
 
@@ -29,23 +30,24 @@ vim cmd/setup.go
 
 1. `dev-setup.sh` builds a linux/amd64 binary to `dist/spinner-linux-amd64`
 2. When you run `setup`:
-   - Setup checks if `dist/spinner-linux-amd64` exists
-   - If found, automatically copies it into the build context
-   - Sets `LOCAL_BUILD=true` for the Dockerfile
-   - Dockerfile uses the local binary instead of downloading from GitHub
+    - Setup checks if `dist/spinner-linux-amd64` exists
+    - If found, automatically copies it into the build context
+    - Sets `LOCAL_BUILD=true` for the Dockerfile
+    - Dockerfile uses the local binary instead of downloading from GitHub
 
 ### GCP Backend
 
 1. `dev-setup.sh` builds and creates `dist/spinner-dev-linux-amd64.tar.gz`
 2. When you run `setup`:
-   - Setup checks if `dist/spinner-dev-linux-amd64.tar.gz` exists
-   - If found, automatically uploads to `gs://{state-bucket}/local-dev/`
-   - Sets `LOCAL_BUILD=true` for the bake VM metadata
-   - Bake VM downloads from state bucket instead of GitHub releases
+    - Setup checks if `dist/spinner-dev-linux-amd64.tar.gz` exists
+    - If found, automatically uploads to `gs://{state-bucket}/local-dev/`
+    - Sets `LOCAL_BUILD=true` for the bake VM metadata
+    - Bake VM downloads from state bucket instead of GitHub releases
 
 ## Production Users
 
-Production users (who download the `spinner` binary from GitHub releases) don't have the source code or the dev script. When they run `setup`:
+Production users (who download the `spinner` binary from GitHub releases) don't have the source code or the dev script.
+When they run `setup`:
 
 1. `LOCAL_BUILD` is not set
 2. Docker downloads the latest release from GitHub
@@ -62,6 +64,7 @@ You need to run `./scripts/dev-setup.sh` first to build the binary.
 ### "failed to upload local binary"
 
 For GCP, ensure:
+
 - You have `gcloud auth application-default login` configured
 - The `--state-bucket` exists and you have write access
 - You ran `./scripts/dev-setup.sh` to create the tarball
@@ -69,6 +72,7 @@ For GCP, ensure:
 ### Changes not reflected in container/VM
 
 Make sure you:
+
 1. Ran `./scripts/dev-setup.sh` after making changes
 2. Rebuilt the image with `setup` (not reusing an old image)
 3. For Docker: use `--recreate` flag if the image already exists
@@ -76,12 +80,14 @@ Make sure you:
 ## Environment Variables
 
 **`LOCAL_BUILD`:**
+
 - Auto-detected when running from source (if `dist/spinner-linux-amd64` exists)
 - Can also be set manually: `LOCAL_BUILD=true ./dist/spinner setup ...`
 - When `"true"`: Use local binary instead of downloading from GitHub
 - When unset or auto-detection fails: Download from GitHub releases (production behavior)
 
-**Production users** (who download the released `spinner` binary) never have the local dev files, so auto-detection doesn't trigger.
+**Production users** (who download the released `spinner` binary) never have the local dev files, so auto-detection
+doesn't trigger.
 
 ## Development Workflow
 
@@ -132,18 +138,23 @@ vim internal/backend/gcp/gcp_provider.go
 The implementation uses environment variable detection to choose between development and production mode:
 
 **Development Mode** (`LOCAL_BUILD=true`):
+
 - Docker: Copy binary from `dist/spinner-linux-amd64` to build context
 - GCP: Upload to `gs://{state-bucket}/local-dev/`, download during bake
 
 **Production Mode** (`LOCAL_BUILD` unset):
+
 - Docker: Download from GitHub releases during image build
 - GCP: Download from GitHub releases during bake
 
-This separation ensures production users never accidentally use dev infrastructure, and developers have a clear, explicit workflow.
+This separation ensures production users never accidentally use dev infrastructure, and developers have a clear,
+explicit workflow.
 
 ### Shared Installation Logic
 
-To avoid duplication, both Docker and GCP use a shared `install_spinner.sh` script (`templates/scripts/install_spinner.sh`) that handles:
+To avoid duplication, both Docker and GCP use a shared `install_spinner.sh` script (
+`templates/scripts/install_spinner.sh`) that handles:
+
 - Detecting `LOCAL_BUILD` environment variable
 - Downloading from GitHub releases (production mode)
 - Installing from local build (development mode)

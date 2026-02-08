@@ -1,50 +1,149 @@
-# Testing Guidelines
+# Testing
 
-## Test Coverage Requirements
+## Quick Start
 
-- **All functionality must have tests**: Every new feature, bug fix, or significant code change must include appropriate tests
-- **Test at the right level**: Use integration tests for end-to-end scenarios, unit tests for business logic
-- **No untested code**: If code cannot be easily tested, it's a sign the design needs improvement
+```bash
+# Run all tests
+go test ./...
 
-## Test Organization
+# Unit tests only (fast, no Docker)
+go test -short ./...
 
-### Test Types
+# Integration tests only (requires Docker)
+go test ./tests/integration/...
+
+# With coverage
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+## Requirements
+
+- **All functionality must have tests** - Every feature, bug fix, or significant change needs tests
+- **Test at the right level** - Integration for end-to-end, unit for business logic
+- **If it's hard to test, redesign it** - Untestable code indicates design problems
+
+## Test Types
 
 **Unit Tests** (`cmd/*_test.go`, `internal/*_test.go`):
-- Test individual functions and logic in isolation
-- Use mocks for external dependencies (Docker, file system, etc.)
-- Fast execution (no Docker or external services)
-- Run with: `go test ./cmd/... ./internal/...`
+- Test logic in isolation with mocked dependencies
+- Fast (milliseconds), no Docker required
+- Run: `go test -short ./...`
 
 **Integration Tests** (`tests/integration/*_test.go`):
-- Test end-to-end CLI behavior with real Docker operations
-- Verify actual container creation, image building, and cleanup
-- Slower execution (requires Docker daemon)
-- Run with: `go test ./tests/integration/...`
-- Skip with short flag: `go test -short ./...`
+- Test CLI end-to-end with real Docker operations
+- Slower, requires Docker daemon
+- Run: `go test ./tests/integration/...`
+- Skip in short mode automatically
 
-### Test Structure
+## Test Utilities
 
+The `tests/testutil` package provides reusable helpers:
+
+**CLI Helpers** (`cli.go`):
+```go
+BuildCLI(t)                                    // Build binary for testing
+RunCommand(t, args...)                         // Run command, capture output
+RunCommandExpectSuccess(t, args...)            // Run and expect success
+RunCommandExpectError(t, args...)              // Run and expect error
 ```
-tests/
-├── testutil/           # Reusable test utilities
-│   ├── docker.go      # Docker helpers (low-level)
-│   ├── cli.go         # CLI execution helpers
-│   └── fixtures.go    # Test data generators
-└── integration/       # Integration tests
-    ├── setup_test.go  # Setup command integration tests
-    └── spin_test.go   # Spin command integration tests
+
+**Docker Helpers** (`docker.go`):
+```go
+DockerImageExists(t, image)                    // Check if image exists
+DockerContainerExists(t, name)                 // Check if container exists
+DockerContainerRunning(t, name)                // Check if running
+RemoveDockerImage(t, image)                    // Clean up image
+RemoveDockerContainer(t, name)                 // Clean up container
+EnsureDockerRunning(t)                         // Verify Docker available
+```
+
+**Fixture Helpers** (`fixtures.go`):
+```go
+GenerateTestID()                               // Unique test identifier
+GenerateTestImageTag()                         // Unique image tag
+CleanupTestResources(t, image, container)      // Clean up after test
+SkipIfDockerNotAvailable(t)                    // Skip if no Docker
 ```
 
 ## Writing Tests
 
-### Use Helper Functions to Avoid Boilerplate
-
-Create helper functions for repeated setup patterns:
-
+**Unit test example:**
 ```go
-// Helper extracts common setup logic
-func setupTestImage(t *testing.T, setupArgs ...string) (imageTag string, imageName string) {
+func TestSetup_MissingNameFlag(t *testing.T) {
+    mockClient := new(docker.MockDockerClient)
+    cmd := NewSetupCommand(mockClient)
+
+    err := cmd.Execute()
+
+    assert.Error(t, err)
+    assert.Contains(t, err.Error(), "--name is required")
+}
+```
+
+**Integration test example:**
+```go
+func TestSetup_SuccessfulBuild(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration test")
+    }
+
+    testutil.SkipIfDockerNotAvailable(t)
+    imageName := "spinner:test-" + testutil.GenerateTestID()
+    t.Cleanup(func() {
+        testutil.RemoveDockerImage(t, imageName)
+    })
+
+    output := testutil.RunCommandExpectSuccess(t, "setup", "--name", imageName)
+
+    assert.Contains(t, output, "Successfully built")
+    assert.True(t, testutil.DockerImageExists(t, imageName))
+}
+```
+
+**Table-driven test example:**
+```go
+func TestSpin_ArgumentParsing(t *testing.T) {
+    tests := []struct {
+        name        string
+        args        []string
+        expectError bool
+        errorMsg    string
+    }{
+        {
+            name:        "missing image",
+            args:        []string{"--repo", "."},
+            expectError: true,
+            errorMsg:    "--image is required",
+        },
+        {
+            name:        "valid args",
+            args:        []string{"--image", "test", "--repo", "."},
+            expectError: false,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            cmd := NewSpinCommand(mockClient)
+            cmd.SetArgs(tt.args)
+            err := cmd.Execute()
+
+            if tt.expectError {
+                assert.Error(t, err)
+                assert.Contains(t, err.Error(), tt.errorMsg)
+            } else {
+                assert.NoError(t, err)
+            }
+        })
+    }
+}
+```
+
+**Helper functions:**
+```go
+// Create helpers for repeated setup patterns
+func setupTestImage(t *testing.T) (imageTag, imageName string) {
     t.Helper()
     testutil.SkipIfDockerNotAvailable(t)
     testutil.BuildCLI(t)
@@ -56,86 +155,29 @@ func setupTestImage(t *testing.T, setupArgs ...string) (imageTag string, imageNa
         testutil.RemoveDockerImage(t, imageName)
     })
 
-    args := append([]string{"setup", "--name", imageTag}, setupArgs...)
-    testutil.RunCommandExpectSuccess(t, args...)
-
-    return imageTag, imageName
-}
-
-// Tests become concise and focused
-func TestSetup_InstalledTools(t *testing.T) {
-    tests := []struct {
-        name            string
-        command         []string
-        wantOutputMatch string
-    }{
-        {name: "git installed", command: []string{"git", "--version"}, wantOutputMatch: "git version"},
-        {name: "claude installed", command: []string{"claude", "--version"}},
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            _, imageName := setupTestImage(t)
-            containerName := runContainerWithImage(t, imageName)
-            output := execInContainer(t, containerName, tt.command...)
-
-            if tt.wantOutputMatch != "" {
-                assert.Contains(t, output, tt.wantOutputMatch)
-            }
-        })
-    }
+    testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag)
+    return
 }
 ```
 
-### Use Table-Driven Tests
+**When to create helpers:**
+- Same setup appears in 2+ tests
+- Multiple steps always go together
+- Need paired cleanup logic
 
-For testing similar scenarios with different inputs, use table-driven tests with structs defining test cases.
-
-### When to Create Helper Functions
-
-**Create a helper when:**
-- The same setup pattern appears in 2+ tests
-- Setup involves multiple steps that always go together
-- Cleanup logic needs to be paired with setup
-
-**Don't create a helper when:**
-- It's only used once
-- It obscures what the test is actually doing
-- The abstraction is leaky or confusing
+**When not to:**
+- Only used once
+- Obscures what test does
+- Creates leaky abstraction
 
 **Where to put helpers:**
-- Test-specific helpers: Same file as the tests (e.g., `setup_test.go`)
-- Reusable across multiple test files: `tests/testutil/` package
+- Test-specific: Same file as tests
+- Reusable: `tests/testutil/` package
 
-## Running Tests
+## Best Practices
 
-```bash
-# All tests
-go test ./...
-
-# Unit tests only (fast)
-go test -short ./...
-
-# Integration tests only
-go test ./tests/integration/...
-
-# Specific test file
-go test ./tests/integration/setup_test.go -v
-
-# With coverage
-go test -cover ./...
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-
-# Verbose output
-go test -v ./...
-```
-
-## Testability Guidelines
-
-- Write pure functions with clear inputs/outputs
-- Avoid side effects where possible
-- Use dependency injection for external dependencies
-- Mock system calls in unit tests
 - Use `t.Helper()` in helper functions for better error reporting
 - Use `t.Cleanup()` for resource cleanup (runs even if test fails)
+- Write pure functions with clear inputs/outputs
+- Use dependency injection for external dependencies
+- Mock system calls in unit tests

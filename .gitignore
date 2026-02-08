@@ -149,4 +149,5 @@ coverage.*
 
 # Spinner
 .spinner
+.spinner.json
 prompt.md

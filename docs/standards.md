@@ -3,12 +3,14 @@
 ## Communication Guidelines
 
 - **Be honest about uncertainty**: Say "I don't know" when uncertain rather than providing incorrect information
-- **Probe for requirements**: Ask clarifying questions about requirements, constraints, and expected behavior before implementing
+- **Probe for requirements**: Ask clarifying questions about requirements, constraints, and expected behavior before
+  implementing
 - **Avoid assumptions**: When requirements are ambiguous, explicitly state assumptions and ask for confirmation
 
 ## Design Principles
 
-Follow SOLID principles: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, and Dependency Inversion. Keep functions small and focused with one clear purpose. Depend on abstractions, not implementations.
+Follow SOLID principles: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, and Dependency
+Inversion. Keep functions small and focused with one clear purpose. Depend on abstractions, not implementations.
 
 ## Code Integration Policy
 
@@ -20,22 +22,24 @@ Follow SOLID principles: Single Responsibility, Open/Closed, Liskov Substitution
 - ❌ **No dead code**: Remove unused code rather than leaving it around
 - 📝 **Document decisions**: When removing code or deciding not to implement something, document why
 
-**Rationale**: Dead code creates maintenance burden, confusion, and false assumptions about what's actually used. If we need functionality later, we can implement it then with full context of the actual requirements.
+**Rationale**: Dead code creates maintenance burden, confusion, and false assumptions about what's actually used. If we
+need functionality later, we can implement it then with full context of the actual requirements.
 
 **Example**:
+
 ```go
 // ❌ Bad: Creating unused helper "just in case"
 func CheckAllPrerequisites() error {
-    // Not called anywhere, keeping for potential future use
+// Not called anywhere, keeping for potential future use
 }
 
 // ✅ Good: Only implement what's needed now
 func CheckPrerequisites() error {
-    // Used in setup command
+// Used in setup command
 }
 
 func CheckEnvironmentVariables() error {
-    // Used in spin command validation
+// Used in spin command validation
 }
 ```
 
@@ -54,19 +58,19 @@ func CheckEnvironmentVariables() error {
 ```go
 // Configuration structs (input)
 type SpinConfig struct {
-    Image         string
-    Repo          string
-    Prompt        string // optional fields use pointer (*string) or check for empty string
-    Branch        string
-    MaxIterations int
-    Recreate      bool
+Image         string
+Repo          string
+Prompt        string // optional fields use pointer (*string) or check for empty string
+Branch        string
+MaxIterations int
+Recreate      bool
 }
 
 // Result structs (output)
 type ValidationResult struct {
-    Valid    bool
-    Error    string
-    Warnings []string
+Valid    bool
+Error    string
+Warnings []string
 }
 ```
 
@@ -79,12 +83,12 @@ type ValidationResult struct {
 
 ```go
 func DoSomething() error {
-    result, err := SomeOperation()
-    if err != nil {
-        return fmt.Errorf("failed to do something: %w", err)
-    }
-    // ... use result
-    return nil
+result, err := SomeOperation()
+if err != nil {
+return fmt.Errorf("failed to do something: %w", err)
+}
+// ... use result
+return nil
 }
 ```
 
@@ -96,18 +100,22 @@ func DoSomething() error {
 
 ## Code Documentation
 
-- **Prefer self-documenting code**: Write clear, descriptive variable and function names that make the code's intent obvious
-- **Avoid excessive comments**: Rarely use single-line comments. If code needs explanation, consider refactoring for clarity first
-- **Use godoc comments for exported items**: When documentation is necessary, use godoc-style comments (complete sentences starting with the item name) for exported functions, types, and packages
+- **Prefer self-documenting code**: Write clear, descriptive variable and function names that make the code's intent
+  obvious
+- **Avoid excessive comments**: Rarely use single-line comments. If code needs explanation, consider refactoring for
+  clarity first
+- **Use godoc comments for exported items**: When documentation is necessary, use godoc-style comments (complete
+  sentences starting with the item name) for exported functions, types, and packages
 - **Document structs and interfaces**: Always document non-obvious types, structs, and their fields
 - **Don't be too verbose**: Keep documentation concise and focused. Avoid obvious or redundant explanations
 
 Example:
+
 ```go
 // GenerateContainerName creates a deterministic container name from the image, repo, and branch.
 // The name is sanitized to meet Docker naming requirements (lowercase alphanumeric and hyphens).
 func GenerateContainerName(image, repo, branch string) string {
-    // implementation
+// implementation
 }
 ```
 
@@ -124,19 +132,23 @@ func GenerateContainerName(image, repo, branch string) string {
 
 ### Test Helpers
 
-Place shared test helpers (factory functions, mock builders, etc.) in a dedicated `helpers_test.go` file within the package — never scatter them across individual test files.
+Place shared test helpers (factory functions, mock builders, etc.) in a dedicated `helpers_test.go` file within the
+package — never scatter them across individual test files.
 
 ### Unused Code
 
-When refactoring or moving code, always check for and remove unused imports, variables, and functions in the affected files.
+When refactoring or moving code, always check for and remove unused imports, variables, and functions in the affected
+files.
 
 ### Avoid Duplication
 
-Favour early abstraction over copy-paste. If a function, constant, or pattern is used in more than one file, extract it to a shared location immediately.
+Favour early abstraction over copy-paste. If a function, constant, or pattern is used in more than one file, extract it
+to a shared location immediately.
 
 ### Linting
 
-Run `golangci-lint run --fix` after making changes — it auto-fixes `govet`, `staticcheck`, and `wsl_v5` issues. The full lint check is `make lint`.
+Run `golangci-lint run --fix` after making changes — it auto-fixes `govet`, `staticcheck`, and `wsl_v5` issues. The full
+lint check is `make lint`.
 
 ## Git Commit Standards
 
