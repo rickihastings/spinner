@@ -76,7 +76,16 @@ func TestGCPLifecycle_FullCycle(t *testing.T) {
 	assert.Contains(t, stdout+stderr, "Reusing running instance: "+instanceName,
 		"spin should reuse running VM")
 
-	// 6. Remove: delete the VM
+	// 6. Spin with --recreate: should destroy and recreate VM
+	recreateArgs := append(spinArgs, "--recreate")
+	stdout, stderr = testutil.RunCommandExpectSuccess(t, recreateArgs...)
+	assert.Contains(t, stdout+stderr, "Instance created successfully: "+instanceName,
+		"spin --recreate should destroy and recreate VM")
+
+	status = testutil.GCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName)
+	assert.Equal(t, "RUNNING", status, "VM should be RUNNING after recreate")
+
+	// 7. Remove: delete the VM
 	testutil.RemoveGCPInstance(t, cfg.Project, cfg.Zone, instanceName)
 
 	assert.False(t, testutil.GCPInstanceExists(t, cfg.Project, cfg.Zone, instanceName),
@@ -115,7 +124,8 @@ func TestGCPLifecycle_VMAutoStopsOnCompletion(t *testing.T) {
 	testutil.WaitForGCSStateStatus(t, cfg.Bucket, instanceName, "completed", 120)
 
 	// Poll VM status until it becomes TERMINATED (with timeout)
-	testutil.WaitForGCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName, "TERMINATED", 30)
+	// GCP can take a while to report TERMINATED after poweroff
+	testutil.WaitForGCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName, "TERMINATED", 120)
 
 	// Verify final state
 	status := testutil.GCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName)
@@ -158,4 +168,39 @@ func TestGCPLifecycle_VMStaysRunningOnError(t *testing.T) {
 	// Verify VM is still running
 	status := testutil.GCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName)
 	assert.Equal(t, "RUNNING", status, "VM should still be RUNNING after error for debugging")
+}
+
+// TestGCPLifecycle_VMStaysRunningWithoutPrompt tests that VMs stay running when no prompt is specified.
+func TestGCPLifecycle_VMStaysRunningWithoutPrompt(t *testing.T) {
+	cfg := testutil.SkipIfGCPNotAvailable(t)
+
+	imageName := testutil.GetSharedGCPImage(t)
+
+	// Create VM without a prompt (interactive mode)
+	spinArgs := []string{
+		"spin",
+		"--backend", "gcp",
+		"--image", imageName,
+		"--repo", testRepo,
+		// Note: NO --prompt flag
+		"--project", cfg.Project,
+		"--zone", cfg.Zone,
+		"--state-bucket", cfg.Bucket,
+	}
+
+	instanceName, _, _ := testutil.RunGCPSpinCommand(t, spinArgs...)
+	require.NotEmpty(t, instanceName, "should get instance name")
+
+	t.Cleanup(func() {
+		testutil.RemoveGCPInstance(t, cfg.Project, cfg.Zone, instanceName)
+		testutil.CleanupGCSPrefix(t, cfg.Bucket, instanceName+"/")
+	})
+
+	// Wait for VM to finish booting and running startup script
+	// Without a prompt, startup.sh should run `tail -f /dev/null` and keep running
+	testutil.Sleep(t, 30)
+
+	// Verify VM is still running
+	status := testutil.GCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName)
+	assert.Equal(t, "RUNNING", status, "VM should stay RUNNING without a prompt for interactive use")
 }

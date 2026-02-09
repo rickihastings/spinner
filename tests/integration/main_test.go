@@ -55,24 +55,22 @@ func TestMain(m *testing.M) {
 		)
 
 		// Check if we should reuse existing image
+		// The image name already encodes the config hash, so existence is sufficient
+		// for validation — no need to also check image labels.
 		forceRebuild := os.Getenv("SPINNER_TEST_FORCE_REBUILD") == "1"
-		imageValid := testutil.ValidateSharedImage(nil,
-			gcpConfig.Project,
-			sharedImageName,
-			configHash,
-		)
+		imageExists := testutil.GCPImageExists(nil, gcpConfig.Project, sharedImageName)
 
 		var success bool
 
-		if imageValid && !forceRebuild {
+		if imageExists && !forceRebuild {
 			fmt.Printf("Reusing existing GCP image: %s\n", sharedImageName)
 
 			success = true
 		} else {
 			if forceRebuild {
 				fmt.Println("Force rebuild enabled, recreating image...")
-			} else if testutil.GCPImageExists(nil, gcpConfig.Project, sharedImageName) {
-				fmt.Println("Image exists but config changed, recreating...")
+			} else {
+				fmt.Printf("Image %s not found, creating...\n", sharedImageName)
 			}
 
 			success = createSharedGCPImage(gcpConfig, sharedImageName, configHash)
@@ -81,15 +79,16 @@ func TestMain(m *testing.M) {
 		if success {
 			fmt.Printf("Shared GCP image ready: %s\n", sharedImageName)
 
-			// Conditionally skip cleanup if KEEP_IMAGE is set
+			// Keep image by default for reuse (tests are too slow to rebuild each run).
+			// Set SPINNER_TEST_DELETE_IMAGE=1 to clean up after tests.
 			cleanupSharedImage = func() {
-				if os.Getenv("SPINNER_TEST_KEEP_IMAGE") == "1" {
-					fmt.Printf("Keeping shared image for reuse: %s\n", sharedImageName)
+				if os.Getenv("SPINNER_TEST_DELETE_IMAGE") == "1" {
+					fmt.Println("Cleaning up shared GCP test resources...")
+					testutil.RemoveGCPImage(nil, gcpConfig.Project, sharedImageName)
 					return
 				}
 
-				fmt.Println("Cleaning up shared GCP test resources...")
-				testutil.RemoveGCPImage(nil, gcpConfig.Project, sharedImageName)
+				fmt.Printf("Keeping shared image for reuse: %s\n", sharedImageName)
 			}
 		} else {
 			fmt.Println("WARNING: Failed to create shared GCP image. GCP tests will be skipped.")
@@ -135,7 +134,7 @@ func buildSharedBinary() string {
 }
 
 // createSharedGCPImage creates a single base GCP image for all tests.
-// This avoids creating 18+ separate images (35+ minutes each).
+// This avoids creating 18+ separate images (5+ minutes each).
 // Returns true if successful, false if failed (allowing tests to skip GCP).
 func createSharedGCPImage(cfg *testutil.GCPTestConfig, imageName, configHash string) bool {
 	// Delete existing image if present (we checked validity earlier)

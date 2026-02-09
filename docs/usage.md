@@ -368,10 +368,11 @@ gsutil cat gs://<state-bucket>/<instance-name>/state.json
 
 ### Auto-Stop Behavior
 
-GCP VMs automatically stop when the agent completes successfully (detects `~~ FEATURE_COMPLETED ~~` signal). This prevents wasted compute resources and reduces costs.
+GCP VMs automatically stop when the agent completes successfully **and a prompt was specified**. This prevents wasted compute resources and reduces costs for autonomous tasks.
 
 **Behavior:**
-- **Successful completion (exit 0):** VM stops automatically within 5 seconds
+- **Successful completion with prompt (exit 0):** VM stops automatically within 5 seconds
+- **Successful completion without prompt:** VM keeps running for interactive use
 - **Errors/rate limits (exit 1):** VM keeps running for debugging
 
 **To restart a stopped VM:**

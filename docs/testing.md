@@ -91,21 +91,22 @@ GCP integration tests use a shared image that takes 35+ minutes to bake. To avoi
 - Rebuilds only if missing or config changed
 
 **Environment Variables**:
-- `SPINNER_TEST_KEEP_IMAGE=1` - Persist image after tests (enable reuse)
+- `SPINNER_TEST_DELETE_IMAGE=1` - Delete image after tests (default: keep for reuse)
 - `SPINNER_TEST_FORCE_REBUILD=1` - Force rebuild ignoring existing image
 
 **Example Workflow**:
 ```bash
-# First run: create and keep image
-export SPINNER_TEST_KEEP_IMAGE=1
-go test ./tests/integration -run GCP  # 40 minutes
+# First run: creates image (~40 minutes)
+go test ./tests/integration -run GCP
 
-# Later runs: instant reuse
-go test ./tests/integration -run GCP  # 5 minutes
+# Later runs: reuses existing image (~5 minutes)
+go test ./tests/integration -run GCP
 
 # Force rebuild (tool updates, base image changes)
-export SPINNER_TEST_FORCE_REBUILD=1
-go test ./tests/integration -run GCP
+SPINNER_TEST_FORCE_REBUILD=1 go test ./tests/integration -run GCP
+
+# Delete image after tests (one-off cleanup)
+SPINNER_TEST_DELETE_IMAGE=1 go test ./tests/integration -run GCP
 ```
 
 **Manual Cleanup**:

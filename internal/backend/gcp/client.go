@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	compute "cloud.google.com/go/compute/apiv1"
@@ -457,7 +458,7 @@ func (c *RealGCPClient) ObjectSize(ctx context.Context, bucket, object string) (
 func (c *RealGCPClient) ObjectExists(ctx context.Context, bucket, object string) (bool, error) {
 	_, err := c.storage.Bucket(bucket).Object(object).Attrs(ctx)
 	if err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return false, nil
 		}
 

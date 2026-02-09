@@ -57,6 +57,9 @@ fi
 
 echo "Delegating to startup.sh..."
 
+# Disable set -e so we can capture the exit code from startup.sh
+set +e
+
 # Switch to spinner user and run startup in the workspace directory
 su - spinner -c "cd /home/spinner/workspace && \
     export GITHUB_TOKEN='${GITHUB_TOKEN}' && \
@@ -71,12 +74,14 @@ su - spinner -c "cd /home/spinner/workspace && \
     export LOG_DIR='${LOG_DIR}' && \
     export STATE_DIR='${STATE_DIR}' && \
     /usr/local/bin/startup.sh"
-
-# Capture exit code
 EXIT_CODE=$?
 
-# If spinner exec completed successfully (exit 0), shutdown VM
-if [ $EXIT_CODE -eq 0 ]; then
+# Re-enable set -e
+set -e
+
+# If spinner exec completed successfully (exit 0) AND a prompt was specified, shutdown VM
+# Without a prompt, the VM should keep running for interactive use
+if [ $EXIT_CODE -eq 0 ] && [ -n "$PROMPT" ]; then
     echo "Execution completed successfully. Stopping VM instance..."
     # Give logs/state a moment to flush
     sleep 2
@@ -84,5 +89,5 @@ if [ $EXIT_CODE -eq 0 ]; then
     sudo poweroff
 fi
 
-# For non-zero exit codes, keep VM running for debugging
+# For non-zero exit codes or when no prompt specified, keep VM running
 exit $EXIT_CODE
