@@ -39,7 +39,7 @@ var (
 			AdditionalWriter: additionalWriter,
 		})
 	}
-	pushChangesFunc = PushChanges
+	pushChangesFunc = pushChanges
 )
 
 // Runner executes the main iteration loop.
@@ -86,7 +86,7 @@ func NewRunner(config *Config, state *State, statePath string, opts ...RunnerOpt
 
 // saveState saves state locally and, if configured, syncs to a remote store.
 func (r *Runner) saveState() error {
-	err := SaveState(r.statePath, r.state)
+	err := saveState(r.statePath, r.state)
 	if err == nil && r.stateSync != nil {
 		r.stateSync(r.statePath)
 	}
@@ -108,7 +108,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		r.stateSync = r.stateSyncFactory(ctx)
 	}
 
-	r.state.Status = StatusRunning
+	r.state.Status = statusRunning
 	if err := r.saveState(); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to save initial state: %v\n", err)
 	}
@@ -133,7 +133,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		case <-ctx.Done():
 			fmt.Println("\n⚠️  Loop interrupted by user (Ctrl+C)")
 
-			r.state.Status = StatusError
+			r.state.Status = statusError
 			r.state.ErrorMessage = "interrupted by user"
 			_ = r.saveState()
 
@@ -161,7 +161,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error running Claude: %v\n", err)
 
-			r.state.Status = StatusError
+			r.state.Status = statusError
 			r.state.ErrorMessage = err.Error()
 			_ = r.saveState()
 
@@ -184,7 +184,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		if result.AuthError {
 			fmt.Println("\n\n❌ Authentication error detected - please run /login")
 
-			r.state.Status = StatusAuthError
+			r.state.Status = statusAuthError
 			r.state.ErrorMessage = result.ErrorMessage
 			_ = r.saveState()
 
@@ -195,7 +195,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		if result.Completed {
 			fmt.Println("\n\n🎯 ALL TASKS COMPLETE.")
 
-			r.state.Status = StatusCompleted
+			r.state.Status = statusCompleted
 			r.state.CompletedAt = time.Now()
 			_ = r.saveState()
 
@@ -204,14 +204,14 @@ func (r *Runner) Run(ctx context.Context) int {
 
 		// Check for rate limiting
 		if result.RateLimited {
-			r.state.Status = StatusRateLimited
+			r.state.Status = statusRateLimited
 			r.state.ErrorMessage = result.ErrorMessage
 			_ = r.saveState()
 
 			waitForRateLimit(ctx)
 
 			// Reset status and don't increment iteration (redo this iteration)
-			r.state.Status = StatusRunning
+			r.state.Status = statusRunning
 			r.state.ErrorMessage = ""
 			r.state.Iteration--
 
@@ -222,7 +222,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		if result.Error != nil {
 			fmt.Fprintf(os.Stderr, "\n⚠️  Error during iteration: %v\n", result.Error)
 
-			r.state.Status = StatusError
+			r.state.Status = statusError
 			r.state.ErrorMessage = result.ErrorMessage
 			_ = r.saveState()
 			// Continue to next iteration instead of exiting
@@ -233,7 +233,7 @@ func (r *Runner) Run(ctx context.Context) int {
 
 	// Max iterations reached
 	fmt.Printf("\n⚠️  Max iterations (%d) reached\n", r.config.MaxIterations)
-	r.state.Status = StatusError
+	r.state.Status = statusError
 	r.state.ErrorMessage = "max iterations reached"
 	_ = r.saveState()
 

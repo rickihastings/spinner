@@ -139,46 +139,6 @@ func TestGCPFlags_UnknownBackendError(t *testing.T) {
 	}
 }
 
-// TestGCPFlags_ConfigFileLoading tests that .spinner.json config file is loaded and provides defaults.
-func TestGCPFlags_ConfigFileLoading(t *testing.T) {
-
-	// Create a temporary directory with a .spinner.json
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, ".spinner.json")
-
-	// Write config file with GCP defaults
-	configContent := `{
-  "backend": "gcp",
-  "project": "config-project",
-  "zone": "us-west1-b",
-  "state-bucket": "config-bucket"
-}`
-
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write config file: %v", err)
-	}
-
-	// Run a command from that directory — the config should be picked up
-	// Since we can't easily change the working directory of the subprocess,
-	// and Viper reads from ".", we test that config file values are read
-	// by verifying that the setup command doesn't require explicit flags
-	// when the config file provides them.
-	//
-	// Note: This test verifies the config loading mechanism works. The actual
-	// precedence (CLI > env > config > defaults) is tested in unit tests for
-	// the helpers.go functions. The integration test focuses on end-to-end
-	// validation behavior.
-	t.Run("config file values are silently ignored cross-backend", func(t *testing.T) {
-		// When using Docker backend, GCP config file values should be silently ignored
-		// (not cause errors). This doesn't require actual Docker or GCP.
-		// The test is that the CLI doesn't error about GCP flags being set.
-		// However, since we can't change the subprocess working directory easily,
-		// this test verifies the concept through the flag validation tests above.
-		t.Log("Config file cross-backend silence is verified by the flag validation tests")
-	})
-}
-
 // TestGCPFlags_PrecedenceChain tests the flag precedence: CLI > env > config > defaults.
 func TestGCPFlags_PrecedenceChain(t *testing.T) {
 

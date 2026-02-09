@@ -89,5 +89,21 @@ if [ $EXIT_CODE -eq 0 ] && [ -n "$PROMPT" ]; then
     sudo poweroff
 fi
 
+ # For non-zero exit codes, write error state to GCS so watchers can detect the failure
+if [ $EXIT_CODE -ne 0 ] && [ -n "$SPINNER_STATE_BUCKET" ] && [ -n "$SPINNER_INSTANCE_NAME" ]; then
+    echo "Startup failed with exit code $EXIT_CODE. Writing error state to GCS..."
+    STATE_JSON=$(cat <<STATEEOF
+{
+  "iteration": 0,
+  "status": "error",
+  "error_message": "startup script failed with exit code $EXIT_CODE",
+  "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+STATEEOF
+)
+    echo "$STATE_JSON" | gsutil -q cp - "gs://${SPINNER_STATE_BUCKET}/${SPINNER_INSTANCE_NAME}/state.json" || true
+fi
+
 # For non-zero exit codes or when no prompt specified, keep VM running
 exit $EXIT_CODE

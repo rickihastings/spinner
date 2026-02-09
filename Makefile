@@ -1,4 +1,4 @@
-.PHONY: build test lint format format-check install-hooks clean release snapshot
+.PHONY: build test lint format format-check install-hooks clean release snapshot bake-dev
 
 # Version information
 VERSION ?= dev
@@ -13,17 +13,20 @@ LDFLAGS := -s -w \
 build:
 	go build -ldflags "$(LDFLAGS)" -o dist/spinner
 
-# Run unit tests (builds first)
-test: build
-	go test ./internal/...
+# Run unit tests
+test:
+	go test ./internal/... -v
 
-# Run docker tests (builds first)
-test-docker: build
-	go test ./tests/integration/ -run Docker
+# Run docker tests
+test-docker:
+	go test ./tests/integration/ -v -run Docker
 
-# Run gcp tests (builds first)
-test-gcp: build
-	go test ./tests/integration/ -run GCP -timeout 20m
+# Run gcp tests
+test-gcp:
+	go test ./tests/integration/ -v -run GCP -timeout 20m
+
+# Run all tests
+test-all: test test-docker test-gcp
 
 # Run linter
 lint:
@@ -60,3 +63,7 @@ release:
 # Create a snapshot release (for testing, no tag required)
 snapshot:
 	goreleaser release --snapshot --clean
+
+# Bake GCP dev image with Go, Docker, Tailscale, and golangci-lint
+bake-dev: build
+	./dist/spinner setup --name spinner-dev --bake-script ./scripts/dev-bake.sh
