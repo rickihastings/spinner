@@ -555,3 +555,175 @@ func TestSpinCommand_CLIFlagOverridesEnvVar(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "--project is required")
 }
+
+// TestParseAndValidateEnvVars_ValidCases tests valid env var parsing
+func TestParseAndValidateEnvVars_ValidCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected map[string]string
+	}{
+		{
+			name:     "single env var",
+			input:    []string{"NPM_TOKEN=abc123"},
+			expected: map[string]string{"NPM_TOKEN": "abc123"},
+		},
+		{
+			name:  "multiple env vars",
+			input: []string{"NPM_TOKEN=abc", "MY_API_KEY=xyz"},
+			expected: map[string]string{
+				"NPM_TOKEN":  "abc",
+				"MY_API_KEY": "xyz",
+			},
+		},
+		{
+			name:     "env var with equals in value",
+			input:    []string{"CONFIG=key=value"},
+			expected: map[string]string{"CONFIG": "key=value"},
+		},
+		{
+			name:     "env var with empty value",
+			input:    []string{"MY_VAR="},
+			expected: map[string]string{"MY_VAR": ""},
+		},
+		{
+			name:     "env var with spaces in value",
+			input:    []string{"MESSAGE=hello world"},
+			expected: map[string]string{"MESSAGE": "hello world"},
+		},
+		{
+			name:     "no env vars",
+			input:    []string{},
+			expected: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseAndValidateEnvVars(tt.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestParseAndValidateEnvVars_InvalidFormat tests invalid format handling
+func TestParseAndValidateEnvVars_InvalidFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		errorMsg string
+	}{
+		{
+			name:     "no equals sign",
+			input:    []string{"INVALID"},
+			errorMsg: "--env: invalid format \"INVALID\", expected KEY=VALUE",
+		},
+		{
+			name:     "empty key",
+			input:    []string{"=value"},
+			errorMsg: "--env: key must not be empty",
+		},
+		{
+			name:     "multiple invalid vars",
+			input:    []string{"VALID=123", "INVALID"},
+			errorMsg: "--env: invalid format \"INVALID\", expected KEY=VALUE",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseAndValidateEnvVars(tt.input)
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), tt.errorMsg)
+		})
+	}
+}
+
+// TestParseAndValidateEnvVars_ReservedVars tests that reserved variables are rejected
+func TestParseAndValidateEnvVars_ReservedVars(t *testing.T) {
+	reservedVars := []string{
+		"GITHUB_TOKEN",
+		"CLAUDE_CODE_OAUTH_TOKEN",
+		"REPO_URL",
+		"PROMPT",
+		"BRANCH",
+		"MAX_ITERATIONS",
+		"LOG_DIR",
+		"STATE_DIR",
+		"SPINNER_LOG_BUCKET",
+		"SPINNER_STATE_BUCKET",
+		"SPINNER_INSTANCE_NAME",
+	}
+
+	for _, reserved := range reservedVars {
+		t.Run(reserved, func(t *testing.T) {
+			result, err := parseAndValidateEnvVars([]string{reserved + "=override"})
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "cannot override reserved variable")
+			assert.Contains(t, err.Error(), reserved)
+		})
+	}
+}
+
+// TestSpinCommand_EnvFlagParsing tests that --env flag is correctly parsed and passed through
+func TestSpinCommand_EnvFlagParsing(t *testing.T) {
+	cmd := setupSpinCommandWithMocks(t)
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--env", "NPM_TOKEN=abc123",
+		"--env", "MY_API_KEY=xyz",
+	})
+
+	err := cmd.Execute()
+
+	assert.NoError(t, err)
+}
+
+// TestSpinCommand_EnvFlagInvalidFormat tests that invalid --env format produces error
+func TestSpinCommand_EnvFlagInvalidFormat(t *testing.T) {
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--env", "INVALID",
+	})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "--env: invalid format")
+}
+
+// TestSpinCommand_EnvFlagReservedVar tests that reserved vars cannot be overridden
+func TestSpinCommand_EnvFlagReservedVar(t *testing.T) {
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--env", "GITHUB_TOKEN=override",
+	})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot override reserved variable")
+	assert.Contains(t, err.Error(), "GITHUB_TOKEN")
+}

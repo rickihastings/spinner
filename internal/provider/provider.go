@@ -63,13 +63,15 @@ type SetupConfig struct {
 // CreateConfig holds configuration for creating an instance from a provisioned
 // environment. Repo, Prompt, Branch, and MaxIterations are universal —
 // every backend needs to know what code to run and how. Options carries
-// backend-specific keys: e.g. "image" for Docker.
+// backend-specific keys: e.g. "image" for Docker. EnvVars carries custom
+// environment variables from the --env flag.
 type CreateConfig struct {
 	Repo          string
 	Prompt        string
 	Branch        string
 	MaxIterations string
 	Options       map[string]string
+	EnvVars       map[string]string
 }
 
 // Instance represents an execution environment instance.

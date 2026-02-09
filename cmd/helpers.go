@@ -32,6 +32,7 @@ const (
 	flagDiskSize      = "disk-size"
 	flagStateBucket   = "state-bucket"
 	flagBakeScript    = "bake-script"
+	flagEnv           = "env"
 )
 
 // GCP default values.

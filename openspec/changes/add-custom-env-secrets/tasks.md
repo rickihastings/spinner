@@ -2,11 +2,11 @@
 
 ## 1.0 Core `--env` Flag and Provider Plumbing
 
-- [ ] 1.1 Add `flagEnv` constant to `cmd/helpers.go` and `EnvVars map[string]string` field to `provider.CreateConfig`
-- [ ] 1.2 Add `--env` flag (StringSliceVar) to `cmd/spin.go`, parse `KEY=VALUE` pairs into map, validate format and reserved vars
-- [ ] 1.3 Pass parsed `EnvVars` map from spin command into `CreateConfig`
-- [ ] 1.4 Add unit tests for `--env` flag parsing: valid pairs, multiple vars, equals-in-value, empty value, invalid format, empty key, reserved var rejection
-- [ ] 1.5 Verify build and all existing tests pass
+- [x] 1.1 Add `flagEnv` constant to `cmd/helpers.go` and `EnvVars map[string]string` field to `provider.CreateConfig`
+- [x] 1.2 Add `--env` flag (StringSliceVar) to `cmd/spin.go`, parse `KEY=VALUE` pairs into map, validate format and reserved vars
+- [x] 1.3 Pass parsed `EnvVars` map from spin command into `CreateConfig`
+- [x] 1.4 Add unit tests for `--env` flag parsing: valid pairs, multiple vars, equals-in-value, empty value, invalid format, empty key, reserved var rejection
+- [x] 1.5 Verify build and all existing tests pass
 
 ## 2.0 Docker Backend: `--env-file` Implementation
 

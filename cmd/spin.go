@@ -31,6 +31,7 @@ func NewSpinCommand(f *provider.Factory) *cobra.Command {
 		spinRecreate      bool
 		spinSetup         bool
 		spinWatch         bool
+		spinEnvVars       []string
 	)
 
 	cmd := &cobra.Command{
@@ -101,6 +102,12 @@ EXAMPLES:
 			spinSetup = viper.GetBool(flagSetup)
 			spinWatch = viper.GetBool(flagWatch)
 
+			// Parse and validate custom env vars
+			envVars, err := parseAndValidateEnvVars(spinEnvVars)
+			if err != nil {
+				return err
+			}
+
 			if spinImage == "" {
 				return fmt.Errorf("--image flag is required")
 			}
@@ -159,6 +166,7 @@ EXAMPLES:
 				Branch:        spinBranch,
 				MaxIterations: spinMaxIterations,
 				Options:       createOptions,
+				EnvVars:       envVars,
 			}
 
 			name := p.InstanceName(createConfig)
@@ -250,6 +258,7 @@ EXAMPLES:
 	cmd.Flags().BoolVar(&spinSetup, flagSetup, false, "Build/rebuild the environment before spinning (optional)")
 	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 	cmd.Flags().BoolVar(&spinWatch, flagWatch, false, "Enter watch mode after instance is ready (optional)")
+	cmd.Flags().StringSliceVar(&spinEnvVars, flagEnv, []string{}, "Custom environment variables (KEY=VALUE, repeatable)")
 
 	// Docker backend flags
 	cmd.Flags().String(flagBaseImage, "", "Base Docker image (Docker backend, requires --setup)")
@@ -264,4 +273,50 @@ EXAMPLES:
 	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
 
 	return cmd
+}
+
+// parseAndValidateEnvVars parses a list of KEY=VALUE strings into a map
+// and validates the format and reserved variable names.
+func parseAndValidateEnvVars(envVars []string) (map[string]string, error) {
+	result := make(map[string]string)
+
+	// Reserved variables that cannot be overridden
+	reserved := map[string]bool{
+		"GITHUB_TOKEN":           true,
+		"CLAUDE_CODE_OAUTH_TOKEN": true,
+		"REPO_URL":               true,
+		"PROMPT":                 true,
+		"BRANCH":                 true,
+		"MAX_ITERATIONS":         true,
+		"LOG_DIR":                true,
+		"STATE_DIR":              true,
+		"SPINNER_LOG_BUCKET":     true,
+		"SPINNER_STATE_BUCKET":   true,
+		"SPINNER_INSTANCE_NAME":  true,
+	}
+
+	for _, env := range envVars {
+		// Split on first '=' only
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("--env: invalid format %q, expected KEY=VALUE", env)
+		}
+
+		key := parts[0]
+		value := parts[1]
+
+		// Validate key is not empty
+		if key == "" {
+			return nil, fmt.Errorf("--env: key must not be empty")
+		}
+
+		// Validate key is not reserved
+		if reserved[key] {
+			return nil, fmt.Errorf("--env: cannot override reserved variable %q", key)
+		}
+
+		result[key] = value
+	}
+
+	return result, nil
 }
