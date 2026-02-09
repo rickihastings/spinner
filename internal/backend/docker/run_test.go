@@ -286,7 +286,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			containerName: "spinner-test-repo",
 			hasNpmrc:      false,
 			expectedArgs: []string{
-				"-e", "PROMPT='fix the bug'",
+				"-e", "PROMPT=fix the bug",
 				"-e", "MAX_ITERATIONS=100",
 				"-e", "LOG_DIR=/logs",
 			},
@@ -303,7 +303,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			containerName: "spinner-test-repo",
 			hasNpmrc:      false,
 			expectedArgs: []string{
-				"-e", "PROMPT='add feature'",
+				"-e", "PROMPT=add feature",
 				"-e", "MAX_ITERATIONS=50",
 				"-e", "LOG_DIR=/logs",
 			},
@@ -320,8 +320,8 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			containerName: "spinner-test-repo-feature-new",
 			hasNpmrc:      false,
 			expectedArgs: []string{
-				"-e", "PROMPT='test task'",
-				"-e", "BRANCH='feature/new'",
+				"-e", "PROMPT=test task",
+				"-e", "BRANCH=feature/new",
 				"-e", "LOG_DIR=/logs",
 			},
 			description: "should include branch when provided with prompt",
@@ -336,7 +336,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			containerName: "spinner-test-repo-develop",
 			hasNpmrc:      false,
 			expectedArgs: []string{
-				"-e", "BRANCH='develop'",
+				"-e", "BRANCH=develop",
 			},
 			unexpectedArgs: []string{"PROMPT=", "MAX_ITERATIONS=", "LOG_DIR="},
 			description:    "should include branch even without prompt",

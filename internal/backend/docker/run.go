@@ -129,12 +129,12 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 
 	// Add branch if specified
 	if config.Branch != "" {
-		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("BRANCH=%s", escapeShellArg(config.Branch)))
+		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("BRANCH=%s", config.Branch))
 	}
 
 	// Add Ralph loop environment variables if prompt is provided
 	if config.Prompt != "" {
-		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("PROMPT=%s", escapeShellArg(config.Prompt)))
+		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("PROMPT=%s", config.Prompt))
 
 		maxIterations := config.MaxIterations
 		if maxIterations == "" {

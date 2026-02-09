@@ -45,6 +45,9 @@ type ContainerMetrics struct {
 	// MemoryPercent is the memory usage as a percentage (0-100)
 	MemoryPercent float64
 
+	// Iteration is the current iteration count from the state file
+	Iteration int
+
 	// Error contains any error that occurred during metrics collection
 	Error error
 }

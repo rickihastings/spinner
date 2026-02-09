@@ -270,17 +270,6 @@ func (ui *WatchUI) appendLog(event agent.Event) {
 		}
 	}
 
-	// Track iterations from assistant messages
-	if event.Type == "assistant_message" {
-		ui.mu.Lock()
-		ui.currentIter++
-		ui.mu.Unlock()
-		// Trigger header update to show new iteration count
-		ui.app.QueueUpdateDraw(func() {
-			ui.renderHeader()
-		})
-	}
-
 	ui.app.QueueUpdateDraw(func() {
 		var line string
 
@@ -303,6 +292,11 @@ func (ui *WatchUI) appendLog(event agent.Event) {
 func (ui *WatchUI) updateMetrics(m provider.ContainerMetrics) {
 	ui.mu.Lock()
 	ui.lastMetrics = m
+
+	if m.Iteration > 0 {
+		ui.currentIter = m.Iteration
+	}
+
 	ui.mu.Unlock()
 
 	ui.app.QueueUpdateDraw(func() {

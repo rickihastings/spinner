@@ -41,7 +41,14 @@ func newLogWatcher(containerName string, parser agent.LineParser) (*logWatcher, 
 	}, nil
 }
 
+// headLines is the number of lines captured from the start of the log file.
+// These are always included alongside the tail to ensure early events like
+// system_init (which contains the model name) are not lost.
+const headLines = 5
+
 // tailExistingLines reads the last N lines from the log file and returns them as raw strings.
+// It also always includes the first few lines of the file so that early events
+// (e.g. system_init) are captured even for long-running containers.
 func (lw *logWatcher) tailExistingLines(_ context.Context, numLines int) ([]string, error) {
 	logFilePath := filepath.Join(lw.logsDir, "raw.log")
 
@@ -64,6 +71,10 @@ func (lw *logWatcher) tailExistingLines(_ context.Context, numLines int) ([]stri
 	ringIdx := 0
 	ringCount := 0
 
+	// Also capture the first few lines for early events like system_init
+	head := make([]string, 0, headLines)
+	totalLines := 0
+
 	scanner := bufio.NewScanner(file)
 	// Increase buffer for large JSON lines
 	buf := make([]byte, 0, 64*1024)
@@ -74,6 +85,13 @@ func (lw *logWatcher) tailExistingLines(_ context.Context, numLines int) ([]stri
 		if line == "" {
 			continue
 		}
+
+		// Capture head lines
+		if totalLines < headLines {
+			head = append(head, line)
+		}
+
+		totalLines++
 
 		ring[ringIdx] = line
 
@@ -88,7 +106,7 @@ func (lw *logWatcher) tailExistingLines(_ context.Context, numLines int) ([]stri
 	}
 
 	// Reconstruct the last N lines in order from the ring buffer.
-	var lines []string
+	var tail []string
 
 	start := 0
 	if ringCount == numLines {
@@ -97,8 +115,28 @@ func (lw *logWatcher) tailExistingLines(_ context.Context, numLines int) ([]stri
 
 	for i := 0; i < ringCount; i++ {
 		line := ring[(start+i)%numLines]
-		lines = append(lines, line)
+		tail = append(tail, line)
 	}
+
+	// If the file is short enough that head overlaps with tail, just return tail
+	if totalLines <= numLines {
+		return tail, nil
+	}
+
+	// Prepend head lines that aren't already in the tail window
+	// Head lines are from positions 0..len(head)-1, tail starts at totalLines-numLines.
+	// If head count < totalLines-numLines, none overlap.
+	tailStart := totalLines - numLines
+
+	var lines []string
+
+	for i, line := range head {
+		if i < tailStart {
+			lines = append(lines, line)
+		}
+	}
+
+	lines = append(lines, tail...)
 
 	return lines, nil
 }
@@ -232,4 +270,3 @@ FileExists:
 		}
 	}
 }
-

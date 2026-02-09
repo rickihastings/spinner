@@ -13,6 +13,7 @@ import (
 
 	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	execpkg "github.com/rickihastings/spinner/internal/exec"
 	"github.com/rickihastings/spinner/internal/provider"
 )
 
@@ -190,13 +191,35 @@ func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName str
 		memoryPercent = (float64(memoryUsed) / float64(memoryLimit)) * 100.0
 	}
 
-	return provider.ContainerMetrics{
+	metrics := provider.ContainerMetrics{
 		State:         state,
 		CPUPercent:    cpuPercent,
 		MemoryUsed:    memoryUsed,
 		MemoryLimit:   memoryLimit,
 		MemoryPercent: memoryPercent,
 	}
+
+	// Read iteration count from state file
+	metrics.Iteration = readIterationFromState(containerName)
+
+	return metrics
+}
+
+// readIterationFromState reads the current iteration count from the container's state file.
+func readIterationFromState(containerName string) int {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return 0
+	}
+
+	statePath := filepath.Join(homeDir, ".spinner", containerName, "state", "state.json")
+
+	state, err := execpkg.LoadState(statePath)
+	if err != nil {
+		return 0
+	}
+
+	return state.Iteration
 }
 
 // mapDockerStateToMetrics converts Docker container state to provider.ContainerState type

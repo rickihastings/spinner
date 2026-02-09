@@ -177,15 +177,23 @@ func TestTailExistingLogs_RingBufferKeepsLastN(t *testing.T) {
 	logsDir := filepath.Join(tmpDir, "logs")
 	require.NoError(t, os.MkdirAll(logsDir, 0755))
 
-	// Write 5 lines, request only last 2
-	lines := []string{"line-a", "line-b", "line-c", "line-d", "line-e"}
-	content := strings.Join(lines, "\n") + "\n"
+	// Write 10 lines, request only last 2. Head lines (first 5) should also be included.
+	allLines := []string{
+		"line-0", "line-1", "line-2", "line-3", "line-4",
+		"line-5", "line-6", "line-7", "line-8", "line-9",
+	}
+	content := strings.Join(allLines, "\n") + "\n"
 	require.NoError(t, os.WriteFile(filepath.Join(logsDir, "raw.log"), []byte(content), 0644))
 
 	mock := &mockLineParser{
 		responses: map[string]*agent.Event{
-			"line-d": {Type: "event-d", Timestamp: time.Now()},
-			"line-e": {Type: "event-e", Timestamp: time.Now()},
+			"line-0": {Type: "event-0", Timestamp: time.Now()},
+			"line-1": {Type: "event-1", Timestamp: time.Now()},
+			"line-2": {Type: "event-2", Timestamp: time.Now()},
+			"line-3": {Type: "event-3", Timestamp: time.Now()},
+			"line-4": {Type: "event-4", Timestamp: time.Now()},
+			"line-8": {Type: "event-8", Timestamp: time.Now()},
+			"line-9": {Type: "event-9", Timestamp: time.Now()},
 		},
 	}
 
@@ -198,10 +206,34 @@ func TestTailExistingLogs_RingBufferKeepsLastN(t *testing.T) {
 	events, err := lw.tailExistingLogs(context.Background(), 2)
 	require.NoError(t, err)
 
-	// Only last 2 lines were parsed
-	assert.Len(t, events, 2)
-	assert.Equal(t, "event-d", events[0].Type)
-	assert.Equal(t, "event-e", events[1].Type)
-	// Verify the mock only saw the last 2 lines
-	assert.Equal(t, []string{"line-d", "line-e"}, mock.calls)
+	// Should include head lines (first 5) + tail lines (last 2) = 7 events
+	assert.Len(t, events, 7)
+	assert.Equal(t, "event-0", events[0].Type)
+	assert.Equal(t, "event-4", events[4].Type)
+	assert.Equal(t, "event-8", events[5].Type)
+	assert.Equal(t, "event-9", events[6].Type)
+}
+
+func TestTailExistingLines_HeadOverlapWithTail(t *testing.T) {
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	require.NoError(t, os.MkdirAll(logsDir, 0755))
+
+	// Write 4 lines, request last 3. Head (first 5) fully overlaps with tail,
+	// so only tail should be returned (no duplicates).
+	allLines := []string{"line-a", "line-b", "line-c", "line-d"}
+	content := strings.Join(allLines, "\n") + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(logsDir, "raw.log"), []byte(content), 0644))
+
+	lw := &logWatcher{
+		containerName: "test",
+		logsDir:       logsDir,
+	}
+
+	lines, err := lw.tailExistingLines(context.Background(), 3)
+	require.NoError(t, err)
+
+	// Total lines (4) <= numLines (3) is false, but head (4 lines) all overlap with tail start (4-3=1).
+	// Head lines at index 0 don't overlap (0 < 1), so we get head[0] + tail.
+	assert.Equal(t, []string{"line-a", "line-b", "line-c", "line-d"}, lines)
 }
