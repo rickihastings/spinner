@@ -285,6 +285,7 @@ Or use `--recreate` on the next run to start fresh.
 For detailed walkthroughs, see the [guides](docs/guides/) directory:
 
 - **[Docker Sandbox Guide](docs/guides/docker.md)** — Setting up sandbox images, running interactive or autonomous containers, and monitoring progress with watch mode
+- **[GCP Sandbox Guide](docs/guides/gcp.md)** — Baking VM images, custom bake scripts, running agents on GCP VMs, auto-stop behavior, and state persistence with GCS
 
 ## Development
 

@@ -192,13 +192,13 @@ cat ~/.spinner/<container-name>/logs/raw.log
 
 The state file tracks:
 
-| Field | Description |
-|-------|-------------|
-| `iteration` | Current iteration number |
-| `status` | `running`, `completed`, `rate_limited`, `error`, or `auth_error` |
-| `started_at` | When execution started |
-| `completed_at` | When execution finished (if done) |
-| `error_message` | Error details (if any) |
+| Field           | Description                                                      |
+|-----------------|------------------------------------------------------------------|
+| `iteration`     | Current iteration number                                         |
+| `status`        | `running`, `completed`, `rate_limited`, `error`, or `auth_error` |
+| `started_at`    | When execution started                                           |
+| `completed_at`  | When execution finished (if done)                                |
+| `error_message` | Error details (if any)                                           |
 
 ### Stopping a Container
 
@@ -215,13 +215,13 @@ If Claude hits an API rate limit during autonomous execution, Spinner automatica
 
 ## Quick Reference
 
-| Task | Command |
-|------|---------|
-| Build a sandbox image | `spinner setup --name my-sandbox` |
-| Interactive sandbox | `spinner spin --image my-sandbox --repo <url>` |
-| Autonomous agent | `spinner spin --image my-sandbox --repo <url> --prompt "task"` |
-| Watch live | `spinner spin --image my-sandbox --repo <url> --prompt "task" --watch` |
-| Watch existing | `spinner watch <container-name>` |
-| Recreate container | `spinner spin --image my-sandbox --repo <url> --recreate` |
-| Check state | `cat ~/.spinner/<container-name>/state/state.json` |
-| Update spinner | `spinner update` |
+| Task                   | Command                                                                |
+|------------------------|------------------------------------------------------------------------|
+| Build a sandbox image  | `spinner setup --name my-sandbox`                                      |
+| Interactive sandbox    | `spinner spin --image my-sandbox --repo <url>`                         |
+| Autonomous agent       | `spinner spin --image my-sandbox --repo <url> --prompt "task"`         |
+| Watch live             | `spinner spin --image my-sandbox --repo <url> --prompt "task" --watch` |
+| Watch existing         | `spinner watch <container-name>`                                       |
+| Recreate container     | `spinner spin --image my-sandbox --repo <url> --recreate`              |
+| Check state            | `cat ~/.spinner/<container-name>/state/state.json`                     |
+| Update spinner         | `spinner update`                                                       |
