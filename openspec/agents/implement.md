@@ -25,11 +25,11 @@ A "slice" is the X.0 header AND ALL its numbered sub-tasks:
 - ALWAYS halt after completing and committing a slice
 - Never automatically continue to the next slice
 
-**STOPPING CONDITIONS:**
+**STOPPING CONDITIONS (read carefully - the completion signal must ONLY appear when every slice is done):**
 
-- After completing a slice → Check if uncompleted slices remain
-  - **Remaining slices exist** → HALT (do not show signal)
-  - **NO remaining slices** → Output `~~ FEATURE_COMPLETED ~~`, then HALT
+- After completing a slice → Read tasks.md and check if ANY uncompleted slices remain
+  - **ANY uncompleted slices remain** → HALT immediately. Do NOT output `~~ FEATURE_COMPLETED ~~`. No signal whatsoever.
+  - **ALL slices are complete (zero uncompleted slices in the entire tasks.md)** → Output `~~ FEATURE_COMPLETED ~~`, then HALT
 
 ## Implementation Workflow
 
@@ -105,10 +105,10 @@ After finalizing the slice, check for remaining work:
 # Look for ## X.0 headings with unchecked sub-tasks
 ```
 
-**Decision:**
+**Decision (the completion signal must ONLY appear when every slice is done):**
 
-- **Uncompleted slices remain** → HALT. Do not show any signal. Stop execution.
-- **All slices complete** → Output `~~ FEATURE_COMPLETED ~~`, then HALT.
+- **ANY uncompleted slices remain** → HALT immediately. Do NOT output `~~ FEATURE_COMPLETED ~~`. No signal whatsoever. Stop execution.
+- **ALL slices are complete (zero remaining in the entire tasks.md)** → Output `~~ FEATURE_COMPLETED ~~`, then HALT.
 
 **CRITICAL:** Never continue to the next slice automatically. Always halt after completing one vertical slice.
 

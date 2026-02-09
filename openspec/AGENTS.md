@@ -11,7 +11,9 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 - Implement ONLY ONE vertical slice (X.0) per session
 - Complete ALL sub-tasks (X.1, X.2, X.3...) for that slice
 - DO NOT proceed to (X+1).0 under any circumstances
-- After completing X.0: output `~~ FEATURE_COMPLETED ~~` if no more slices exist then STOP, else STOP IMMEDIATELY
+- After completing X.0: check tasks.md for remaining uncompleted slices
+  - **If uncompleted slices remain** → STOP IMMEDIATELY without outputting any signal
+  - **If ALL slices are complete (none remaining)** → output `~~ FEATURE_COMPLETED ~~`, then STOP
 
 **EACH SLICE MUST INCLUDE:**
 
@@ -86,7 +88,9 @@ changes, tests for existing behavior
 - Complete entire slice before stopping; each commit = valid, tested state
 - Never defer tests; they're part of the slice (unless task list specifies otherwise)
 - Update spec immediately if implementation diverges
-- On completion: output `~~ FEATURE_COMPLETED ~~` if no more slices, else HALT
+- On completion: check if uncompleted slices remain in tasks.md
+  - **Uncompleted slices remain** → HALT without outputting any signal
+  - **ALL slices complete** → output `~~ FEATURE_COMPLETED ~~`, then HALT
 
 ### Stage 3: Archiving Changes
 

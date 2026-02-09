@@ -1,8 +1,21 @@
-FROM ubuntu:22.04
+FROM golang:1.24-bookworm
+
+# Install development tools
+RUN apt-get update && apt-get install -y \
+    git \
+    make \
+    docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install golangci-lint
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 WORKDIR /workspace
 
-# Install essential tools
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+# Cache Go module dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
 
 CMD ["/bin/bash"]
