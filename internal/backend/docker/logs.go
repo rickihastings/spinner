@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -178,10 +180,12 @@ FileExists:
 		return fmt.Errorf("failed to watch log file: %w", err)
 	}
 
-	// Create scanner for reading new lines with larger buffer for JSON
-	scanner := bufio.NewScanner(file)
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024) // 1MB max
+	// Use bufio.Reader instead of bufio.Scanner to avoid the EOF-stuck bug:
+	// bufio.Scanner sets an internal error state on io.EOF and never retries,
+	// so new data appended to the file after EOF is never read.
+	// bufio.Reader does not have this problem — ReadString will read new data
+	// on subsequent calls even after returning io.EOF.
+	reader := bufio.NewReaderSize(file, 1024*1024) // 1MB buffer for large JSON lines
 
 	for {
 		select {
@@ -192,22 +196,27 @@ FileExists:
 
 			// Only process write events
 			if fsEvent.Op&fsnotify.Write == fsnotify.Write {
-				// Read new lines
-				for scanner.Scan() {
-					line := scanner.Text()
-					if line == "" {
-						continue
+				// Read all available new lines
+				for {
+					line, err := reader.ReadString('\n')
+					if line != "" {
+						trimmed := strings.TrimRight(line, "\n\r")
+						if trimmed != "" {
+							select {
+							case lineCh <- trimmed:
+							case <-ctx.Done():
+								return ctx.Err()
+							}
+						}
 					}
 
-					select {
-					case lineCh <- line:
-					case <-ctx.Done():
-						return ctx.Err()
-					}
-				}
+					if err != nil {
+						if err == io.EOF {
+							break // No more data right now, wait for next write event
+						}
 
-				if err := scanner.Err(); err != nil {
-					return fmt.Errorf("error reading log file: %w", err)
+						return fmt.Errorf("error reading log file: %w", err)
+					}
 				}
 			}
 
@@ -224,29 +233,3 @@ FileExists:
 	}
 }
 
-// watchLogs watches for new log entries and streams parsed events to the provided channel.
-func (lw *logWatcher) watchLogs(ctx context.Context, logCh chan<- agent.Event) error {
-	// Create a channel for raw lines
-	lineCh := make(chan string, 100)
-
-	// Start WatchLines in a goroutine
-	go func() {
-		defer close(lineCh)
-
-		_ = lw.watchLines(ctx, lineCh)
-	}()
-
-	// Parse lines and send events
-	for line := range lineCh {
-		event := lw.parser.ParseLine(line)
-		if event != nil {
-			select {
-			case logCh <- *event:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-	}
-
-	return nil
-}

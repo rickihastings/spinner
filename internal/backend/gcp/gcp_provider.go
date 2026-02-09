@@ -349,6 +349,10 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 						_ = fmt.Errorf("failed to parse max iterations: %s", value)
 					}
 				}
+			case "BRANCH":
+				if value != "" {
+					metadata.Branch = value
+				}
 			}
 		}
 	}

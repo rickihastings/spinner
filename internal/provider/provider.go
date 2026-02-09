@@ -94,6 +94,9 @@ type InstanceMetadata struct {
 
 	// MaxIterations is the configured iteration limit (if available from environment)
 	MaxIterations int
+
+	// Branch is the git branch being worked on inside the instance
+	Branch string
 }
 
 // Provider is the backend-agnostic interface for managing isolated execution

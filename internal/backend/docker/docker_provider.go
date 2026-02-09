@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rickihastings/spinner/internal/provider"
 )
@@ -242,16 +243,21 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 		ImageID:    getDockerImageID(name),
 	}
 
-	// Try to get agent and max iterations from environment variables
-	// These are set in the container at creation time
-	if model := os.Getenv("ANTHROPIC_MODEL"); model != "" {
+	// Read environment variables from the container (not the host process)
+	envVars := getContainerEnvVars(name)
+
+	if model, ok := envVars["ANTHROPIC_MODEL"]; ok && model != "" {
 		metadata.Agent = model
 	}
 
-	if maxIter := os.Getenv("MAX_ITERATIONS"); maxIter != "" {
+	if maxIter, ok := envVars["MAX_ITERATIONS"]; ok && maxIter != "" {
 		if val, parseErr := fmt.Sscanf(maxIter, "%d", &metadata.MaxIterations); parseErr != nil || val != 1 {
 			_ = fmt.Errorf("failed to parse max iterations: %s", maxIter)
 		}
+	}
+
+	if branch, ok := envVars["BRANCH"]; ok && branch != "" {
+		metadata.Branch = branch
 	}
 
 	return metadata, nil
@@ -285,6 +291,34 @@ func getDockerImageID(containerName string) string {
 	}
 
 	return result
+}
+
+// getContainerEnvVars reads environment variables from a Docker container using docker inspect.
+func getContainerEnvVars(containerName string) map[string]string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := fmt.Sprintf("docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' %s", containerName)
+
+	result, err := execCommand(ctx, cmd)
+	if err != nil {
+		return nil
+	}
+
+	envMap := make(map[string]string)
+
+	for _, line := range strings.Split(result, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		if idx := strings.IndexByte(line, '='); idx >= 0 {
+			envMap[line[:idx]] = line[idx+1:]
+		}
+	}
+
+	return envMap
 }
 
 // execCommand executes a shell command and returns the output.

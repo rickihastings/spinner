@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 
 	"github.com/rickihastings/spinner/internal/agent"
 	"github.com/rickihastings/spinner/internal/agent/claude"
@@ -81,11 +79,6 @@ EXAMPLES:
 func gatherWatchContext(ctx context.Context, p provider.Provider, instanceName string) tui.WatchContext {
 	wctx := tui.WatchContext{}
 
-	// Get git branch
-	if branch := getGitBranch(); branch != "" {
-		wctx.Branch = branch
-	}
-
 	// Get instance metadata from provider
 	if metadata, err := p.GetInstanceMetadata(ctx, instanceName); err == nil && metadata != nil {
 		wctx.Environment = metadata.Backend
@@ -93,21 +86,10 @@ func gatherWatchContext(ctx context.Context, p provider.Provider, instanceName s
 		wctx.ImageID = metadata.ImageID
 		wctx.Agent = metadata.Agent
 		wctx.MaxIterations = metadata.MaxIterations
+		wctx.Branch = metadata.Branch
 	}
 
 	return wctx
-}
-
-// getGitBranch gets the current git branch name
-func getGitBranch() string {
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-
-	output, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(string(output))
 }
 
 // performWatch executes the watch workflow for an instance.
