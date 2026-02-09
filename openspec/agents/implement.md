@@ -98,19 +98,7 @@ Complete ALL sub-tasks in the vertical slice before committing.
 
 ### 5. Check and Halt
 
-After finalizing the slice, check for remaining work:
-
-```bash
-# Check tasks.md for any uncompleted slices
-# Look for ## X.0 headings with unchecked sub-tasks
-```
-
-**Decision (the completion signal must ONLY appear when every slice is done):**
-
-- **ANY uncompleted slices remain** → HALT immediately. Do NOT output `~~ FEATURE_COMPLETED ~~`. No signal whatsoever. Stop execution.
-- **ALL slices are complete (zero remaining in the entire tasks.md)** → Output `~~ FEATURE_COMPLETED ~~`, then HALT.
-
-**CRITICAL:** Never continue to the next slice automatically. Always halt after completing one vertical slice.
+After finalizing the slice, apply the stopping conditions from Critical Rules above. Never continue to the next slice automatically.
 
 ## Quality Guidelines
 
