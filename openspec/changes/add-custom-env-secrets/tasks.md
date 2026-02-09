@@ -1,0 +1,26 @@
+# Tasks: Add Custom Environment Variables / Secrets
+
+## 1.0 Core `--env` Flag and Provider Plumbing
+
+- [ ] 1.1 Add `flagEnv` constant to `cmd/helpers.go` and `EnvVars map[string]string` field to `provider.CreateConfig`
+- [ ] 1.2 Add `--env` flag (StringSliceVar) to `cmd/spin.go`, parse `KEY=VALUE` pairs into map, validate format and reserved vars
+- [ ] 1.3 Pass parsed `EnvVars` map from spin command into `CreateConfig`
+- [ ] 1.4 Add unit tests for `--env` flag parsing: valid pairs, multiple vars, equals-in-value, empty value, invalid format, empty key, reserved var rejection
+- [ ] 1.5 Verify build and all existing tests pass
+
+## 2.0 Docker Backend: `--env-file` Implementation
+
+- [ ] 2.1 Add `EnvVars map[string]string` to `docker.SpinConfig`
+- [ ] 2.2 Modify `BuildDockerRunCommand` to write all env vars (built-in + custom) to a temp file with `0600` permissions and use `--env-file` instead of individual `-e` flags
+- [ ] 2.3 Return temp file path from `BuildDockerRunCommand` so caller can clean up after `RunContainer`
+- [ ] 2.4 Update `docker_provider.go` `Create()` to pass `EnvVars` from `CreateConfig` to `SpinConfig` and handle temp file cleanup
+- [ ] 2.5 Update `run_test.go` with tests: env-file generation, file permissions, built-in vars included, custom vars included, cleanup after use
+- [ ] 2.6 Update `docker_provider_test.go` to verify `EnvVars` flow through `Create()`
+- [ ] 2.7 Verify build and all tests pass
+
+## 3.0 GCP Backend: Metadata Prefix Implementation
+
+- [ ] 3.1 Modify `gcp_provider.go` `Create()` to merge custom env vars into instance metadata with `SPINNER_ENV_` prefix
+- [ ] 3.2 Update `templates/scripts/gcp_runtime.sh` to read all `SPINNER_ENV_*` metadata keys, strip prefix, and export as env vars
+- [ ] 3.3 Add unit tests for GCP metadata merging: custom vars prefixed, no collision with internal keys, empty env vars map
+- [ ] 3.4 Verify build and all tests pass
