@@ -282,17 +282,17 @@ func parseAndValidateEnvVars(envVars []string) (map[string]string, error) {
 
 	// Reserved variables that cannot be overridden
 	reserved := map[string]bool{
-		"GITHUB_TOKEN":           true,
+		"GITHUB_TOKEN":            true,
 		"CLAUDE_CODE_OAUTH_TOKEN": true,
-		"REPO_URL":               true,
-		"PROMPT":                 true,
-		"BRANCH":                 true,
-		"MAX_ITERATIONS":         true,
-		"LOG_DIR":                true,
-		"STATE_DIR":              true,
-		"SPINNER_LOG_BUCKET":     true,
-		"SPINNER_STATE_BUCKET":   true,
-		"SPINNER_INSTANCE_NAME":  true,
+		"REPO_URL":                true,
+		"PROMPT":                  true,
+		"BRANCH":                  true,
+		"MAX_ITERATIONS":          true,
+		"LOG_DIR":                 true,
+		"STATE_DIR":               true,
+		"SPINNER_LOG_BUCKET":      true,
+		"SPINNER_STATE_BUCKET":    true,
+		"SPINNER_INSTANCE_NAME":   true,
 	}
 
 	for _, env := range envVars {

@@ -819,6 +819,16 @@ The `--env` flag SHALL have integration tests that verify end-to-end behavior wi
 - **WHEN** the container environment is inspected
 - **THEN** the test SHALL verify the full value is preserved correctly
 
+### Requirement: GCP Integration Test Coverage for Custom Environment Variables
+
+The `--env` flag SHALL have a GCP integration test that verifies env vars are passed as instance metadata.
+
+#### Scenario: GCP integration test for env vars in metadata
+
+- **GIVEN** spin command is executed with `--backend gcp --env MY_CUSTOM_VAR=hello_world --env API_KEY=secret123`
+- **WHEN** the GCP instance metadata is inspected via `gcloud compute instances describe`
+- **THEN** the test SHALL verify `SPINNER_ENV_MY_CUSTOM_VAR=hello_world` and `SPINNER_ENV_API_KEY=secret123` are present in instance metadata
+
 ### Requirement: Grouped Help Output
 
 The spin command help SHALL organize flags into backend-specific groups for clarity.

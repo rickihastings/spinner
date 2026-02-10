@@ -123,6 +123,30 @@ func GCPInstanceStatus(t *testing.T, project, zone, name string) string {
 	return strings.TrimSpace(string(output))
 }
 
+// GCPInstanceMetadata returns the value of a specific metadata key for a GCP VM instance.
+// Returns the value and true if found, empty string and false if not found.
+func GCPInstanceMetadata(t *testing.T, project, zone, name, key string) (string, bool) {
+	t.Helper()
+
+	cmd := exec.Command("gcloud", "compute", "instances", "describe", name,
+		"--project", project,
+		"--zone", zone,
+		"--format", fmt.Sprintf("value(metadata.items.filter(key:%s).extract(value).flatten())", key),
+	)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", false
+	}
+
+	val := strings.TrimSpace(string(output))
+	if val == "" {
+		return "", false
+	}
+
+	return val, true
+}
+
 // StopGCPInstance stops a running GCP VM instance.
 func StopGCPInstance(t *testing.T, project, zone, name string) {
 	t.Helper()
