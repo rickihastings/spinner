@@ -582,6 +582,114 @@ WORKDIR /workspace
 	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running")
 }
 
+// TestSpin_EnvVarsSingleVar tests that --env KEY=VALUE sets the env var in the container
+func TestSpin_EnvVarsSingleVar(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	_, imageName := testutil.SetupTestImage(t)
+
+	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--env", "MY_CUSTOM_VAR=hello_world"}
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Inspect container env vars
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	assert.Contains(t, string(output), "MY_CUSTOM_VAR=hello_world", "custom env var should be set in container")
+}
+
+// TestSpin_EnvVarsMultipleVars tests that multiple --env flags all set their env vars
+func TestSpin_EnvVarsMultipleVars(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	_, imageName := testutil.SetupTestImage(t)
+
+	args := []string{
+		"spin", "--image", imageName, "--repo", testRepo,
+		"--env", "VAR_ONE=alpha",
+		"--env", "VAR_TWO=beta",
+		"--env", "VAR_THREE=gamma",
+	}
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	envVars := string(output)
+	assert.Contains(t, envVars, "VAR_ONE=alpha", "first env var should be set")
+	assert.Contains(t, envVars, "VAR_TWO=beta", "second env var should be set")
+	assert.Contains(t, envVars, "VAR_THREE=gamma", "third env var should be set")
+}
+
+// TestSpin_EnvVarsReservedRejected tests that reserved variable names are rejected
+func TestSpin_EnvVarsReservedRejected(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	reservedVars := []string{
+		"GITHUB_TOKEN=fake",
+		"CLAUDE_CODE_OAUTH_TOKEN=fake",
+		"REPO_URL=fake",
+		"PROMPT=fake",
+		"BRANCH=fake",
+		"MAX_ITERATIONS=fake",
+	}
+
+	for _, env := range reservedVars {
+		key := strings.SplitN(env, "=", 2)[0]
+		t.Run(key, func(t *testing.T) {
+			args := []string{"spin", "--image", "spinner:fake", "--repo", testRepo, "--env", env}
+			stdout, stderr, exitCode := testutil.RunCommandExpectError(t, args...)
+			output := stdout + stderr
+
+			assert.NotEqual(t, 0, exitCode, "should reject reserved variable %s", key)
+			assert.Contains(t, output, "cannot override reserved variable", "should mention reserved variable")
+		})
+	}
+}
+
+// TestSpin_EnvVarsInvalidFormat tests that invalid --env format is rejected
+func TestSpin_EnvVarsInvalidFormat(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	args := []string{"spin", "--image", "spinner:fake", "--repo", testRepo, "--env", "NO_EQUALS_SIGN"}
+	stdout, stderr, exitCode := testutil.RunCommandExpectError(t, args...)
+	output := stdout + stderr
+
+	assert.NotEqual(t, 0, exitCode, "should reject invalid format")
+	assert.Contains(t, output, "invalid format", "should mention invalid format")
+}
+
+// TestSpin_EnvVarsValueWithEquals tests that env values containing '=' are handled correctly
+func TestSpin_EnvVarsValueWithEquals(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	_, imageName := testutil.SetupTestImage(t)
+
+	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--env", "DATABASE_URL=postgres://user:pass@host/db?sslmode=require"}
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	assert.Contains(t, string(output), "DATABASE_URL=postgres://user:pass@host/db?sslmode=require",
+		"env value containing '=' should be preserved correctly")
+}
+
 // TestSpin_SetupRebuildsExistingImage tests that --setup rebuilds image even if it exists
 func TestSpin_SetupRebuildsExistingImage(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
