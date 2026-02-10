@@ -127,6 +127,15 @@ func (r *Runner) Run(ctx context.Context) int {
 		}
 	}
 
+	// Truncate the log file once at session start so previous runs don't
+	// accumulate. Individual iterations append to this file.
+	if r.config.LogDir != "" {
+		logPath := filepath.Join(r.config.LogDir, "raw.log")
+		if err := os.Truncate(logPath, 0); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Warning: failed to truncate log file: %v\n", err)
+		}
+	}
+
 	for r.state.Iteration = 1; r.state.Iteration <= r.config.MaxIterations; r.state.Iteration++ {
 		// Check for context cancellation
 		select {

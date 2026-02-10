@@ -234,6 +234,16 @@ FileExists:
 
 			// Only process write events
 			if fsEvent.Op&fsnotify.Write == fsnotify.Write {
+				// Detect file truncation: if file size is smaller than our
+				// read position, the file was truncated (e.g. new session).
+				// Reset to the beginning so we don't get stuck at a stale offset.
+				if info, statErr := os.Stat(logFilePath); statErr == nil {
+					if pos, seekErr := file.Seek(0, io.SeekCurrent); seekErr == nil && info.Size() < pos {
+						_, _ = file.Seek(0, io.SeekStart)
+						reader.Reset(file)
+					}
+				}
+
 				// Read all available new lines
 				for {
 					line, err := reader.ReadString('\n')

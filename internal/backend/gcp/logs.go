@@ -101,7 +101,12 @@ func pollLogChunk(ctx context.Context, client Client, bucket, object string, off
 		return offset, err
 	}
 
-	if size <= offset {
+	if size < offset {
+		// File was truncated (e.g. new session started). Reset to beginning.
+		offset = 0
+	}
+
+	if size == offset {
 		return offset, nil // no new data
 	}
 

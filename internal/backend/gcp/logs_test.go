@@ -205,6 +205,53 @@ func TestWaitForObject_ContextCancelled(t *testing.T) {
 	}
 }
 
+func TestPollLogChunk_ResetsOnTruncation(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	bucket := "test-bucket"
+	object := "instance/logs/raw.log"
+
+	// Simulate: offset is 500 (from previous iteration) but file was truncated
+	// and new data has been written (size is now 20, much less than 500).
+	client.On("ObjectSize", ctx, bucket, object).Return(int64(20), nil)
+	client.On("ReadObjectRange", ctx, bucket, object, int64(0)).
+		Return([]byte("new line 1\nnew line 2\n"), nil)
+
+	ch := make(chan string, 10)
+
+	newOffset, err := pollLogChunk(ctx, client, bucket, object, 500, ch)
+	if err != nil {
+		t.Fatalf("pollLogChunk returned error: %v", err)
+	}
+
+	// Should have reset to 0 and read new content
+	if newOffset != 22 {
+		t.Errorf("expected offset 22, got %d", newOffset)
+	}
+
+	close(ch)
+
+	var lines []string
+	for line := range ch {
+		lines = append(lines, line)
+	}
+
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d", len(lines))
+	}
+
+	if lines[0] != "new line 1" {
+		t.Errorf("expected 'new line 1', got %q", lines[0])
+	}
+
+	if lines[1] != "new line 2" {
+		t.Errorf("expected 'new line 2', got %q", lines[1])
+	}
+
+	client.AssertExpectations(t)
+}
+
 func TestWatchLogs_ContextCancellation(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx, cancel := context.WithCancel(context.Background())

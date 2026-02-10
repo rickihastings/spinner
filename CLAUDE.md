@@ -29,11 +29,17 @@ and persists state. The agent works until it outputs `~~ FEATURE_COMPLETED ~~` o
 
 ## Key Concepts
 
-- **Iteration loop** (`internal/exec/loop.go`) — the core execution cycle. Each iteration: run Claude → check result → push to git → save state → repeat. Rate limits trigger a 61-minute wait. Auth errors stop the loop.
-- **Completion signal** — the agent outputs `~~ FEATURE_COMPLETED ~~` in its response to signal it's done. This is detected by the parser in `internal/agent/claude/executor.go`.
-- **Provider abstraction** (`internal/provider/provider.go`) — backend-agnostic interface. Docker is the only provider today, but the architecture supports VMs, K8s, etc. Commands depend on the Provider interface, never on Docker directly.
-- **State file** (`/state/state.json` in container) — JSON tracking iteration count, status (`running`/`completed`/`rate_limited`/`error`/`auth_error`), and timestamps. Mounted from host at `~/.spinner/<container-name>/state/`.
-- **Container naming** — deterministic: `{image}-{repo}[-branch]` (sanitized). Existing containers are reused unless `--recreate` is passed.
+- **Iteration loop** (`internal/exec/loop.go`) — the core execution cycle. Each iteration: run Claude → check result →
+  push to git → save state → repeat. Rate limits trigger a 61-minute wait. Auth errors stop the loop.
+- **Completion signal** — the agent outputs `~~ FEATURE_COMPLETED ~~` in its response to signal it's done. This is
+  detected by the parser in `internal/agent/claude/executor.go`.
+- **Provider abstraction** (`internal/provider/provider.go`) — backend-agnostic interface. Docker is the only provider
+  today, but the architecture supports VMs, K8s, etc. Commands depend on the Provider interface, never on Docker
+  directly.
+- **State file** (`/state/state.json` in container) — JSON tracking iteration count, status (`running`/`completed`/
+  `rate_limited`/`error`/`auth_error`), and timestamps. Mounted from host at `~/.spinner/<container-name>/state/`.
+- **Container naming** — deterministic: `{image}-{repo}[-branch]` (sanitized). Existing containers are reused unless
+  `--recreate` is passed.
 - **max-iterations** — default is 100 when not specified.
 
 # Project Documentation
@@ -64,7 +70,10 @@ go build -o dist/spinner
 
 ### Sandbox Proxy Fix
 
-If `go mod download` fails with DNS errors for `storage.googleapis.com`, the sandbox `no_proxy`/`NO_PROXY` vars are blocking the HTTP proxy. Fix by removing Google domains before running Go commands:
+**IMPORTANT**: this is ONLY a concern when running inside the Claude Web sandbox
+
+If `go mod download` fails with DNS errors for `storage.googleapis.com`, the sandbox `no_proxy`/`NO_PROXY` vars are
+blocking the HTTP proxy. Fix by removing Google domains before running Go commands:
 
 ```bash
 export no_proxy=$(echo "$no_proxy" | sed 's/,\*\.googleapis\.com//g;s/,\*\.google\.com//g;s/,storage\.googleapis\.com//g')

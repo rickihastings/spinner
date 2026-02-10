@@ -214,6 +214,67 @@ func TestTailExistingLogs_RingBufferKeepsLastN(t *testing.T) {
 	assert.Equal(t, "event-9", events[6].Type)
 }
 
+func TestWatchLines_ResetsOnTruncation(t *testing.T) {
+	tmpDir := t.TempDir()
+	logsDir := filepath.Join(tmpDir, "logs")
+	require.NoError(t, os.MkdirAll(logsDir, 0755))
+
+	logFilePath := filepath.Join(logsDir, "raw.log")
+
+	// Write initial content so the file exists and has data
+	require.NoError(t, os.WriteFile(logFilePath, []byte("old-line-1\nold-line-2\n"), 0644))
+
+	lw := &logWatcher{
+		containerName: "test",
+		logsDir:       logsDir,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	lineCh := make(chan string, 100)
+
+	// Start watchLines in background
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- lw.watchLines(ctx, lineCh)
+	}()
+
+	// Give watcher time to start and seek to end
+	time.Sleep(100 * time.Millisecond)
+
+	// Append a line — watcher should see it
+	f, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_APPEND, 0644)
+	require.NoError(t, err)
+	_, err = f.WriteString("pre-truncate\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	select {
+	case line := <-lineCh:
+		assert.Equal(t, "pre-truncate", line)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for pre-truncate line")
+	}
+
+	// Truncate and write new content (simulates new iteration with os.Create)
+	f, err = os.Create(logFilePath)
+	require.NoError(t, err)
+	_, err = f.WriteString("post-truncate\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	// Watcher should detect truncation and read from start
+	select {
+	case line := <-lineCh:
+		assert.Equal(t, "post-truncate", line)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for post-truncate line — watcher stuck after truncation")
+	}
+
+	cancel()
+}
+
 func TestTailExistingLines_HeadOverlapWithTail(t *testing.T) {
 	tmpDir := t.TempDir()
 	logsDir := filepath.Join(tmpDir, "logs")

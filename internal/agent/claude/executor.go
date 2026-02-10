@@ -107,9 +107,9 @@ func (e *Executor) Execute(ctx context.Context, prompt string) (<-chan agent.Eve
 			return nil, fmt.Errorf("failed to create log directory: %w", err)
 		}
 
-		logFile, err = os.Create(e.config.LogPath)
+		logFile, err = os.OpenFile(e.config.LogPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create log file: %w", err)
+			return nil, fmt.Errorf("failed to open log file: %w", err)
 		}
 	}
 
