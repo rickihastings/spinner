@@ -207,6 +207,28 @@ spinner spin \
   --prompt "Fix the build pipeline"
 ```
 
+### Passing Secrets and Environment Variables
+
+Use the `--env` flag to inject custom environment variables (API keys, tokens, config values) into the VM at runtime:
+
+```bash
+spinner spin \
+  --image my-sandbox \
+  --repo git@github.com:your-org/your-repo.git \
+  --prompt "Publish the package" \
+  --env NPM_TOKEN=npm_abc123 \
+  --env MY_API_KEY=sk-xyz
+```
+
+The flag is repeatable — pass `--env` once per variable. Values are split on the first `=`, so values containing `=` are
+handled correctly (e.g., `--env "DATABASE_URL=postgres://host/db?ssl=true"`).
+
+On GCP, custom env vars are passed as instance metadata with a `SPINNER_ENV_` prefix (e.g., `SPINNER_ENV_NPM_TOKEN`).
+The VM's runtime script automatically strips the prefix and exports the variables into the execution environment.
+
+> **Note:** You cannot override reserved variables (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `REPO_URL`, `PROMPT`,
+> `BRANCH`, `MAX_ITERATIONS`, and others used internally). The CLI will print an error if you try.
+
 ## Step 3: Watch Progress
 
 For autonomous runs, you will want to monitor what the agent is doing.
@@ -359,6 +381,7 @@ metrics while CPU metrics continue to work via the standard Compute Engine metri
 | Autonomous agent        | `spinner spin --image my-sandbox --repo <url> --prompt "task"`                     |
 | Watch live              | `spinner spin --image my-sandbox --repo <url> --prompt "task" --watch`             |
 | Watch existing          | `spinner watch <instance-name>`                                                    |
+| Pass secrets            | `spinner spin --image my-sandbox --repo <url> --env NPM_TOKEN=abc`                 |
 | Recreate VM             | `spinner spin --image my-sandbox --repo <url> --recreate`                          |
 | Check state             | `gsutil cat gs://<bucket>/<instance-name>/state.json`                              |
 | SSH into VM             | `gcloud compute ssh <instance-name> --zone <zone> --project <project>`             |

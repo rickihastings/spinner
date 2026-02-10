@@ -120,6 +120,29 @@ spinner spin \
   --prompt "Fix the build pipeline"
 ```
 
+### Passing Secrets and Environment Variables
+
+Use the `--env` flag to inject custom environment variables (API keys, tokens, config values) into the container at
+runtime:
+
+```bash
+spinner spin \
+  --image my-sandbox \
+  --repo git@github.com:your-org/your-repo.git \
+  --prompt "Publish the package" \
+  --env NPM_TOKEN=npm_abc123 \
+  --env MY_API_KEY=sk-xyz
+```
+
+The flag is repeatable — pass `--env` once per variable. Values are split on the first `=`, so values containing `=` are
+handled correctly (e.g., `--env "DATABASE_URL=postgres://host/db?ssl=true"`).
+
+Secrets passed via `--env` are written to a temporary file and delivered to Docker via `--env-file`. This keeps secret
+values out of host process listings (`ps aux`). The temporary file is deleted immediately after the container starts.
+
+> **Note:** You cannot override reserved variables (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `REPO_URL`, `PROMPT`,
+> `BRANCH`, `MAX_ITERATIONS`, and others used internally). The CLI will print an error if you try.
+
 ## Step 3: Watch Progress
 
 For autonomous runs, you will want to monitor what the agent is doing. There are two ways to enter watch mode.
@@ -224,4 +247,5 @@ If Claude hits an API rate limit during autonomous execution, Spinner automatica
 | Watch existing         | `spinner watch <container-name>`                                       |
 | Recreate container     | `spinner spin --image my-sandbox --repo <url> --recreate`              |
 | Check state            | `cat ~/.spinner/<container-name>/state/state.json`                     |
+| Pass secrets           | `spinner spin --image my-sandbox --repo <url> --env NPM_TOKEN=abc`     |
 | Update spinner         | `spinner update`                                                       |
