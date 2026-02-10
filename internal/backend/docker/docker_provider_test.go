@@ -341,3 +341,90 @@ func TestDockerProvider_Status_None(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, provider.InstanceStatusNone, status)
 }
+
+func TestDockerProvider_Create_WithEnvVars(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	client := new(MockDockerClient)
+	p := NewDockerProvider(client)
+	ctx := context.Background()
+
+	client.On("ImageExists", ctx, "spinner:test").Return(true, nil)
+	client.On("RunContainer", ctx, mock.Anything, "spinner-test-repo").Return(
+		ContainerResult{Success: true, ContainerName: "spinner-test-repo"}, nil,
+	)
+	client.On("VerifyContainerStatus", ctx, "spinner-test-repo").Return(
+		ContainerResult{Success: true, ContainerName: "spinner-test-repo"}, nil,
+	)
+
+	instance, err := p.Create(ctx, provider.CreateConfig{
+		Repo:    "https://github.com/user/repo.git",
+		Options: map[string]string{"image": "spinner:test"},
+		EnvVars: map[string]string{
+			"NPM_TOKEN":  "npm-secret-123",
+			"MY_API_KEY": "api-secret-456",
+		},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "spinner-test-repo", instance.Name)
+	assert.Equal(t, provider.InstanceStatusRunning, instance.Status)
+	client.AssertExpectations(t)
+}
+
+func TestDockerProvider_Create_WithEmptyEnvVars(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	client := new(MockDockerClient)
+	p := NewDockerProvider(client)
+	ctx := context.Background()
+
+	client.On("ImageExists", ctx, "spinner:test").Return(true, nil)
+	client.On("RunContainer", ctx, mock.Anything, "spinner-test-repo").Return(
+		ContainerResult{Success: true, ContainerName: "spinner-test-repo"}, nil,
+	)
+	client.On("VerifyContainerStatus", ctx, "spinner-test-repo").Return(
+		ContainerResult{Success: true, ContainerName: "spinner-test-repo"}, nil,
+	)
+
+	instance, err := p.Create(ctx, provider.CreateConfig{
+		Repo:    "https://github.com/user/repo.git",
+		Options: map[string]string{"image": "spinner:test"},
+		EnvVars: map[string]string{},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "spinner-test-repo", instance.Name)
+	assert.Equal(t, provider.InstanceStatusRunning, instance.Status)
+	client.AssertExpectations(t)
+}
+
+func TestDockerProvider_Create_WithNilEnvVars(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	client := new(MockDockerClient)
+	p := NewDockerProvider(client)
+	ctx := context.Background()
+
+	client.On("ImageExists", ctx, "spinner:test").Return(true, nil)
+	client.On("RunContainer", ctx, mock.Anything, "spinner-test-repo").Return(
+		ContainerResult{Success: true, ContainerName: "spinner-test-repo"}, nil,
+	)
+	client.On("VerifyContainerStatus", ctx, "spinner-test-repo").Return(
+		ContainerResult{Success: true, ContainerName: "spinner-test-repo"}, nil,
+	)
+
+	instance, err := p.Create(ctx, provider.CreateConfig{
+		Repo:    "https://github.com/user/repo.git",
+		Options: map[string]string{"image": "spinner:test"},
+		EnvVars: nil,
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "spinner-test-repo", instance.Name)
+	assert.Equal(t, provider.InstanceStatusRunning, instance.Status)
+	client.AssertExpectations(t)
+}

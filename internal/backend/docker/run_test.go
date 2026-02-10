@@ -268,13 +268,11 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			hasNpmrc:      false,
 			expectedArgs: []string{
 				"run", "-d", "--name", "spinner-test-repo",
-				"-e", "GITHUB_TOKEN=test-github-token",
-				"-e", "CLAUDE_CODE_OAUTH_TOKEN=test-claude-token",
-				"-e", "REPO_URL=https://github.com/user/repo.git",
+				"--env-file",
 				"spinner:test",
 			},
-			unexpectedArgs: []string{"PROMPT=", "MAX_ITERATIONS=", "BRANCH="},
-			description:    "should create basic run command without Ralph environment",
+			unexpectedArgs: []string{"-e GITHUB_TOKEN=", "-e CLAUDE_CODE_OAUTH_TOKEN="},
+			description:    "should create basic run command with --env-file",
 		},
 		{
 			name: "run with prompt",
@@ -286,11 +284,9 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			containerName: "spinner-test-repo",
 			hasNpmrc:      false,
 			expectedArgs: []string{
-				"-e", "PROMPT=fix the bug",
-				"-e", "MAX_ITERATIONS=100",
-				"-e", "LOG_DIR=/logs",
+				"--env-file",
 			},
-			description: "should include prompt and default max iterations",
+			description: "should use --env-file with prompt",
 		},
 		{
 			name: "run with prompt and custom max iterations",
@@ -303,11 +299,9 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			containerName: "spinner-test-repo",
 			hasNpmrc:      false,
 			expectedArgs: []string{
-				"-e", "PROMPT=add feature",
-				"-e", "MAX_ITERATIONS=50",
-				"-e", "LOG_DIR=/logs",
+				"--env-file",
 			},
-			description: "should use custom max iterations when provided",
+			description: "should use --env-file with custom max iterations",
 		},
 		{
 			name: "run with prompt and branch",
@@ -320,11 +314,9 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			containerName: "spinner-test-repo-feature-new",
 			hasNpmrc:      false,
 			expectedArgs: []string{
-				"-e", "PROMPT=test task",
-				"-e", "BRANCH=feature/new",
-				"-e", "LOG_DIR=/logs",
+				"--env-file",
 			},
-			description: "should include branch when provided with prompt",
+			description: "should use --env-file with branch and prompt",
 		},
 		{
 			name: "run with branch but no prompt",
@@ -336,16 +328,19 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			containerName: "spinner-test-repo-develop",
 			hasNpmrc:      false,
 			expectedArgs: []string{
-				"-e", "BRANCH=develop",
+				"--env-file",
 			},
-			unexpectedArgs: []string{"PROMPT=", "MAX_ITERATIONS=", "LOG_DIR="},
-			description:    "should include branch even without prompt",
+			unexpectedArgs: []string{"-e PROMPT=", "-e MAX_ITERATIONS="},
+			description:    "should use --env-file even with branch only",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args, err := buildDockerRunCommand(tt.config, tt.containerName, tt.hasNpmrc)
+			args, tmpFile, err := buildDockerRunCommand(tt.config, tt.containerName, tt.hasNpmrc)
+			if tmpFile != "" {
+				defer os.Remove(tmpFile)
+			}
 
 			assert.NoError(t, err)
 			assert.NotNil(t, args)
@@ -400,7 +395,10 @@ func TestBuildDockerRunCommand_NpmrcHandling(t *testing.T) {
 				Repo:  "https://github.com/user/repo.git",
 			}
 
-			args, err := buildDockerRunCommand(config, "test-container", tt.hasNpmrc)
+			args, tmpFile, err := buildDockerRunCommand(config, "test-container", tt.hasNpmrc)
+			if tmpFile != "" {
+				defer os.Remove(tmpFile)
+			}
 
 			assert.NoError(t, err)
 
@@ -453,17 +451,19 @@ func TestBuildDockerRunCommand_SshToHttpsConversion(t *testing.T) {
 				Repo:  tt.repoURL,
 			}
 
-			args, err := buildDockerRunCommand(config, "test-container", false)
+			_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+			if tmpFile != "" {
+				defer os.Remove(tmpFile)
+			}
 
 			assert.NoError(t, err)
 
-			argsStr := ""
-			for _, arg := range args {
-				argsStr += arg + " "
-			}
+			// Verify temp file contains converted URL
+			content, err := os.ReadFile(tmpFile)
+			assert.NoError(t, err)
 
-			expectedEnvVar := "REPO_URL=" + tt.expectedURL
-			assert.Contains(t, argsStr, expectedEnvVar, "should use converted URL")
+			expectedEnvVar := "REPO_URL=" + tt.expectedURL + "\n"
+			assert.Contains(t, string(content), expectedEnvVar, "should use converted URL in env file")
 		})
 	}
 }
@@ -712,4 +712,164 @@ func TestNamingScenarios_TableDriven(t *testing.T) {
 			assert.Equal(t, tt.expectedName, result)
 		})
 	}
+}
+
+// TestBuildDockerRunCommand_EnvFile tests that env vars are written to a temp file
+func TestBuildDockerRunCommand_EnvFile(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-github-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-claude-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image: "spinner:test",
+		Repo:  "https://github.com/user/repo.git",
+		EnvVars: map[string]string{
+			"NPM_TOKEN":  "npm-secret-123",
+			"MY_API_KEY": "api-secret-456",
+		},
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tmpFile, "should return temp file path")
+	defer os.Remove(tmpFile)
+
+	// Verify args contain --env-file
+	argsStr := ""
+	for _, arg := range args {
+		argsStr += arg + " "
+	}
+	assert.Contains(t, argsStr, "--env-file", "should use --env-file")
+	assert.Contains(t, argsStr, tmpFile, "should reference temp file path")
+
+	// Verify temp file exists and has correct permissions
+	fileInfo, err := os.Stat(tmpFile)
+	assert.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), fileInfo.Mode().Perm(), "temp file should have 0600 permissions")
+
+	// Verify temp file contents
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+	contentStr := string(content)
+
+	// Check built-in vars are present
+	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-github-token\n")
+	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-claude-token\n")
+	assert.Contains(t, contentStr, "REPO_URL=https://github.com/user/repo.git\n")
+
+	// Check custom vars are present
+	assert.Contains(t, contentStr, "NPM_TOKEN=npm-secret-123\n")
+	assert.Contains(t, contentStr, "MY_API_KEY=api-secret-456\n")
+}
+
+// TestBuildDockerRunCommand_EnvFileWithPromptAndBranch tests env file with all options
+func TestBuildDockerRunCommand_EnvFileWithPromptAndBranch(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image:         "spinner:test",
+		Repo:          "https://github.com/user/repo.git",
+		Prompt:        "fix the bug",
+		Branch:        "feature/test",
+		MaxIterations: "50",
+		EnvVars: map[string]string{
+			"CUSTOM_VAR": "custom-value",
+		},
+	}
+
+	_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tmpFile)
+	defer os.Remove(tmpFile)
+
+	// Verify temp file contents include all vars
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+	contentStr := string(content)
+
+	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
+	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-token\n")
+	assert.Contains(t, contentStr, "REPO_URL=https://github.com/user/repo.git\n")
+	assert.Contains(t, contentStr, "BRANCH=feature/test\n")
+	assert.Contains(t, contentStr, "PROMPT=fix the bug\n")
+	assert.Contains(t, contentStr, "MAX_ITERATIONS=50\n")
+	assert.Contains(t, contentStr, "LOG_DIR=/logs\n")
+	assert.Contains(t, contentStr, "CUSTOM_VAR=custom-value\n")
+}
+
+// TestBuildDockerRunCommand_EnvFileEmptyCustomVars tests with no custom env vars
+func TestBuildDockerRunCommand_EnvFileEmptyCustomVars(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image:   "spinner:test",
+		Repo:    "https://github.com/user/repo.git",
+		EnvVars: map[string]string{},
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tmpFile)
+	defer os.Remove(tmpFile)
+
+	// Verify args use --env-file even with no custom vars
+	argsStr := ""
+	for _, arg := range args {
+		argsStr += arg + " "
+	}
+	assert.Contains(t, argsStr, "--env-file")
+
+	// Verify temp file still contains built-in vars
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+	contentStr := string(content)
+
+	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
+	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-token\n")
+}
+
+// TestBuildDockerRunCommand_EnvFileNilCustomVars tests with nil custom env vars map
+func TestBuildDockerRunCommand_EnvFileNilCustomVars(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image:   "spinner:test",
+		Repo:    "https://github.com/user/repo.git",
+		EnvVars: nil,
+	}
+
+	_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tmpFile)
+	defer os.Remove(tmpFile)
+
+	// Should handle nil map gracefully
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+	contentStr := string(content)
+
+	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
+	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-token\n")
 }

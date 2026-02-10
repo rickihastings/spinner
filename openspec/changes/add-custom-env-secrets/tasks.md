@@ -10,13 +10,13 @@
 
 ## 2.0 Docker Backend: `--env-file` Implementation
 
-- [ ] 2.1 Add `EnvVars map[string]string` to `docker.SpinConfig`
-- [ ] 2.2 Modify `BuildDockerRunCommand` to write all env vars (built-in + custom) to a temp file with `0600` permissions and use `--env-file` instead of individual `-e` flags
-- [ ] 2.3 Return temp file path from `BuildDockerRunCommand` so caller can clean up after `RunContainer`
-- [ ] 2.4 Update `docker_provider.go` `Create()` to pass `EnvVars` from `CreateConfig` to `SpinConfig` and handle temp file cleanup
-- [ ] 2.5 Update `run_test.go` with tests: env-file generation, file permissions, built-in vars included, custom vars included, cleanup after use
-- [ ] 2.6 Update `docker_provider_test.go` to verify `EnvVars` flow through `Create()`
-- [ ] 2.7 Verify build and all tests pass
+- [x] 2.1 Add `EnvVars map[string]string` to `docker.SpinConfig`
+- [x] 2.2 Modify `BuildDockerRunCommand` to write all env vars (built-in + custom) to a temp file with `0600` permissions and use `--env-file` instead of individual `-e` flags
+- [x] 2.3 Return temp file path from `BuildDockerRunCommand` so caller can clean up after `RunContainer`
+- [x] 2.4 Update `docker_provider.go` `Create()` to pass `EnvVars` from `CreateConfig` to `SpinConfig` and handle temp file cleanup
+- [x] 2.5 Update `run_test.go` with tests: env-file generation, file permissions, built-in vars included, custom vars included, cleanup after use
+- [x] 2.6 Update `docker_provider_test.go` to verify `EnvVars` flow through `Create()`
+- [x] 2.7 Verify build and all tests pass
 
 ## 3.0 GCP Backend: Metadata Prefix Implementation
 

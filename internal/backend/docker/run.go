@@ -15,6 +15,7 @@ type spinConfig struct {
 	Prompt        string
 	Branch        string
 	MaxIterations string
+	EnvVars       map[string]string
 }
 
 // ContainerResult contains the result of a container operation.
@@ -101,13 +102,62 @@ func generateContainerName(config spinConfig) string {
 }
 
 // buildDockerRunCommand builds the docker run command arguments.
-func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc bool) ([]string, error) {
+// Returns docker args and a temp file path (or empty string if no temp file created).
+// The caller MUST delete the temp file after docker run completes.
+func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc bool) ([]string, string, error) {
 	// Convert SSH URLs to HTTPS for GitHub PAT authentication
 	repoURL := convertSshToHttps(config.Repo)
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
+		return nil, "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Create temp file for all environment variables
+	tmpFile, err := os.CreateTemp("", "spinner-env-")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create env file: %w", err)
+	}
+	tmpFilePath := tmpFile.Name()
+
+	// Set permissions to 0600 (owner read/write only)
+	if err := os.Chmod(tmpFilePath, 0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFilePath)
+		return nil, "", fmt.Errorf("failed to set env file permissions: %w", err)
+	}
+
+	// Write built-in environment variables
+	fmt.Fprintf(tmpFile, "GITHUB_TOKEN=%s\n", os.Getenv("GITHUB_TOKEN"))
+	fmt.Fprintf(tmpFile, "CLAUDE_CODE_OAUTH_TOKEN=%s\n", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"))
+	fmt.Fprintf(tmpFile, "REPO_URL=%s\n", repoURL)
+
+	// Add branch if specified
+	if config.Branch != "" {
+		fmt.Fprintf(tmpFile, "BRANCH=%s\n", config.Branch)
+	}
+
+	// Add Ralph loop environment variables if prompt is provided
+	if config.Prompt != "" {
+		fmt.Fprintf(tmpFile, "PROMPT=%s\n", config.Prompt)
+
+		maxIterations := config.MaxIterations
+		if maxIterations == "" {
+			maxIterations = defaultMaxIterations
+		}
+
+		fmt.Fprintf(tmpFile, "MAX_ITERATIONS=%s\n", maxIterations)
+		fmt.Fprintf(tmpFile, "LOG_DIR=/logs\n")
+	}
+
+	// Write custom environment variables
+	for key, value := range config.EnvVars {
+		fmt.Fprintf(tmpFile, "%s=%s\n", key, value)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpFilePath)
+		return nil, "", fmt.Errorf("failed to close env file: %w", err)
 	}
 
 	dockerArgs := []string{
@@ -115,36 +165,12 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		"-d",
 		"--name",
 		containerName,
-		"-e",
-		fmt.Sprintf("GITHUB_TOKEN=%s", os.Getenv("GITHUB_TOKEN")),
-		"-e",
-		fmt.Sprintf("CLAUDE_CODE_OAUTH_TOKEN=%s", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN")),
-		"-e",
-		fmt.Sprintf("REPO_URL=%s", repoURL),
+		"--env-file",
+		tmpFilePath,
 		"-v",
 		fmt.Sprintf("%s/.spinner/%s/logs:/logs", homeDir, containerName),
 		"-v",
 		fmt.Sprintf("%s/.spinner/%s/state:/state", homeDir, containerName),
-	}
-
-	// Add branch if specified
-	if config.Branch != "" {
-		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("BRANCH=%s", config.Branch))
-	}
-
-	// Add Ralph loop environment variables if prompt is provided
-	if config.Prompt != "" {
-		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("PROMPT=%s", config.Prompt))
-
-		maxIterations := config.MaxIterations
-		if maxIterations == "" {
-			maxIterations = defaultMaxIterations
-		}
-
-		dockerArgs = append(dockerArgs, "-e", fmt.Sprintf("MAX_ITERATIONS=%s", maxIterations))
-
-		// Set LOG_DIR to match the mounted logs directory
-		dockerArgs = append(dockerArgs, "-e", "LOG_DIR=/logs")
 	}
 
 	// Add .npmrc mount if it exists
@@ -156,5 +182,5 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	// Add image
 	dockerArgs = append(dockerArgs, config.Image)
 
-	return dockerArgs, nil
+	return dockerArgs, tmpFilePath, nil
 }

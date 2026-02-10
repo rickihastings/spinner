@@ -76,11 +76,17 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		Prompt:        config.Prompt,
 		Branch:        config.Branch,
 		MaxIterations: config.MaxIterations,
+		EnvVars:       config.EnvVars,
 	}
 
-	args, err := buildDockerRunCommand(sc, containerName, hasNpmrc)
+	args, tmpFile, err := buildDockerRunCommand(sc, containerName, hasNpmrc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build run command: %w", err)
+	}
+
+	// Ensure temp file cleanup happens after docker run
+	if tmpFile != "" {
+		defer os.Remove(tmpFile)
 	}
 
 	result, err := p.client.RunContainer(ctx, args, containerName)
