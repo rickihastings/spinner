@@ -192,6 +192,11 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		metadata["SPINNER_STATE_BUCKET"] = p.bucket
 	}
 
+	// Add custom env vars with SPINNER_ENV_ prefix
+	for key, value := range config.EnvVars {
+		metadata["SPINNER_ENV_"+key] = value
+	}
+
 	labels := map[string]string{
 		"spinner-managed": "true",
 		"spinner-image":   sanitizeLabel(image),

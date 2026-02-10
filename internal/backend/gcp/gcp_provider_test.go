@@ -484,3 +484,112 @@ func TestProviderWatchMetrics_StoppedVM(t *testing.T) {
 
 	mockClient.AssertExpectations(t)
 }
+
+func TestProviderCreateWithCustomEnvVars(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	// Image exists
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	// CreateInstance with custom env vars - verify they have SPINNER_ENV_ prefix
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
+		return config.Metadata["SPINNER_ENV_NPM_TOKEN"] == "abc123" &&
+			config.Metadata["SPINNER_ENV_API_KEY"] == "secret456"
+	})).Return(nil)
+
+	config := provider.CreateConfig{
+		Repo:   "https://github.com/user/repo.git",
+		Prompt: "Fix the bug",
+		Options: map[string]string{
+			"image": "my-env",
+		},
+		EnvVars: map[string]string{
+			"NPM_TOKEN": "abc123",
+			"API_KEY":   "secret456",
+		},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.NoError(t, err)
+	assert.NotNil(t, instance)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderCreateWithEmptyEnvVars(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	// Image exists
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	// CreateInstance with empty env vars map - verify no SPINNER_ENV_ keys
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
+		// Verify no metadata keys start with SPINNER_ENV_
+		for key := range config.Metadata {
+			if len(key) >= 12 && key[:12] == "SPINNER_ENV_" {
+				return false
+			}
+		}
+		return true
+	})).Return(nil)
+
+	config := provider.CreateConfig{
+		Repo:   "https://github.com/user/repo.git",
+		Prompt: "Fix the bug",
+		Options: map[string]string{
+			"image": "my-env",
+		},
+		EnvVars: map[string]string{},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.NoError(t, err)
+	assert.NotNil(t, instance)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderCreateCustomEnvVarsNoCollision(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	// Image exists
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	// CreateInstance - verify custom env vars don't overwrite internal metadata
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
+		// Internal keys should be present and unchanged
+		if config.Metadata["REPO_URL"] != "https://github.com/user/repo.git" {
+			return false
+		}
+		if config.Metadata["PROMPT"] != "Fix the bug" {
+			return false
+		}
+		// Custom var should be prefixed
+		if config.Metadata["SPINNER_ENV_MY_VAR"] != "value" {
+			return false
+		}
+		// Verify internal keys are NOT prefixed
+		_, hasPrefixedRepo := config.Metadata["SPINNER_ENV_REPO_URL"]
+		return !hasPrefixedRepo
+	})).Return(nil)
+
+	config := provider.CreateConfig{
+		Repo:   "https://github.com/user/repo.git",
+		Prompt: "Fix the bug",
+		Options: map[string]string{
+			"image": "my-env",
+		},
+		EnvVars: map[string]string{
+			"MY_VAR": "value",
+		},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.NoError(t, err)
+	assert.NotNil(t, instance)
+	mockClient.AssertExpectations(t)
+}

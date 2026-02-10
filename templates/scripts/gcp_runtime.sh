@@ -28,6 +28,18 @@ SPINNER_STATE_BUCKET=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_STATE_BUCKE
 export GITHUB_TOKEN CLAUDE_CODE_OAUTH_TOKEN REPO_URL PROMPT BRANCH MAX_ITERATIONS
 export SPINNER_LOG_BUCKET SPINNER_INSTANCE_NAME SPINNER_STATE_BUCKET
 
+# Read custom env vars from metadata (SPINNER_ENV_ prefix)
+echo "Reading custom environment variables..."
+for key in $(curl -sf -H "$META_HEADER" "$META_URL/" 2>/dev/null | grep "^SPINNER_ENV_" || echo ""); do
+    if [ -n "$key" ]; then
+        value=$(curl -sf -H "$META_HEADER" "$META_URL/$key" 2>/dev/null || echo "")
+        # Strip SPINNER_ENV_ prefix and export
+        var_name="${key#SPINNER_ENV_}"
+        export "$var_name=$value"
+        echo "Exported custom var: $var_name"
+    fi
+done
+
 # Set log directory and state directory
 export LOG_DIR="/home/spinner/logs"
 export STATE_DIR="/home/spinner/state"
@@ -61,18 +73,8 @@ echo "Delegating to startup.sh..."
 set +e
 
 # Switch to spinner user and run startup in the workspace directory
-su - spinner -c "cd /home/spinner/workspace && \
-    export GITHUB_TOKEN='${GITHUB_TOKEN}' && \
-    export CLAUDE_CODE_OAUTH_TOKEN='${CLAUDE_CODE_OAUTH_TOKEN}' && \
-    export REPO_URL='${REPO_URL}' && \
-    export PROMPT='${PROMPT}' && \
-    export BRANCH='${BRANCH}' && \
-    export MAX_ITERATIONS='${MAX_ITERATIONS}' && \
-    export SPINNER_LOG_BUCKET='${SPINNER_LOG_BUCKET}' && \
-    export SPINNER_STATE_BUCKET='${SPINNER_STATE_BUCKET}' && \
-    export SPINNER_INSTANCE_NAME='${SPINNER_INSTANCE_NAME}' && \
-    export LOG_DIR='${LOG_DIR}' && \
-    export STATE_DIR='${STATE_DIR}' && \
+# Use su -m to preserve environment variables (including custom ones)
+su -m spinner -c "cd /home/spinner/workspace && \
     /usr/local/bin/startup.sh"
 EXIT_CODE=$?
 

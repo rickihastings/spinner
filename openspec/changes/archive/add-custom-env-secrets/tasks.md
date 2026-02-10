@@ -20,7 +20,7 @@
 
 ## 3.0 GCP Backend: Metadata Prefix Implementation
 
-- [ ] 3.1 Modify `gcp_provider.go` `Create()` to merge custom env vars into instance metadata with `SPINNER_ENV_` prefix
-- [ ] 3.2 Update `templates/scripts/gcp_runtime.sh` to read all `SPINNER_ENV_*` metadata keys, strip prefix, and export as env vars
-- [ ] 3.3 Add unit tests for GCP metadata merging: custom vars prefixed, no collision with internal keys, empty env vars map
-- [ ] 3.4 Verify build and all tests pass
+- [x] 3.1 Modify `gcp_provider.go` `Create()` to merge custom env vars into instance metadata with `SPINNER_ENV_` prefix
+- [x] 3.2 Update `templates/scripts/gcp_runtime.sh` to read all `SPINNER_ENV_*` metadata keys, strip prefix, and export as env vars
+- [x] 3.3 Add unit tests for GCP metadata merging: custom vars prefixed, no collision with internal keys, empty env vars map
+- [x] 3.4 Verify build and all tests pass
