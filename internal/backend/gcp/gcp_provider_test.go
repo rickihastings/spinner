@@ -533,6 +533,7 @@ func TestProviderCreateWithEmptyEnvVars(t *testing.T) {
 				return false
 			}
 		}
+
 		return true
 	})).Return(nil)
 
@@ -565,15 +566,19 @@ func TestProviderCreateCustomEnvVarsNoCollision(t *testing.T) {
 		if config.Metadata["REPO_URL"] != "https://github.com/user/repo.git" {
 			return false
 		}
+
 		if config.Metadata["PROMPT"] != "Fix the bug" {
 			return false
 		}
+
 		// Custom var should be prefixed
 		if config.Metadata["SPINNER_ENV_MY_VAR"] != "value" {
 			return false
 		}
+
 		// Verify internal keys are NOT prefixed
 		_, hasPrefixedRepo := config.Metadata["SPINNER_ENV_REPO_URL"]
+
 		return !hasPrefixedRepo
 	})).Return(nil)
 

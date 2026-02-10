@@ -118,45 +118,48 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create env file: %w", err)
 	}
+
 	tmpFilePath := tmpFile.Name()
 
 	// Set permissions to 0600 (owner read/write only)
 	if err := os.Chmod(tmpFilePath, 0600); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFilePath)
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpFilePath)
+
 		return nil, "", fmt.Errorf("failed to set env file permissions: %w", err)
 	}
 
 	// Write built-in environment variables
-	fmt.Fprintf(tmpFile, "GITHUB_TOKEN=%s\n", os.Getenv("GITHUB_TOKEN"))
-	fmt.Fprintf(tmpFile, "CLAUDE_CODE_OAUTH_TOKEN=%s\n", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"))
-	fmt.Fprintf(tmpFile, "REPO_URL=%s\n", repoURL)
+	_, _ = fmt.Fprintf(tmpFile, "GITHUB_TOKEN=%s\n", os.Getenv("GITHUB_TOKEN"))
+	_, _ = fmt.Fprintf(tmpFile, "CLAUDE_CODE_OAUTH_TOKEN=%s\n", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"))
+	_, _ = fmt.Fprintf(tmpFile, "REPO_URL=%s\n", repoURL)
 
 	// Add branch if specified
 	if config.Branch != "" {
-		fmt.Fprintf(tmpFile, "BRANCH=%s\n", config.Branch)
+		_, _ = fmt.Fprintf(tmpFile, "BRANCH=%s\n", config.Branch)
 	}
 
 	// Add Ralph loop environment variables if prompt is provided
 	if config.Prompt != "" {
-		fmt.Fprintf(tmpFile, "PROMPT=%s\n", config.Prompt)
+		_, _ = fmt.Fprintf(tmpFile, "PROMPT=%s\n", config.Prompt)
 
 		maxIterations := config.MaxIterations
 		if maxIterations == "" {
 			maxIterations = defaultMaxIterations
 		}
 
-		fmt.Fprintf(tmpFile, "MAX_ITERATIONS=%s\n", maxIterations)
-		fmt.Fprintf(tmpFile, "LOG_DIR=/logs\n")
+		_, _ = fmt.Fprintf(tmpFile, "MAX_ITERATIONS=%s\n", maxIterations)
+		_, _ = fmt.Fprintf(tmpFile, "LOG_DIR=/logs\n")
 	}
 
 	// Write custom environment variables
 	for key, value := range config.EnvVars {
-		fmt.Fprintf(tmpFile, "%s=%s\n", key, value)
+		_, _ = fmt.Fprintf(tmpFile, "%s=%s\n", key, value)
 	}
 
 	if err := tmpFile.Close(); err != nil {
-		os.Remove(tmpFilePath)
+		_ = os.Remove(tmpFilePath)
+
 		return nil, "", fmt.Errorf("failed to close env file: %w", err)
 	}
 

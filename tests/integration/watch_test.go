@@ -23,6 +23,7 @@ const (
 // TestWatch_WithRunningContainer tests the watch command with a running container
 func TestWatch_WithRunningContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
+
 	binaryPath := testutil.GetBinaryPath()
 
 	// Setup test image and container
@@ -94,6 +95,7 @@ func TestWatch_WithNonExistentContainer(t *testing.T) {
 // TestWatch_WithStoppedContainer tests the watch command with a stopped container
 func TestWatch_WithStoppedContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
+
 	binaryPath := testutil.GetBinaryPath()
 
 	// Setup test image and container
@@ -158,6 +160,7 @@ func TestWatch_WithStoppedContainer(t *testing.T) {
 // TestSpinWatch_FlagIntegration tests the --watch flag with spin command
 func TestSpinWatch_FlagIntegration(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
+
 	binaryPath := testutil.GetBinaryPath()
 
 	// Setup test image
@@ -212,6 +215,7 @@ func TestSpinWatch_FlagIntegration(t *testing.T) {
 // TestWatch_MissingLogDirectory tests the watch command when log directory doesn't exist
 func TestWatch_MissingLogDirectory(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
+
 	binaryPath := testutil.GetBinaryPath()
 
 	// Create a minimal container directly with Docker (bypassing spinner setup)

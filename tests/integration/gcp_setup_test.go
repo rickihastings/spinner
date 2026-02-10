@@ -11,7 +11,6 @@ import (
 // TestGCPSetup_MissingRequiredFlags tests that missing required GCP flags produce clear errors.
 // Does not require actual GCP credentials — tests CLI flag validation only.
 func TestGCPSetup_MissingRequiredFlags(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		args    []string
@@ -61,7 +60,6 @@ func TestGCPSetup_MissingRequiredFlags(t *testing.T) {
 // TestGCPSetup_BakeScriptFileNotFound tests that a non-existent bake script path is rejected.
 // Does not require actual GCP credentials — tests CLI flag validation only.
 func TestGCPSetup_BakeScriptFileNotFound(t *testing.T) {
-
 	args := []string{
 		"setup",
 		"--backend", "gcp",

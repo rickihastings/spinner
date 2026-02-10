@@ -86,7 +86,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 
 	// Ensure temp file cleanup happens after docker run
 	if tmpFile != "" {
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 	}
 
 	result, err := p.client.RunContainer(ctx, args, containerName)

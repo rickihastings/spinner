@@ -67,7 +67,6 @@ func TestGCPFlags_WrongBackendFlagsError(t *testing.T) {
 
 // TestGCPFlags_DockerFlagsRejectedForGCP tests that Docker-specific flags fail with GCP backend.
 func TestGCPFlags_DockerFlagsRejectedForGCP(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		args    []string
@@ -112,7 +111,6 @@ func TestGCPFlags_DockerFlagsRejectedForGCP(t *testing.T) {
 
 // TestGCPFlags_UnknownBackendError tests that unknown backend names produce clear errors.
 func TestGCPFlags_UnknownBackendError(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		args    []string
@@ -141,7 +139,6 @@ func TestGCPFlags_UnknownBackendError(t *testing.T) {
 
 // TestGCPFlags_PrecedenceChain tests the flag precedence: CLI > env > config > defaults.
 func TestGCPFlags_PrecedenceChain(t *testing.T) {
-
 	t.Run("CLI flag overrides env var", func(t *testing.T) {
 		// Set env var for backend
 		env := map[string]string{
@@ -196,7 +193,6 @@ func TestGCPFlags_PrecedenceChain(t *testing.T) {
 
 // TestGCPFlags_BackendFromEnvVar tests that SPINNER_BACKEND env var is respected.
 func TestGCPFlags_BackendFromEnvVar(t *testing.T) {
-
 	// Set SPINNER_BACKEND=gcp via env
 	env := map[string]string{
 		"SPINNER_BACKEND": "gcp",
@@ -213,7 +209,6 @@ func TestGCPFlags_BackendFromEnvVar(t *testing.T) {
 
 // TestGCPFlags_SetupMissingName tests that --name is always required.
 func TestGCPFlags_SetupMissingName(t *testing.T) {
-
 	args := []string{
 		"setup",
 		"--backend", "gcp",
@@ -229,7 +224,6 @@ func TestGCPFlags_SetupMissingName(t *testing.T) {
 
 // TestGCPFlags_SpinMissingImage tests that --image is always required for spin.
 func TestGCPFlags_SpinMissingImage(t *testing.T) {
-
 	args := []string{
 		"spin",
 		"--backend", "gcp",
@@ -246,7 +240,6 @@ func TestGCPFlags_SpinMissingImage(t *testing.T) {
 
 // TestGCPFlags_SpinMissingRepo tests that --repo is always required for spin.
 func TestGCPFlags_SpinMissingRepo(t *testing.T) {
-
 	args := []string{
 		"spin",
 		"--backend", "gcp",
@@ -263,7 +256,6 @@ func TestGCPFlags_SpinMissingRepo(t *testing.T) {
 
 // TestGCPFlags_BakeScriptRequiresSetupOnSpin tests that --bake-script requires --setup on spin.
 func TestGCPFlags_BakeScriptRequiresSetupOnSpin(t *testing.T) {
-
 	// Create a valid bake script file
 	tmpDir := t.TempDir()
 	bakeScriptPath := filepath.Join(tmpDir, "bake.sh")

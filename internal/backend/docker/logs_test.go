@@ -236,6 +236,7 @@ func TestWatchLines_ResetsOnTruncation(t *testing.T) {
 
 	// Start watchLines in background
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- lw.watchLines(ctx, lineCh)
 	}()

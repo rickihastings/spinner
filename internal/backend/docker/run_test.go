@@ -339,7 +339,7 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			args, tmpFile, err := buildDockerRunCommand(tt.config, tt.containerName, tt.hasNpmrc)
 			if tmpFile != "" {
-				defer os.Remove(tmpFile)
+				defer func() { _ = os.Remove(tmpFile) }()
 			}
 
 			assert.NoError(t, err)
@@ -397,7 +397,7 @@ func TestBuildDockerRunCommand_NpmrcHandling(t *testing.T) {
 
 			args, tmpFile, err := buildDockerRunCommand(config, "test-container", tt.hasNpmrc)
 			if tmpFile != "" {
-				defer os.Remove(tmpFile)
+				defer func() { _ = os.Remove(tmpFile) }()
 			}
 
 			assert.NoError(t, err)
@@ -453,7 +453,7 @@ func TestBuildDockerRunCommand_SshToHttpsConversion(t *testing.T) {
 
 			_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
 			if tmpFile != "" {
-				defer os.Remove(tmpFile)
+				defer func() { _ = os.Remove(tmpFile) }()
 			}
 
 			assert.NoError(t, err)
@@ -736,13 +736,15 @@ func TestBuildDockerRunCommand_EnvFile(t *testing.T) {
 	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tmpFile, "should return temp file path")
-	defer os.Remove(tmpFile)
+
+	defer func() { _ = os.Remove(tmpFile) }()
 
 	// Verify args contain --env-file
 	argsStr := ""
 	for _, arg := range args {
 		argsStr += arg + " "
 	}
+
 	assert.Contains(t, argsStr, "--env-file", "should use --env-file")
 	assert.Contains(t, argsStr, tmpFile, "should reference temp file path")
 
@@ -754,6 +756,7 @@ func TestBuildDockerRunCommand_EnvFile(t *testing.T) {
 	// Verify temp file contents
 	content, err := os.ReadFile(tmpFile)
 	assert.NoError(t, err)
+
 	contentStr := string(content)
 
 	// Check built-in vars are present
@@ -790,11 +793,13 @@ func TestBuildDockerRunCommand_EnvFileWithPromptAndBranch(t *testing.T) {
 	_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tmpFile)
-	defer os.Remove(tmpFile)
+
+	defer func() { _ = os.Remove(tmpFile) }()
 
 	// Verify temp file contents include all vars
 	content, err := os.ReadFile(tmpFile)
 	assert.NoError(t, err)
+
 	contentStr := string(content)
 
 	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
@@ -826,18 +831,21 @@ func TestBuildDockerRunCommand_EnvFileEmptyCustomVars(t *testing.T) {
 	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tmpFile)
-	defer os.Remove(tmpFile)
+
+	defer func() { _ = os.Remove(tmpFile) }()
 
 	// Verify args use --env-file even with no custom vars
 	argsStr := ""
 	for _, arg := range args {
 		argsStr += arg + " "
 	}
+
 	assert.Contains(t, argsStr, "--env-file")
 
 	// Verify temp file still contains built-in vars
 	content, err := os.ReadFile(tmpFile)
 	assert.NoError(t, err)
+
 	contentStr := string(content)
 
 	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
@@ -863,11 +871,13 @@ func TestBuildDockerRunCommand_EnvFileNilCustomVars(t *testing.T) {
 	_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tmpFile)
-	defer os.Remove(tmpFile)
+
+	defer func() { _ = os.Remove(tmpFile) }()
 
 	// Should handle nil map gracefully
 	content, err := os.ReadFile(tmpFile)
 	assert.NoError(t, err)
+
 	contentStr := string(content)
 
 	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")

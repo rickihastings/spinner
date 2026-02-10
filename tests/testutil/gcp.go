@@ -241,6 +241,7 @@ func GetImageLabels(t *testing.T, project, imageName string) map[string]string {
 		if t != nil {
 			t.Logf("Warning: failed to parse image labels for %s: %v", imageName, err)
 		}
+
 		return map[string]string{}
 	}
 

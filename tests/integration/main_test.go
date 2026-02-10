@@ -85,6 +85,7 @@ func TestMain(m *testing.M) {
 				if os.Getenv("SPINNER_TEST_DELETE_IMAGE") == "1" {
 					fmt.Println("Cleaning up shared GCP test resources...")
 					testutil.RemoveGCPImage(nil, gcpConfig.Project, sharedImageName)
+
 					return
 				}
 
