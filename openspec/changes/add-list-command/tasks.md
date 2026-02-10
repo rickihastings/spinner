@@ -34,3 +34,24 @@
 - [ ] 3.4 Create `cmd/list_test.go` with unit tests: multi-backend listing, single backend filter, JSON output,
   backend unavailable warning, no instances, stale warning
 - [ ] 3.5 Verify build succeeds and all tests pass
+
+## 4.0 Docker integration tests
+
+- [ ] 4.1 Create `tests/integration/list_test.go` with Docker integration tests: spin up a container via
+  `spinner spin`, verify `spinner list` shows it with correct status/state/labels, verify `--json` output
+  parses correctly, verify `--backend docker` filter works, verify stale detection with manipulated state file
+- [ ] 4.2 Test label presence on newly created containers (`docker inspect` to confirm `spinner-managed=true`)
+- [ ] 4.3 Test name-prefix fallback: manually create a `spinner-` prefixed container without the label,
+  verify `spinner list` discovers it via fallback
+- [ ] 4.4 Verify build succeeds and all integration tests pass
+
+## 5.0 GCP integration tests
+
+- [ ] 5.1 Create `tests/integration/gcp_list_test.go` with GCP integration tests: spin up a VM via
+  `spinner spin --backend gcp`, verify `spinner list` shows it with correct status/metadata/labels
+- [ ] 5.2 Test state enrichment from GCS: verify iteration count, agent status, and timestamps are populated
+  from the GCS state file when `--state-bucket` is configured
+- [ ] 5.3 Test `--json` output with GCP instances includes all metadata fields (image, repo, branch, agent)
+- [ ] 5.4 Test mixed-backend listing: have both a Docker container and GCP VM active, verify `spinner list`
+  shows both grouped by backend
+- [ ] 5.5 Verify build succeeds and all integration tests pass
