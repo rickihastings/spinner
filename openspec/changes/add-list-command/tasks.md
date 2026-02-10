@@ -1,0 +1,36 @@
+# Tasks: add-list-command
+
+## 1.0 Provider interface extension and Docker list with labels
+
+- [ ] 1.1 Add `InstanceInfo` struct and `List(ctx) ([]InstanceInfo, error)` to `Provider` interface in
+  `internal/provider/provider.go`
+- [ ] 1.2 Add `--label spinner-managed=true` to Docker container creation in `internal/backend/docker/run.go`
+- [ ] 1.3 Add `ListContainers` method to Docker `Client` interface and implement using Docker SDK `ContainerList`
+  in `internal/backend/docker/client.go`
+- [ ] 1.4 Implement `List()` on `DockerProvider` with label filter + name-prefix fallback + state file reading
+  in `internal/backend/docker/docker_provider.go`
+- [ ] 1.5 Update mock provider and Docker mock client with `List`/`ListContainers` stubs
+- [ ] 1.6 Add unit tests for Docker `List()`: containers with labels, fallback to name prefix, state enrichment,
+  deduplication, no containers found, Docker unavailable
+- [ ] 1.7 Verify build succeeds and all tests pass
+
+## 2.0 GCP instance listing
+
+- [ ] 2.1 Add `ListInstances` method to GCP `Client` interface and implement using Compute Engine `List` API
+  in `internal/backend/gcp/client.go`
+- [ ] 2.2 Implement `List()` on `GCPProvider` with label filter + metadata/label extraction + GCS state reading
+  in `internal/backend/gcp/gcp_provider.go`
+- [ ] 2.3 Update GCP mock client with `ListInstances` stub
+- [ ] 2.4 Add unit tests for GCP `List()`: VMs with labels, metadata extraction, state enrichment from GCS,
+  no state bucket, no instances found
+- [ ] 2.5 Verify build succeeds and all tests pass
+
+## 3.0 CLI list command with multi-backend orchestration
+
+- [ ] 3.1 Create `cmd/list.go` with `NewListCommand(f *provider.Factory)`: iterate backends, collect InstanceInfo,
+  render table output with BACKEND/NAME/STATUS/STATE/ITER/AGE/LAST UPDATE columns, stale warning indicator
+- [ ] 3.2 Add `--backend` filter flag, `--json` flag, and GCP config flags (project/zone/state-bucket)
+- [ ] 3.3 Register command in `cmd/root.go`
+- [ ] 3.4 Create `cmd/list_test.go` with unit tests: multi-backend listing, single backend filter, JSON output,
+  backend unavailable warning, no instances, stale warning
+- [ ] 3.5 Verify build succeeds and all tests pass
