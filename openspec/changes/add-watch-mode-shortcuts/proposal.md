@@ -28,7 +28,14 @@ when they return to the bottom. A `[SCROLLED]` indicator in the footer signals w
 Add `h` key to toggle the header panel visibility. When hidden, the log view expands to fill the freed space. The
 footer help text updates to reflect the toggle state.
 
-### 3. Help Overlay
+### 3. Configurable Header Default
+
+Allow users to configure the default visibility of the header panel via `.spinner.json` (`watch-header` key) or
+environment variable (`SPINNER_WATCH_HEADER`). Accepted values are `true` (header visible, the default) or `false`
+(header hidden on startup). This follows the existing Viper precedence: env var > `.spinner.json` > default. This is
+intentionally not exposed as a CLI flag — it is a user/team preference, not a per-invocation option.
+
+### 4. Help Overlay
 
 Add `?` key to show/dismiss a small overlay listing all available keyboard shortcuts. The overlay appears centered over
 the log view and dismisses on any keypress.
@@ -37,4 +44,5 @@ the log view and dismisses on any keypress.
 
 - **Specs affected**: `cli-watch` (Keyboard Controls, Auto-Scroll Behavior, TUI Layout)
 - **Code affected**: `internal/tui/watch.go` (keyboard handlers, layout management, new overlay component)
+- **Config affected**: `.spinner.json` (`watch-header` key), env var (`SPINNER_WATCH_HEADER`)
 - **No breaking changes** — all new behavior is additive; default experience (auto-scroll, header visible) is unchanged.
