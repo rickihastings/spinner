@@ -106,6 +106,77 @@ need.
 > **Note:** Since baking creates a reusable image, anything you install via `--bake-script` is available on every VM
 > spun from that image. This avoids reinstalling dependencies on each run.
 
+### Customizing Claude Code Configuration
+
+If you use custom MCP servers, slash commands, skills, or other Claude Code settings, you can include them in the baked
+image via your bake script. The bake script runs as root after the `spinner` user and Claude Code are already installed,
+so you can write directly to `/home/spinner/.claude/`.
+
+**Inline configuration:**
+
+```bash
+#!/bin/bash
+
+# Create the .claude config directory
+mkdir -p /home/spinner/.claude/commands
+
+# Write MCP server and settings configuration
+cat > /home/spinner/.claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "allow": ["mcp__my-server__*"]
+  },
+  "mcpServers": {
+    "my-server": {
+      "command": "my-mcp-server",
+      "args": ["--port", "3000"]
+    }
+  }
+}
+EOF
+
+# Write a custom slash command
+cat > /home/spinner/.claude/commands/deploy.md << 'EOF'
+Run the deployment pipeline and verify it succeeds.
+EOF
+
+# Fix ownership
+chown -R spinner:spinner /home/spinner/.claude/
+```
+
+**Download from a GCS bucket:**
+
+If you maintain your Claude Code configuration in a GCS bucket:
+
+```bash
+#!/bin/bash
+
+# Download Claude Code config from GCS
+gsutil -m cp -r gs://my-config-bucket/claude-config/ /home/spinner/.claude/
+chown -R spinner:spinner /home/spinner/.claude/
+```
+
+**Clone from a git repository:**
+
+```bash
+#!/bin/bash
+
+# Clone config repo and copy Claude Code settings
+git clone https://github.com/my-org/agent-config.git /tmp/agent-config
+cp -r /tmp/agent-config/.claude/ /home/spinner/.claude/
+chown -R spinner:spinner /home/spinner/.claude/
+rm -rf /tmp/agent-config
+```
+
+Then bake the image:
+
+```bash
+spinner setup --name my-custom-env --bake-script ./custom-install.sh
+```
+
+> **Tip:** Only include the specific config files you need (settings, commands, skills) rather than your entire
+> `~/.claude/` directory, which may contain tokens or session data that should not be baked into an image.
+
 ### Customizing VM Resources
 
 You can configure the machine type and disk size:
