@@ -58,6 +58,17 @@ The CLI SHALL support keyboard input for controlling the watch interface.
 - **THEN** the header panel SHALL toggle between visible and hidden
 - **AND** the log view SHALL expand or contract to fill the available space
 
+#### Scenario: Header default from configuration
+
+- **WHEN** `watch-header` is set to `false` in `.spinner.json` or `SPINNER_WATCH_HEADER` is set to `false`
+- **THEN** the header panel SHALL be hidden when watch mode starts
+- **AND** the user SHALL still be able to toggle it with 'h' key
+
+#### Scenario: Header default without configuration
+
+- **WHEN** no `watch-header` configuration is present
+- **THEN** the header panel SHALL be visible when watch mode starts (default: `true`)
+
 #### Scenario: Show help overlay
 
 - **WHEN** user presses '?' key and the help overlay is not visible
@@ -100,7 +111,8 @@ The CLI SHALL auto-scroll the log view as new entries arrive, with the ability t
 ### Requirement: TUI Layout
 
 The watch command SHALL display a split-pane terminal UI with container metadata and metrics at the top and logs at the
-bottom. The header panel SHALL be toggleable.
+bottom. The header panel SHALL be toggleable. The initial header visibility SHALL be configurable via `.spinner.json`
+(`watch-header`) or environment variable (`SPINNER_WATCH_HEADER`), defaulting to visible.
 
 #### Scenario: TUI renders on terminal
 
@@ -132,6 +144,37 @@ bottom. The header panel SHALL be toggleable.
 - **AND** the log view SHALL contract to accommodate it
 
 ## ADDED Requirements
+
+### Requirement: Header Default Configuration
+
+The CLI SHALL allow the default header visibility to be configured via `.spinner.json` or environment variable, without
+a CLI flag.
+
+#### Scenario: Configure via .spinner.json
+
+- **WHEN** `.spinner.json` contains `"watch-header": false`
+- **THEN** the header panel SHALL default to hidden when watch mode starts
+
+#### Scenario: Configure via environment variable
+
+- **WHEN** `SPINNER_WATCH_HEADER` is set to `false`
+- **THEN** the header panel SHALL default to hidden when watch mode starts
+
+#### Scenario: Environment variable overrides .spinner.json
+
+- **WHEN** `.spinner.json` contains `"watch-header": true` and `SPINNER_WATCH_HEADER` is set to `false`
+- **THEN** the header panel SHALL default to hidden (env var takes precedence)
+
+#### Scenario: No configuration present
+
+- **WHEN** neither `.spinner.json` nor `SPINNER_WATCH_HEADER` specifies a value
+- **THEN** the header panel SHALL default to visible (`true`)
+
+#### Scenario: Runtime toggle unaffected by default
+
+- **WHEN** the header default is configured to hidden
+- **AND** the user presses 'h' key
+- **THEN** the header panel SHALL become visible (toggle still works normally)
 
 ### Requirement: Help Overlay
 

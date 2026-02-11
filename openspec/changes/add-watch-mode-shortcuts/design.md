@@ -8,6 +8,7 @@
 |------|--------|---------|
 | `internal/tui/watch.go` | modify | Add scrolling state, keyboard handlers, header toggle, help overlay, footer updates |
 | `internal/tui/watch_test.go` | modify | Add tests for new keyboard handling, scroll state, header toggle, overlay logic |
+| `cmd/watch.go` | modify | Read `watch-header` from Viper and pass to `NewWatchUI` |
 
 ### Approach
 
@@ -49,11 +50,25 @@ row (±1 for line, ±page height for page), and call `ScrollTo(newRow, 0)`.
 **Page height calculation**: Use `logView.GetInnerRect()` to get the visible height of the log view, then scroll by
 that many rows for page up/down.
 
-#### 3. Header Toggle
+#### 3. Header Default Configuration
 
-Add a `headerVisible bool` field (default `true`) to `WatchUI`.
+The initial value of `headerVisible` is driven by configuration rather than being hardcoded to `true`.
 
-- **Toggle on `h`**: Remove or re-add the header from the flex layout.
+- **Viper key**: `watch-header` (accessed via `viper.GetBool("watch-header")`)
+- **Env var**: `SPINNER_WATCH_HEADER` (automatic via Viper's `SPINNER_` prefix + `AutomaticEnv()`)
+- **`.spinner.json`**: `{ "watch-header": false }`
+- **Default**: `true` (set via `viper.SetDefault("watch-header", true)` in `cmd/root.go`)
+- **No CLI flag**: This is intentionally not exposed as a `--watch-header` flag. It's a user/team preference setting,
+  not a per-invocation option. The Viper key is registered with `SetDefault` only, no flag binding.
+
+In `cmd/watch.go`, the `performWatch` function reads `viper.GetBool("watch-header")` and passes it to `NewWatchUI`
+(or via a config/options struct). The TUI initializes `headerVisible` to this value.
+
+#### 4. Header Toggle
+
+Add a `headerVisible bool` field to `WatchUI`, initialized from configuration (see §3 above).
+
+- **Toggle on `h`**: Toggle `headerVisible` and remove or re-add the header from the flex layout.
   - Hide: `ui.layout.RemoveItem(ui.header)`
   - Show: Use `tview.Flex.AddItemAtIndex` or rebuild the layout with the header re-inserted at index 0.
   - Since `tview.Flex` doesn't have `AddItemAtIndex`, the simplest approach is to clear and rebuild the flex:
@@ -65,7 +80,7 @@ Add a `headerVisible bool` field (default `true`) to `WatchUI`.
     ```
 - **Footer text update**: When header is hidden, update footer to show `h: show header` instead of `h: hide header`.
 
-#### 4. Help Overlay
+#### 5. Help Overlay
 
 Add a `helpVisible bool` field and a `helpOverlay *tview.TextView` component.
 
@@ -89,7 +104,7 @@ Add a `helpVisible bool` field and a `helpOverlay *tview.TextView` component.
  q            Quit
 ```
 
-#### 5. Footer Text Updates
+#### 6. Footer Text Updates
 
 The footer currently shows a static `Press q to quit`. Update it dynamically based on state:
 
@@ -109,3 +124,7 @@ This keeps the footer to a single line and provides both discoverability and scr
 4. **No separate scroll-lock key**: Auto-scroll state is managed implicitly by directional keys rather than an explicit
    toggle. Scrolling up pauses auto-scroll; reaching the bottom resumes it. This matches common terminal emulator
    behavior (e.g., iTerm2, Windows Terminal).
+5. **Config-only header default, no CLI flag**: The header visibility default is a user/team preference (e.g., "I always
+   want headers off") rather than a per-invocation option. Exposing it via `.spinner.json` and `SPINNER_WATCH_HEADER`
+   fits the existing config precedence model. A `--watch-header` flag would clutter the command signature for something
+   that rarely changes between runs. The `h` key remains the primary interaction for toggling during a session.
