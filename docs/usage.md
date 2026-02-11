@@ -210,6 +210,27 @@ go test ./internal/docker/...
 - You're in a git repository with proper configuration
 - The `--image` matches a previous `--name` from setup
 
+## Customizing the Agent's Claude Code Configuration
+
+Spinner images come with Claude Code installed, but with a default configuration. If you use custom MCP servers,
+skills, commands, or other Claude Code settings locally, you can bake them into the image so the agent has access to
+them at runtime.
+
+Claude Code stores its configuration in the `~/.claude/` directory. Inside a Spinner container or VM, the agent runs as
+the `spinner` user with home directory `/home/spinner`, so the target path is `/home/spinner/.claude/`.
+
+Common things you might want to include:
+
+- **MCP servers** — `settings.json` with your `mcpServers` configuration
+- **Custom slash commands** — files in `.claude/commands/`
+- **Skills** — files in `.claude/skills/`
+- **Settings** — `settings.json` with permissions, preferences, or model configuration
+
+The mechanism differs by backend:
+
+- **Docker** — use a custom Dockerfile via `--dockerfile` (see the [Docker guide](guides/docker.md#customizing-claude-code-configuration))
+- **GCP** — use a custom bake script via `--bake-script` (see the [GCP guide](guides/gcp.md#customizing-claude-code-configuration))
+
 ## Working Command Examples
 
 These are tested, working examples for future reference:

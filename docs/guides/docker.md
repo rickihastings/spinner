@@ -38,6 +38,58 @@ spinner setup --name custom-env --dockerfile ./Dockerfile.custom
 
 > **Note:** `--base-image` and `--dockerfile` cannot be used together.
 
+### Customizing Claude Code Configuration
+
+If you use custom MCP servers, slash commands, skills, or other Claude Code settings, you can bake them into the Docker
+image so the agent has access at runtime. Create a Dockerfile that copies your `.claude/` directory into the spinner
+user's home:
+
+```dockerfile
+FROM ubuntu:22.04
+
+# Copy your Claude Code configuration.
+# The spinner user (UID 1000) is created by the extending template that
+# wraps this Dockerfile, so set ownership to UID/GID 1000.
+COPY .claude/ /home/spinner/.claude/
+RUN chown -R 1000:1000 /home/spinner/.claude/
+```
+
+Then build with:
+
+```bash
+spinner setup --name my-custom-env --dockerfile ./Dockerfile.custom
+```
+
+Spinner builds your Dockerfile first, then layers its own setup (git, Claude Code, the spinner binary) on top. Files
+you placed in `/home/spinner/.claude/` are preserved because the extending template does not overwrite existing
+directories.
+
+**What to include:**
+
+| Path                                    | Purpose                          |
+|-----------------------------------------|----------------------------------|
+| `.claude/settings.json`                 | MCP servers, permissions, prefs  |
+| `.claude/commands/`                     | Custom slash commands             |
+| `.claude/skills/`                       | Custom skills                     |
+
+**Example with MCP servers and custom commands:**
+
+```dockerfile
+FROM ubuntu:22.04
+
+# Install additional dependencies your MCP servers might need
+RUN apt-get update && apt-get install -y python3 python3-pip && rm -rf /var/lib/apt/lists/*
+RUN pip3 install my-mcp-server
+
+# Copy Claude Code config from your local .claude directory
+COPY .claude/settings.json /home/spinner/.claude/settings.json
+COPY .claude/commands/ /home/spinner/.claude/commands/
+RUN chown -R 1000:1000 /home/spinner/.claude/
+```
+
+> **Tip:** Only copy the specific files you need rather than your entire `~/.claude/` directory, which may contain
+> tokens or session data that should not be baked into an image.
+
 ## Step 2: Spin Up a Container
 
 Once your image is built, you spin up a container pointed at a git repository. How the container behaves depends on whether you provide a `--prompt`.
