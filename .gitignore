@@ -151,3 +151,4 @@ coverage.*
 .spinner
 .spinner.json
 prompt.md
+package-lock.json
