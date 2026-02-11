@@ -186,12 +186,14 @@ func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfi
 	}
 
 	if config.ServiceAccount != "" || len(config.Scopes) > 0 {
-		sa := &computepb.ServiceAccount{
-			Scopes: config.Scopes,
+		email := config.ServiceAccount
+		if email == "" {
+			email = "default"
 		}
 
-		if config.ServiceAccount != "" {
-			sa.Email = strPtr(config.ServiceAccount)
+		sa := &computepb.ServiceAccount{
+			Email:  strPtr(email),
+			Scopes: config.Scopes,
 		}
 
 		instance.ServiceAccounts = []*computepb.ServiceAccount{sa}

@@ -14,25 +14,26 @@ import (
 
 // Flag name constants shared across commands.
 const (
-	flagBackend       = "backend"
-	flagName          = "name"
-	flagImage         = "image"
-	flagRepo          = "repo"
-	flagPrompt        = "prompt"
-	flagBranch        = "branch"
-	flagMaxIterations = "max-iterations"
-	flagRecreate      = "recreate"
-	flagSetup         = "setup"
-	flagWatch         = "watch"
-	flagBaseImage     = "base-image"
-	flagDockerfile    = "dockerfile"
-	flagProject       = "project"
-	flagZone          = "zone"
-	flagMachineType   = "machine-type"
-	flagDiskSize      = "disk-size"
-	flagStateBucket   = "state-bucket"
-	flagBakeScript    = "bake-script"
-	flagEnv           = "env"
+	flagBackend        = "backend"
+	flagName           = "name"
+	flagImage          = "image"
+	flagRepo           = "repo"
+	flagPrompt         = "prompt"
+	flagBranch         = "branch"
+	flagMaxIterations  = "max-iterations"
+	flagRecreate       = "recreate"
+	flagSetup          = "setup"
+	flagWatch          = "watch"
+	flagBaseImage      = "base-image"
+	flagDockerfile     = "dockerfile"
+	flagProject        = "project"
+	flagZone           = "zone"
+	flagMachineType    = "machine-type"
+	flagDiskSize       = "disk-size"
+	flagStateBucket    = "state-bucket"
+	flagBakeScript     = "bake-script"
+	flagServiceAccount = "service-account"
+	flagEnv            = "env"
 )
 
 // GCP default values.
@@ -127,7 +128,7 @@ func runSetup(ctx context.Context, p provider.Provider, backend, name string) er
 // the wrong backend. Only explicitly-set CLI flags trigger errors; values
 // from .spinner.json or env vars are silently ignored.
 func validateBackendFlags(cmd *cobra.Command, backend string) error {
-	gcpOnlyFlags := []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket, flagBakeScript}
+	gcpOnlyFlags := []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket, flagBakeScript, flagServiceAccount}
 	dockerOnlyFlags := []string{flagBaseImage, flagDockerfile}
 
 	if backend != provider.BackendGCP {
@@ -238,7 +239,7 @@ func validateBakeScriptFlag(cmd *cobra.Command) error {
 }
 
 // gcpFlags is the list of all GCP-specific flag names.
-var gcpFlags = []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket, flagBakeScript}
+var gcpFlags = []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket, flagBakeScript, flagServiceAccount}
 
 // bindGCPFlags binds all GCP-specific flags on cmd to Viper.
 // Skips flags that don't exist on the command (e.g. watch doesn't have machine-type).
@@ -264,12 +265,13 @@ func gcpOptionsFromViper() map[string]string {
 	}
 
 	return map[string]string{
-		flagProject:     viper.GetString(flagProject),
-		flagZone:        viper.GetString(flagZone),
-		flagStateBucket: viper.GetString(flagStateBucket),
-		flagMachineType: mt,
-		flagDiskSize:    strconv.Itoa(ds),
-		flagBakeScript:  viper.GetString(flagBakeScript),
+		flagProject:        viper.GetString(flagProject),
+		flagZone:           viper.GetString(flagZone),
+		flagStateBucket:    viper.GetString(flagStateBucket),
+		flagMachineType:    mt,
+		flagDiskSize:       strconv.Itoa(ds),
+		flagBakeScript:     viper.GetString(flagBakeScript),
+		flagServiceAccount: viper.GetString(flagServiceAccount),
 	}
 }
 

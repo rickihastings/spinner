@@ -95,6 +95,7 @@ EXAMPLES:
 	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
 	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
 	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
+	cmd.Flags().String(flagServiceAccount, "", "GCP service account email (GCP backend)")
 
 	return cmd
 }
