@@ -8,6 +8,7 @@ import (
 
 	"github.com/rickihastings/spinner/internal/prerequisites"
 	"github.com/rickihastings/spinner/internal/provider"
+	"github.com/rickihastings/spinner/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -160,6 +161,9 @@ EXAMPLES:
 					createOptions[k] = v
 				}
 			}
+
+			// Convert SSH URLs to HTTPS so all backends use PAT auth via GITHUB_TOKEN.
+			spinRepo = util.ConvertSshToHttps(spinRepo)
 
 			createConfig := provider.CreateConfig{
 				Repo:          spinRepo,

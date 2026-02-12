@@ -417,8 +417,9 @@ func TestBuildDockerRunCommand_NpmrcHandling(t *testing.T) {
 	}
 }
 
-// TestBuildDockerRunCommand_SshToHttpsConversion tests SSH URL conversion
-func TestBuildDockerRunCommand_SshToHttpsConversion(t *testing.T) {
+// TestBuildDockerRunCommand_RepoURLPassthrough tests that the repo URL is written as-is
+// (SSH-to-HTTPS conversion happens upstream in cmd/spin.go before reaching the provider)
+func TestBuildDockerRunCommand_RepoURLPassthrough(t *testing.T) {
 	_ = os.Setenv("GITHUB_TOKEN", "test-token")
 	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
 
@@ -427,66 +428,22 @@ func TestBuildDockerRunCommand_SshToHttpsConversion(t *testing.T) {
 		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
 	}()
 
-	tests := []struct {
-		name        string
-		repoURL     string
-		expectedURL string
-	}{
-		{
-			name:        "convert SSH to HTTPS",
-			repoURL:     "git@github.com:user/repo.git",
-			expectedURL: "https://github.com/user/repo.git",
-		},
-		{
-			name:        "keep HTTPS as-is",
-			repoURL:     "https://github.com/user/repo.git",
-			expectedURL: "https://github.com/user/repo.git",
-		},
+	config := spinConfig{
+		Image: "spinner:test",
+		Repo:  "https://github.com/user/repo.git",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := spinConfig{
-				Image: "spinner:test",
-				Repo:  tt.repoURL,
-			}
-
-			_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
-			if tmpFile != "" {
-				defer func() { _ = os.Remove(tmpFile) }()
-			}
-
-			assert.NoError(t, err)
-
-			// Verify temp file contains converted URL
-			content, err := os.ReadFile(tmpFile)
-			assert.NoError(t, err)
-
-			expectedEnvVar := "REPO_URL=" + tt.expectedURL + "\n"
-			assert.Contains(t, string(content), expectedEnvVar, "should use converted URL in env file")
-		})
-	}
-}
-
-// TestConvertSshToHttps tests SSH to HTTPS URL conversion
-func TestConvertSshToHttps(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"git@github.com:user/repo.git", "https://github.com/user/repo.git"},
-		{"git@github.com:org/project.git", "https://github.com/org/project.git"},
-		{"https://github.com/user/repo.git", "https://github.com/user/repo.git"},
-		{"http://github.com/user/repo.git", "http://github.com/user/repo.git"},
-		{"other-url", "other-url"},
+	_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	if tmpFile != "" {
+		defer func() { _ = os.Remove(tmpFile) }()
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result := convertSshToHttps(tt.input)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+	assert.NoError(t, err)
+
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+
+	assert.Contains(t, string(content), "REPO_URL=https://github.com/user/repo.git\n", "should pass repo URL through as-is")
 }
 
 // TestEscapeShellArg tests shell argument escaping

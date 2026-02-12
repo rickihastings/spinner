@@ -269,7 +269,7 @@ func TestCollectGCPMetrics_RunningWithCPU(t *testing.T) {
 		IntervalSeconds: metricsQueryIntervalSeconds,
 	}).Return([]metricPoint{{Value: 60.0}}, nil)
 
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateRunning, metrics.State)
 	assert.InDelta(t, 75.0, metrics.CPUPercent, 0.01)
 	assert.InDelta(t, 60.0, metrics.MemoryPercent, 0.01)
@@ -299,7 +299,7 @@ func TestCollectGCPMetrics_RunningNoCPUData(t *testing.T) {
 		IntervalSeconds: metricsQueryIntervalSeconds,
 	}).Return([]metricPoint{}, nil)
 
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateRunning, metrics.State)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
 	assert.Equal(t, 0.0, metrics.MemoryPercent)
@@ -329,7 +329,7 @@ func TestCollectGCPMetrics_RunningCPUError(t *testing.T) {
 		IntervalSeconds: metricsQueryIntervalSeconds,
 	}).Return([]metricPoint{{Value: 45.0}}, nil)
 
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateRunning, metrics.State)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
 	assert.InDelta(t, 45.0, metrics.MemoryPercent, 0.01)
@@ -347,7 +347,7 @@ func TestCollectGCPMetrics_Stopped(t *testing.T) {
 		Return(&computepb.Instance{Status: &terminated}, nil)
 
 	// Should not query metrics for stopped VMs
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateStopped, metrics.State)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
 	assert.NoError(t, metrics.Error)
@@ -361,7 +361,7 @@ func TestCollectGCPMetrics_VMNotFound(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(nil, fmt.Errorf("googleapi: Error 404: not found"))
 
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateExited, metrics.State)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
 	assert.NoError(t, metrics.Error)
@@ -375,10 +375,66 @@ func TestCollectGCPMetrics_APIError(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(nil, fmt.Errorf("permission denied"))
 
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1")
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateUnknown, metrics.State)
 	assert.Error(t, metrics.Error)
 	assert.Contains(t, metrics.Error.Error(), "failed to get VM state")
+	client.AssertExpectations(t)
+}
+
+func TestCollectGCPMetrics_ReadsIterationFromGCS(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	running := "RUNNING"
+	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
+		Return(&computepb.Instance{Status: &running}, nil)
+
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
+		MetricType:      cpuMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{{Value: 0.50}}, nil)
+
+	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
+		MetricType:      memoryPercentMetricType,
+		InstanceName:    "vm-1",
+		Zone:            "zone",
+		IntervalSeconds: metricsQueryIntervalSeconds,
+	}).Return([]metricPoint{{Value: 40.0}}, nil)
+
+	// Mock GCS state file with iteration 5
+	client.On("ObjectExists", ctx, "my-bucket", "vm-1/state.json").
+		Return(true, nil)
+	client.On("ReadObject", ctx, "my-bucket", "vm-1/state.json").
+		Return([]byte(`{"iteration": 5, "status": "running"}`), nil)
+
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "my-bucket")
+	assert.Equal(t, provider.StateRunning, metrics.State)
+	assert.Equal(t, 5, metrics.Iteration)
+	assert.InDelta(t, 50.0, metrics.CPUPercent, 0.01)
+	assert.InDelta(t, 40.0, metrics.MemoryPercent, 0.01)
+	client.AssertExpectations(t)
+}
+
+func TestReadIterationFromGCS_NoBucket(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	iter := readIterationFromGCS(ctx, client, "", "vm-1")
+	assert.Equal(t, 0, iter)
+}
+
+func TestReadIterationFromGCS_NoState(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	client.On("ObjectExists", ctx, "bucket", "vm-1/state.json").
+		Return(false, nil)
+
+	iter := readIterationFromGCS(ctx, client, "bucket", "vm-1")
+	assert.Equal(t, 0, iter)
 	client.AssertExpectations(t)
 }
 
@@ -416,7 +472,7 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		done <- streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", ch)
+		done <- streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "", ch)
 	}()
 
 	// Read initial metrics
@@ -446,7 +502,7 @@ func TestStreamGCPMetrics_StoppedVM(t *testing.T) {
 
 	ch := make(chan provider.ContainerMetrics, 10)
 
-	err := streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", ch)
+	err := streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "", ch)
 	assert.NoError(t, err)
 
 	// Should get one metrics message and then return
@@ -469,7 +525,7 @@ func TestStreamGCPMetrics_ExitedVM(t *testing.T) {
 
 	ch := make(chan provider.ContainerMetrics, 10)
 
-	err := streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", ch)
+	err := streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "", ch)
 	assert.NoError(t, err)
 
 	select {
@@ -491,7 +547,7 @@ func TestStreamGCPMetrics_FatalError(t *testing.T) {
 
 	ch := make(chan provider.ContainerMetrics, 10)
 
-	err := streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", ch)
+	err := streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "", ch)
 	// Fatal error: unknown state with error should return the error
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get VM state")
@@ -534,7 +590,7 @@ func TestStreamGCPMetrics_ContextCancellation(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		done <- streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", ch)
+		done <- streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "", ch)
 	}()
 
 	// Read initial metrics

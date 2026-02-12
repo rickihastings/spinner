@@ -149,26 +149,37 @@ func (e *Executor) Execute(ctx context.Context, prompt string) (<-chan agent.Eve
 			}
 		}
 
-		// Capture stderr to log file
+		// Capture stderr into a buffer so we can include it in error messages,
+		// and optionally tee to the log file.
+		var stderrBuf strings.Builder
+
 		if logFile != nil {
 			stderrScanner := bufio.NewScanner(stderr)
 			for stderrScanner.Scan() {
-				_, _ = fmt.Fprintln(logFile, stderrScanner.Text())
+				line := stderrScanner.Text()
+				_, _ = fmt.Fprintln(logFile, line)
+				stderrBuf.WriteString(line)
+				stderrBuf.WriteString("\n")
 			}
 		} else {
-			// Drain stderr even if not logging
-			_, _ = io.Copy(io.Discard, stderr)
+			// Drain stderr into buffer even if not logging
+			_, _ = io.Copy(&stderrBuf, stderr)
 		}
 
 		// Wait for command to finish
 		if err := cmd.Wait(); err != nil {
 			// Emit error event if command failed
 			if ctx.Err() == nil { // Don't emit error if context was cancelled
+				msg := err.Error()
+				if stderrOutput := strings.TrimSpace(stderrBuf.String()); stderrOutput != "" {
+					msg = fmt.Sprintf("%s: %s", err.Error(), stderrOutput)
+				}
+
 				events <- agent.Event{
 					Type: eventTypeError,
 					Data: errorData{
 						Type:    errorTypeCommand,
-						Message: err.Error(),
+						Message: msg,
 					},
 				}
 			}
@@ -202,7 +213,7 @@ func (e *Executor) ExecuteAndCollect(ctx context.Context, prompt string) (*agent
 				result.RateLimited = true
 			} else if isAuthError(&event) {
 				result.AuthError = true
-			} else if data.Type != errorTypeCommand {
+			} else {
 				result.Error = fmt.Errorf("claude error: %s", data.Message)
 			}
 

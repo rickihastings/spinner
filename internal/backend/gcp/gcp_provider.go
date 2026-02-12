@@ -300,7 +300,7 @@ func (p *Provider) WatchLogs(ctx context.Context, name string, _ int, ch chan<- 
 // WatchMetrics streams resource metrics from Cloud Monitoring.
 // Polls CPU utilization at 60-second intervals and maps VM state to ContainerMetrics.
 func (p *Provider) WatchMetrics(ctx context.Context, name string, ch chan<- provider.ContainerMetrics) error {
-	return streamGCPMetrics(ctx, p.client, p.project, p.zone, name, ch)
+	return streamGCPMetrics(ctx, p.client, p.project, p.zone, name, p.bucket, ch)
 }
 
 // GetInstanceMetadata returns metadata about a GCP VM instance.

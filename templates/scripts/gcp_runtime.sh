@@ -91,10 +91,15 @@ if [ $EXIT_CODE -eq 0 ] && [ -n "$PROMPT" ]; then
     sudo poweroff
 fi
 
- # For non-zero exit codes, write error state to GCS so watchers can detect the failure
+ # For non-zero exit codes, write a fallback error state to GCS so watchers
+ # can detect the failure. Only write if the loop hasn't already synced state
+ # (e.g., startup.sh failed during git clone before the loop started).
+ # The local state file is written by the loop; if it exists, the loop already
+ # synced its own (more detailed) error to GCS.
 if [ $EXIT_CODE -ne 0 ] && [ -n "$SPINNER_STATE_BUCKET" ] && [ -n "$SPINNER_INSTANCE_NAME" ]; then
-    echo "Startup failed with exit code $EXIT_CODE. Writing error state to GCS..."
-    STATE_JSON=$(cat <<STATEEOF
+    if [ ! -f "$STATE_DIR/state.json" ]; then
+        echo "Startup failed with exit code $EXIT_CODE. Writing error state to GCS..."
+        STATE_JSON=$(cat <<STATEEOF
 {
   "iteration": 0,
   "status": "error",
@@ -104,7 +109,10 @@ if [ $EXIT_CODE -ne 0 ] && [ -n "$SPINNER_STATE_BUCKET" ] && [ -n "$SPINNER_INST
 }
 STATEEOF
 )
-    echo "$STATE_JSON" | gsutil -q cp - "gs://${SPINNER_STATE_BUCKET}/${SPINNER_INSTANCE_NAME}/state.json" || true
+        echo "$STATE_JSON" | gsutil -q cp - "gs://${SPINNER_STATE_BUCKET}/${SPINNER_INSTANCE_NAME}/state.json" || true
+    else
+        echo "Loop already synced error state to GCS, skipping fallback write."
+    fi
 fi
 
 # For non-zero exit codes or when no prompt specified, keep VM running

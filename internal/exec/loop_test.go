@@ -2,8 +2,10 @@ package exec
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -359,6 +361,141 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 
 	if state.ErrorMessage != "interrupted by user" {
 		t.Errorf("Expected error message 'interrupted by user', got %s", state.ErrorMessage)
+	}
+}
+
+func TestRunner_Run_ConsecutiveErrors(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	config := &Config{
+		Prompt:        "test prompt",
+		MaxIterations: 100,
+		Branch:        "main",
+		LogDir:        tmpDir,
+	}
+
+	state := &State{
+		Status:    statusRunning,
+		Iteration: 0,
+	}
+
+	runner := NewRunner(config, state, statePath)
+
+	// Mock executor factory to always return an error
+	oldExecutorFactory := executorFactory
+
+	defer func() { executorFactory = oldExecutorFactory }()
+
+	callCount := 0
+
+	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+		callCount++
+		return &mockExecutor{
+			result: &agent.Result{
+				Error:        fmt.Errorf("claude CLI failed"),
+				ErrorMessage: "exit status 1",
+			},
+			err: nil,
+		}
+	}
+
+	oldPushChanges := pushChangesFunc
+
+	defer func() { pushChangesFunc = oldPushChanges }()
+
+	pushChangesFunc = func(ctx context.Context, branch string) error {
+		return nil
+	}
+
+	ctx := context.Background()
+	exitCode := runner.Run(ctx)
+
+	// Should bail out after maxConsecutiveErrors (3), not run all 100 iterations
+	if exitCode != 1 {
+		t.Errorf("Expected exit code 1, got %d", exitCode)
+	}
+
+	if callCount != maxConsecutiveErrors {
+		t.Errorf("Expected %d calls (consecutive error limit), got %d", maxConsecutiveErrors, callCount)
+	}
+
+	if state.Status != statusError {
+		t.Errorf("Expected status error, got %s", state.Status)
+	}
+
+	if !strings.Contains(state.ErrorMessage, "consecutive errors") {
+		t.Errorf("Expected error message to mention consecutive errors, got %s", state.ErrorMessage)
+	}
+}
+
+func TestRunner_Run_ConsecutiveErrorsReset(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	config := &Config{
+		Prompt:        "test prompt",
+		MaxIterations: 10,
+		Branch:        "main",
+		LogDir:        tmpDir,
+	}
+
+	state := &State{
+		Status:    statusRunning,
+		Iteration: 0,
+	}
+
+	runner := NewRunner(config, state, statePath)
+
+	// Mock executor: alternate between error and success
+	oldExecutorFactory := executorFactory
+
+	defer func() { executorFactory = oldExecutorFactory }()
+
+	callCount := 0
+
+	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+		callCount++
+		// Alternate: error, error, success, error, error, success, ...
+		if callCount%3 != 0 {
+			return &mockExecutor{
+				result: &agent.Result{
+					Error:        fmt.Errorf("transient error"),
+					ErrorMessage: "transient failure",
+				},
+				err: nil,
+			}
+		}
+
+		return &mockExecutor{
+			result: &agent.Result{},
+			err:    nil,
+		}
+	}
+
+	oldPushChanges := pushChangesFunc
+
+	defer func() { pushChangesFunc = oldPushChanges }()
+
+	pushChangesFunc = func(ctx context.Context, branch string) error {
+		return nil
+	}
+
+	ctx := context.Background()
+	exitCode := runner.Run(ctx)
+
+	// Should hit max iterations since errors never reach 3 consecutive
+	if exitCode != 1 {
+		t.Errorf("Expected exit code 1 (max iterations), got %d", exitCode)
+	}
+
+	if state.ErrorMessage != "max iterations reached" {
+		t.Errorf("Expected 'max iterations reached', got %s", state.ErrorMessage)
+	}
+
+	// Should have run all 10 iterations
+	if callCount != 10 {
+		t.Errorf("Expected 10 calls (all iterations), got %d", callCount)
 	}
 }
 

@@ -75,9 +75,9 @@ TSEOF
 
 systemctl enable tailscale-auth.service
 
-echo "=== Installing Node.js and npm ==="
-apt-get update
-apt-get install -y nodejs npm
+echo "=== Installing Node.js 22.x LTS ==="
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs
 
 echo "=== Installing Claude Code CLI (global) ==="
 npm install -g @anthropic-ai/claude-code

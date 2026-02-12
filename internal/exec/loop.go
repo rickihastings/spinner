@@ -15,6 +15,11 @@ import (
 const (
 	// RateLimitWaitSeconds is how long to wait when rate limited (61 minutes)
 	RateLimitWaitSeconds = 3660
+
+	// maxConsecutiveErrors is the number of consecutive errors before the loop
+	// stops. This prevents burning through all iterations when Claude CLI is
+	// broken (e.g., not installed, crashing immediately).
+	maxConsecutiveErrors = 3
 )
 
 // StateSyncFunc is called after each local state save to sync state to a
@@ -136,6 +141,8 @@ func (r *Runner) Run(ctx context.Context) int {
 		}
 	}
 
+	consecutiveErrors := 0
+
 	for r.state.Iteration = 1; r.state.Iteration <= r.config.MaxIterations; r.state.Iteration++ {
 		// Check for context cancellation
 		select {
@@ -229,12 +236,26 @@ func (r *Runner) Run(ctx context.Context) int {
 
 		// Check for other errors
 		if result.Error != nil {
+			consecutiveErrors++
+
 			fmt.Fprintf(os.Stderr, "\n⚠️  Error during iteration: %v\n", result.Error)
+
+			if consecutiveErrors >= maxConsecutiveErrors {
+				fmt.Fprintf(os.Stderr, "\n❌ %d consecutive errors detected, stopping loop\n", maxConsecutiveErrors)
+
+				r.state.Status = statusError
+				r.state.ErrorMessage = fmt.Sprintf("stopped after %d consecutive errors: %s", maxConsecutiveErrors, result.ErrorMessage)
+				_ = r.saveState()
+
+				return 1
+			}
 
 			r.state.Status = statusError
 			r.state.ErrorMessage = result.ErrorMessage
 			_ = r.saveState()
 			// Continue to next iteration instead of exiting
+		} else {
+			consecutiveErrors = 0
 		}
 
 		fmt.Println("\n✓ Iteration complete.")

@@ -43,16 +43,6 @@ func escapeShellArg(arg string) string {
 	return "'" + strings.ReplaceAll(arg, "'", "'\\''") + "'"
 }
 
-// convertSshToHttps converts SSH Git URLs to HTTPS format for GitHub PAT authentication.
-// Example: git@github.com:user/repo.git -> https://github.com/user/repo.git
-func convertSshToHttps(repoURL string) string {
-	if strings.HasPrefix(repoURL, "git@github.com:") {
-		return strings.Replace(repoURL, "git@github.com:", "https://github.com/", 1)
-	}
-
-	return repoURL
-}
-
 // sanitizeComponent sanitizes a component for use in a Docker container name.
 // Converts to lowercase, replaces invalid characters with hyphens,
 // collapses consecutive hyphens, and trims leading/trailing hyphens.
@@ -105,9 +95,6 @@ func generateContainerName(config spinConfig) string {
 // Returns docker args and a temp file path (or empty string if no temp file created).
 // The caller MUST delete the temp file after docker run completes.
 func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc bool) ([]string, string, error) {
-	// Convert SSH URLs to HTTPS for GitHub PAT authentication
-	repoURL := convertSshToHttps(config.Repo)
-
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get home directory: %w", err)
@@ -132,7 +119,7 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	// Write built-in environment variables
 	_, _ = fmt.Fprintf(tmpFile, "GITHUB_TOKEN=%s\n", os.Getenv("GITHUB_TOKEN"))
 	_, _ = fmt.Fprintf(tmpFile, "CLAUDE_CODE_OAUTH_TOKEN=%s\n", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"))
-	_, _ = fmt.Fprintf(tmpFile, "REPO_URL=%s\n", repoURL)
+	_, _ = fmt.Fprintf(tmpFile, "REPO_URL=%s\n", config.Repo)
 
 	// Add branch if specified
 	if config.Branch != "" {
