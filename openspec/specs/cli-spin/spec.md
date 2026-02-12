@@ -719,7 +719,30 @@ The spin command SHALL accept GCP-specific flags when `--backend gcp` is selecte
 
 ### Requirement: Configuration File Support
 
-The spin command SHALL read infrastructure defaults from a `.spinner.json` file at the repo root.
+The spin command SHALL read infrastructure defaults from a `.spinner.json` file discovered by searching from the current working directory upward through ancestor directories, with a fallback to `$HOME/.spinner.json`.
+
+#### Scenario: Config file in current directory
+
+- **WHEN** `.spinner.json` exists in the current working directory
+- **THEN** the CLI SHALL load that file as the configuration source
+
+#### Scenario: Config file in ancestor directory
+
+- **WHEN** no `.spinner.json` exists in the current working directory
+- **AND** a `.spinner.json` exists in an ancestor directory (e.g., `$HOME/.spinner.json` when cwd is `$HOME/projects/repo`)
+- **THEN** the CLI SHALL traverse upward from cwd and load the nearest `.spinner.json` found
+
+#### Scenario: Config file in home directory as fallback
+
+- **WHEN** no `.spinner.json` exists in the current directory or any ancestor directory
+- **AND** `$HOME/.spinner.json` exists
+- **THEN** the CLI SHALL load `$HOME/.spinner.json` as a fallback
+
+#### Scenario: First config file wins (no merging)
+
+- **WHEN** `.spinner.json` exists in both the current directory and `$HOME`
+- **THEN** the CLI SHALL load only the nearest file (current directory)
+- **AND** the home directory file SHALL be ignored entirely (no merging)
 
 #### Scenario: Config file provides full GCP config
 
@@ -735,7 +758,7 @@ The spin command SHALL read infrastructure defaults from a `.spinner.json` file 
 
 #### Scenario: No config file present
 
-- **WHEN** no `.spinner.json` exists in the current directory
+- **WHEN** no `.spinner.json` exists in the current directory, any ancestor directory, or `$HOME`
 - **THEN** the CLI SHALL continue normally using CLI flags, env vars, and defaults
 
 ### Requirement: Custom Environment Variables
