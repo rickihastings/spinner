@@ -4,19 +4,20 @@
 
 ### Requirement: Secret Store CLI
 
-The CLI SHALL provide a `spinner secret` subcommand for managing secrets in a platform-appropriate secure
-store (macOS Keychain or encrypted file). Secret values SHALL never be stored in plaintext on the filesystem.
+The CLI SHALL provide a `spinner secret` subcommand for managing secrets in an encrypted file store
+(`~/.spinner/secrets.enc`). Secret values SHALL be encrypted at rest using AES-256-GCM with Argon2id
+key derivation. Secret values SHALL never be stored in plaintext on the filesystem.
 
 #### Scenario: Set secret with prompted input
 
 - **WHEN** user runs `spinner secret set MY_TOKEN`
 - **THEN** the CLI SHALL prompt for the value with hidden input (no echo)
-- **AND** the value SHALL be stored in the secret store under the key `MY_TOKEN`
+- **AND** the value SHALL be stored encrypted in the secret store under the key `MY_TOKEN`
 
 #### Scenario: Set secret with inline value
 
 - **WHEN** user runs `spinner secret set MY_TOKEN --value abc123`
-- **THEN** the CLI SHALL store `abc123` in the secret store under the key `MY_TOKEN`
+- **THEN** the CLI SHALL store `abc123` encrypted in the secret store under the key `MY_TOKEN`
 - **AND** no interactive prompt SHALL be shown
 
 #### Scenario: Set secret overwrites existing value
@@ -46,30 +47,27 @@ store (macOS Keychain or encrypted file). Secret values SHALL never be stored in
 - **THEN** the CLI SHALL print an error indicating the key was not found
 - **AND** the CLI SHALL exit with non-zero status
 
-#### Scenario: Auto-detect backend on macOS
+#### Scenario: Passphrase prompt for encrypted store
 
-- **WHEN** the CLI runs on macOS with `/usr/bin/security` available
-- **THEN** the secret store SHALL use macOS Keychain as the backend
-
-#### Scenario: Auto-detect backend on Linux
-
-- **WHEN** the CLI runs on a non-macOS platform
-- **THEN** the secret store SHALL use the encrypted file backend (`~/.spinner/secrets.enc`)
-
-#### Scenario: Backend override via environment variable
-
-- **WHEN** the `SPINNER_SECRET_BACKEND` environment variable is set to `keychain` or `file`
-- **THEN** the CLI SHALL use the specified backend regardless of platform detection
-
-#### Scenario: Encrypted file backend passphrase prompt
-
-- **WHEN** the encrypted file backend is used and `SPINNER_SECRET_PASSPHRASE` is not set
+- **WHEN** a secret store operation is performed and `SPINNER_SECRET_PASSPHRASE` is not set
 - **THEN** the CLI SHALL prompt the user for a passphrase with hidden input
 
-#### Scenario: Encrypted file backend passphrase via environment
+#### Scenario: Passphrase via environment variable
 
-- **WHEN** the encrypted file backend is used and `SPINNER_SECRET_PASSPHRASE` is set
+- **WHEN** a secret store operation is performed and `SPINNER_SECRET_PASSPHRASE` is set
 - **THEN** the CLI SHALL use the environment variable value as the passphrase without prompting
+
+#### Scenario: Wrong passphrase
+
+- **WHEN** the user provides an incorrect passphrase for an existing encrypted store
+- **THEN** the CLI SHALL print an error indicating authentication failed
+- **AND** the CLI SHALL exit with non-zero status
+
+#### Scenario: First use creates store file
+
+- **WHEN** user runs `spinner secret set` and `~/.spinner/secrets.enc` does not exist
+- **THEN** the CLI SHALL create the file with `0600` permissions
+- **AND** the user SHALL be prompted to set a passphrase
 
 ### Requirement: Secret Flag
 
@@ -123,9 +121,9 @@ environment. Secret values SHALL never appear on the command line.
 
 ### Requirement: GitHub Token Environment Variable
 
-The CLI SHALL resolve `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` from the secret store first, then fall
-back to host environment variables via `os.Getenv()`. The CLI SHALL report an error only if neither source
-provides a value. Token values SHALL NOT appear in docker command output or logs.
+The CLI SHALL resolve `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` from the encrypted secret store first,
+then fall back to host environment variables via `os.Getenv()`. The CLI SHALL report an error only if
+neither source provides a value. Token values SHALL NOT appear in docker command output or logs.
 
 #### Scenario: Token resolved from secret store
 

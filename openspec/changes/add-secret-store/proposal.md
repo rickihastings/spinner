@@ -2,27 +2,28 @@
 
 ## Summary
 
-Add a secret store abstraction (`internal/secret/`) with macOS Keychain and encrypted file backends, a
+Add an encrypted secret store (`internal/secret/`) backed by an AES-256-GCM encrypted file, a
 `spinner secret set/list/delete` CLI subcommand, and a `--secret KEY` flag on `spin` that references keys
 from the store. Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) auto-resolve from the store
 first, then fall back to environment variables for backward compatibility.
 
 ## Motivation
 
-Spinner currently reads `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` from host environment variables via
-`os.Getenv()`. In practice, users store these in `.envrc` files on disk — plaintext secrets visible to any
-process with filesystem access. This is particularly concerning when running agents autonomously:
+Spinner reads `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` from host environment variables and forwards
+them into containers — the host CLI never uses these tokens itself, it just passes them through. In
+practice, users store these in `.envrc` files on disk — plaintext secrets visible to any process with
+filesystem access. This is particularly concerning when running agents autonomously:
 
 - **Plaintext on disk** — `.envrc` files contain sensitive tokens readable by any local process (including
   the autonomous agents Spinner orchestrates)
 - **Shell history exposure** — `--env KEY=VALUE` puts secret values in shell history and `ps aux`
 - **No separation** — non-sensitive config and sensitive tokens share the same `.envrc` file with no
   distinction between them
-- **No secure storage** — there is no way to store secrets outside the filesystem today
+- **No secure storage** — there is no way to store secrets outside plaintext files today
 
-macOS Keychain provides hardware-backed secure storage that most Spinner users already have access to. An
-encrypted file backend covers Linux/CI environments. Together they give users a way to keep tokens out of
-plaintext files entirely.
+An encrypted file store gives users a single, cross-platform way to keep tokens out of plaintext files.
+At spin-time, the store is unlocked once, values are read and forwarded into the container — the same
+pass-through model as today, but with encrypted storage instead of `.envrc`.
 
 ## What Changes
 
@@ -31,9 +32,7 @@ plaintext files entirely.
 New `internal/secret/` package with:
 
 - **Store interface** — `Set`, `Get`, `Delete`, `List` methods with `ErrNotFound` sentinel
-- **Keychain backend** — macOS `security` CLI for native Keychain integration (no CGo)
-- **Encrypted file backend** — AES-256-GCM with Argon2id key derivation for Linux/CI
-- **Auto-detection** — selects Keychain on macOS, encrypted file elsewhere
+- **Encrypted file backend** — AES-256-GCM with Argon2id key derivation (`~/.spinner/secrets.enc`)
 - **Resolver** — centralizes token resolution: store first, then env var fallback
 
 ### Added Capability: `spinner secret` CLI Subcommand
@@ -66,9 +65,7 @@ New `internal/secret/` package with:
 | Area | Change Type |
 |---|---|
 | `internal/secret/store.go` | New — Store interface, ErrNotFound sentinel |
-| `internal/secret/keychain.go` | New — macOS Keychain backend |
 | `internal/secret/encrypted.go` | New — AES-256-GCM encrypted file backend |
-| `internal/secret/detect.go` | New — backend auto-detection |
 | `internal/secret/resolver.go` | New — token resolution (store → env → error) |
 | `internal/secret/mock_store.go` | New — testify mock for consumer tests |
 | `cmd/secret.go` | New — `spinner secret` subcommand (set/list/delete) |
@@ -94,14 +91,14 @@ New `internal/secret/` package with:
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| macOS Keychain access prompt | First-time system dialog asking terminal to access Keychain | Expected behavior; one-time approval per terminal app |
 | Encrypted file passphrase UX | Interactive prompt blocks CI | `SPINNER_SECRET_PASSPHRASE` env var for non-interactive use; CI can also use env var fallback (existing workflow) |
 | Backward compatibility | Users relying on env vars must continue to work | Resolver falls back to `os.Getenv()` for built-in tokens; env-only workflow unchanged |
-| Encrypted file corruption | Lost secrets | Clear error message; user can delete file and re-set; Keychain unaffected |
+| Encrypted file corruption | Lost secrets | Clear error message; user can delete file and re-set secrets |
 | Go memory safety | Secret strings cannot be reliably zeroed | Accepted Go limitation; all Go CLI tools share this constraint |
 
 ## Non-Goals
 
+- **macOS Keychain / OS-native backends** — encrypted file is cross-platform and sufficient; no need for platform-specific code paths
 - **GCP Secret Manager integration** — future hardening option for GCP-hosted instances
 - **Docker Swarm secrets** — requires Swarm mode, incompatible with standalone containers
 - **Encrypted env-file support** — `--env-file` is for non-sensitive config; sensitive values go through `--secret`

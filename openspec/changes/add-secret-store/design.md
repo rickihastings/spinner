@@ -1,78 +1,41 @@
 # Design: Add Secret Store
 
-## Host-Side Secret Storage Options Analysis
+## Key Insight: Tokens Are Pass-Through
 
-Before choosing an implementation, we evaluated available mechanisms for storing secrets outside plaintext
-files. The goal is to keep sensitive tokens (GitHub PATs, OAuth tokens, API keys) out of `.envrc` files
-while maintaining a simple CLI workflow.
+Spinner never uses `GITHUB_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN` on the host. It reads them from
+environment variables and forwards them into containers:
 
-### Option 1: macOS Keychain via `security` CLI
+- `internal/backend/docker/run.go:120-121` — writes to temp env file
+- `internal/backend/gcp/gcp_provider.go:185-186` — writes to instance metadata
+- `internal/prerequisites/prerequisites.go:20-33` — validates non-empty
 
-Use the macOS Keychain Access system via the `/usr/bin/security` command-line tool.
+The host CLI is a pass-through. This means the secret store only needs to provide values at
+spin-time — unlock once, read values, forward into the container. No persistent runtime access,
+no background processes, no daemon.
 
-| Property | Status |
-|---|---|
-| Secrets on filesystem | No (stored in encrypted Keychain database) |
-| Cross-platform | macOS only |
-| External dependencies | None (ships with macOS) |
-| CGo required | No (CLI invocation via `exec.Command`) |
+## Why Encrypted File Only
 
-**Pros:** Native, hardware-backed, no extra dependencies, well-tested by Apple. Keychain items are
-encrypted at rest and protected by the user's login password. The `security` CLI is stable across
-macOS versions and avoids CGo complexity.
-**Cons:** macOS only. First-time access may trigger a system dialog asking the user to allow terminal
-access to Keychain.
+We evaluated multiple secret storage approaches:
 
-### Option 2: Encrypted File (AES-256-GCM + Argon2id)
+| Option | Pros | Cons |
+|---|---|---|
+| macOS Keychain via `security` CLI | Native, hardware-backed | macOS only, requires CGo or CLI exec, platform-specific codepath |
+| OS-native per-platform | Fully native | 3x implementation, testing complexity; GNOME Keyring needs D-Bus |
+| External tools (`pass`, `vault`) | Rich features | External dependency users must install and configure |
+| **Encrypted file (AES-256-GCM + Argon2id)** | **Cross-platform, pure Go, single codepath** | **Requires passphrase** |
 
-Store secrets in an encrypted JSON file at `~/.spinner/secrets.enc`. Key derived from a passphrase
-using Argon2id, encrypted with AES-256-GCM authenticated encryption.
-
-| Property | Status |
-|---|---|
-| Secrets on filesystem | Encrypted (not plaintext) |
-| Cross-platform | Yes (pure Go) |
-| External dependencies | `golang.org/x/crypto` (already indirect in go.mod) |
-| CGo required | No |
-
-**Pros:** Works everywhere. No external tools needed. Strong cryptographic primitives (Argon2id
-resists GPU attacks, AES-256-GCM provides authenticated encryption). Passphrase can be supplied
-via `SPINNER_SECRET_PASSPHRASE` env var for CI/non-interactive use.
-**Cons:** Requires passphrase management. Interactive prompt for passphrase on each access (unless
-env var is set). File on disk (though encrypted).
-
-### Option 3: OS-Native Per-Platform (Keychain + secret-tool + wincred)
-
-Implement native secret storage for each OS: macOS Keychain, Linux GNOME Keyring via `secret-tool`,
-Windows Credential Manager via `wincred`.
-
-**Pros:** Fully native on every platform.
-**Cons:** Triple the implementation and testing surface. GNOME Keyring requires D-Bus and a running
-desktop session (fails in headless CI). Windows support isn't needed (Spinner doesn't target Windows).
-Significantly more complexity for marginal benefit.
-
-### Option 4: External Tool Integration (`pass`, `1password-cli`, `vault`)
-
-Delegate to an external secret manager chosen by the user.
-
-**Pros:** Rich features, team sharing, audit trails.
-**Cons:** External dependency the user must install and configure. Different tools have different CLIs
-and auth models. Too much configuration burden for a developer CLI tool.
-
-### Recommendation
-
-**Combine Option 1 (Keychain) and Option 2 (Encrypted File).**
+**Decision: Encrypted file only.**
 
 Rationale:
-- **Most Spinner users are on macOS** — Keychain gives them the best experience (no passphrase prompts,
-  native integration, zero configuration).
-- **Linux and CI need a fallback** — the encrypted file backend provides cross-platform coverage with
-  strong cryptography and no external dependencies.
-- **Auto-detection is simple** — check `runtime.GOOS == "darwin"` and `exec.LookPath("security")`
-  succeeds → Keychain; otherwise → encrypted file.
-- **Both backends implement the same `Store` interface** — consumers (resolver, CLI commands) are
-  backend-agnostic. Adding new backends later (GCP Secret Manager, etc.) is trivial.
-- **No CGo** — both backends are pure Go (Keychain via CLI exec, encrypted file via stdlib + x/crypto).
+- **One codepath everywhere** — same implementation on macOS, Linux, CI. No platform detection,
+  no conditional backends, half the code.
+- **Pure Go** — no CGo, no external binaries, no `exec.Command` to mock. `golang.org/x/crypto`
+  (already in go.mod) provides everything.
+- **Passphrase UX is manageable** — `SPINNER_SECRET_PASSPHRASE` env var for CI/scripts, interactive
+  prompt for local development. And for users who don't want any of this, env vars still work
+  (backward compat).
+- **Tokens are pass-through** — we don't need the sophistication of Keychain for a tool that just
+  reads secrets once at startup and forwards them. An encrypted file is sufficient.
 
 ---
 
@@ -83,12 +46,8 @@ Rationale:
 | File | Action | Purpose |
 |---|---|---|
 | `internal/secret/store.go` | **create** | Store interface, ErrNotFound sentinel error |
-| `internal/secret/keychain.go` | **create** | KeychainStore — macOS Keychain via `security` CLI |
-| `internal/secret/keychain_test.go` | **create** | Tests with injectable command runner (no real Keychain) |
 | `internal/secret/encrypted.go` | **create** | EncryptedFileStore — AES-256-GCM + Argon2id |
 | `internal/secret/encrypted_test.go` | **create** | Round-trip, corruption, wrong-passphrase tests |
-| `internal/secret/detect.go` | **create** | `NewStore()` auto-detection (darwin → Keychain, else → file) |
-| `internal/secret/detect_test.go` | **create** | Platform detection tests |
 | `internal/secret/resolver.go` | **create** | `Resolve(store, customKeys)` — store → env → error |
 | `internal/secret/resolver_test.go` | **create** | Resolution order and error condition tests |
 | `internal/secret/mock_store.go` | **create** | Testify MockStore for consumer tests |
@@ -124,29 +83,10 @@ type Store interface {
 }
 ```
 
-Follows the project's pattern of small focused interfaces (like `Provider`). The `ErrNotFound`
-sentinel error lets callers distinguish "not found" from backend failures, matching how
-`environmentVariableError` is already used in `prerequisites.go`.
+Small focused interface following the project's pattern (`Provider`, `DockerClient`). The
+`ErrNotFound` sentinel lets callers distinguish "not found" from backend failures.
 
-#### Keychain Backend
-
-```go
-type KeychainStore struct {
-    service string          // Keychain service name, default: "spinner"
-    runCmd  commandRunner   // injectable for testing
-}
-```
-
-Uses `exec.CommandContext` to call `/usr/bin/security`:
-- `Set`: `security add-generic-password -U -a spinner -s <key> -w <value>` (`-U` updates if exists)
-- `Get`: `security find-generic-password -a spinner -s <key> -w` (outputs password to stdout)
-- `Delete`: `security delete-generic-password -a spinner -s <key>`
-- `List`: `security dump-keychain` filtered by service name, parse `svce` and `acct` attributes
-
-The `commandRunner` function field defaults to `exec.Command(...).Output()` in production but can be
-swapped in tests. This mirrors how the Docker backend mocks its client interface.
-
-#### Encrypted File Backend
+#### Encrypted File Store
 
 ```go
 type EncryptedFileStore struct {
@@ -161,76 +101,68 @@ type EncryptedFileStore struct {
 - **Passphrase source:** `SPINNER_SECRET_PASSPHRASE` env var first, then interactive prompt via
   `golang.org/x/term.ReadPassword()`
 - **Atomic writes:** Write to temp file, then `os.Rename()` to prevent corruption on crash
-- **File permissions:** `0600` (owner read/write only), consistent with Docker's temp env file pattern
-- **Operations:** All operations load-decrypt-modify-encrypt-write atomically
+- **File permissions:** `0600` (owner read/write only)
+- **Missing file:** Treated as empty store (first `Set` creates the file)
+- **Operations:** All mutating operations load-decrypt-modify-encrypt-write atomically
 
-#### Auto-Detection
-
-```go
-func NewStore() (Store, error) {
-    // Check override via SPINNER_SECRET_BACKEND env var or Viper config
-    if override := viper.GetString("secret-backend"); override != "" {
-        // return based on override value ("keychain" or "file")
-    }
-    // Auto-detect
-    if runtime.GOOS == "darwin" {
-        if _, err := exec.LookPath("security"); err == nil {
-            return NewKeychainStore(), nil
-        }
-    }
-    return NewEncryptedFileStore()
-}
-```
+The store is unlocked once per CLI invocation (the passphrase function is called on first
+access). Since tokens are pass-through, there's only one unlock per `spin` command.
 
 #### Secret Resolver
 
 ```go
-type ResolvedSecrets struct {
-    Tokens map[string]string  // GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN
-    Custom map[string]string  // --secret keys
-}
-
-func Resolve(store Store, customKeys []string) (*ResolvedSecrets, error)
+func Resolve(store Store, customKeys []string) (map[string]string, error)
 ```
+
+Returns a single `map[string]string` containing all resolved secrets (built-in tokens + custom keys).
 
 Resolution order per key:
 1. `store.Get(key)` — if found, use it
-2. `os.Getenv(key)` — for built-in tokens only (env fallback for backward compat)
+2. `os.Getenv(key)` — for built-in tokens only (backward compat)
 3. For built-in tokens: error if neither source has a value
-4. For custom `--secret` keys: must exist in store (no env fallback — if user says `--secret NPM_TOKEN`,
-   it must be in the store; silent env fallback would undermine the security intent)
+4. For custom `--secret` keys: must exist in store (no env fallback)
+
+The resolver replaces the three scattered `os.Getenv` call sites:
+- `prerequisites.CheckEnvironmentVariables()` — removed, resolver subsumes this
+- `docker/run.go:120-121` — reads from `config.Secrets` instead
+- `gcp_provider.go:185-186` — reads from `config.Secrets` instead
 
 #### Spin Command Integration
 
-The resolver centralizes token resolution, replacing the three scattered `os.Getenv` call sites:
-- `prerequisites.CheckEnvironmentVariables()` (removed — resolver subsumes this)
-- `docker/run.go` line 120-121 (reads from `config.Secrets` instead)
-- `gcp_provider.go` line 185-186 (reads from `config.Secrets` instead)
+Resolved values are placed in `CreateConfig.Secrets` so backends receive pre-resolved values
+via config rather than calling `os.Getenv()` themselves. This matches the existing `EnvVars`
+pattern and keeps backends ignorant of the secret storage mechanism.
 
-Resolved values are placed in `CreateConfig.Secrets` so backends receive pre-resolved values via
-config rather than calling `os.Getenv()` themselves. This matches the existing `EnvVars` pattern
-and keeps backends ignorant of the secret storage mechanism.
+```go
+// In cmd/spin.go RunE:
+store := secret.NewEncryptedFileStore(defaultPath, passphraseFunc)
+resolved, err := secret.Resolve(store, spinSecrets)  // spinSecrets from --secret flags
+// ...
+createConfig := provider.CreateConfig{
+    // ...existing fields...
+    Secrets: resolved,
+}
+```
 
 #### Container Delivery (Unchanged)
 
 - **Docker:** Secrets from `config.Secrets` are written to the temp env file alongside other vars
   (same `0600` permissions, same `defer os.Remove()` cleanup)
-- **GCP:** Secrets from `config.Secrets` are written to instance metadata (same as existing tokens)
+- **GCP:** Secrets from `config.Secrets` are written to instance metadata
 
-No changes to the container delivery mechanism. The security improvement is on the host side
-(secrets in Keychain/encrypted file instead of plaintext `.envrc`).
+No changes to the container delivery mechanism. The improvement is entirely on the host side.
 
 ### Key Decisions
 
 | Decision | Rationale |
 |---|---|
+| Encrypted file only (no Keychain) | Single codepath, cross-platform, pure Go. Tokens are pass-through so Keychain sophistication isn't needed |
 | Secrets in `CreateConfig` (not Store in backends) | Backends stay ignorant of secret storage. Resolution happens once at command level. Matches existing `EnvVars` pattern |
-| `--secret` separate from `--env` | `--env KEY=VALUE` exposes value on CLI (shell history). `--secret KEY` references store only (value never on command line). Different security semantics |
-| `security` CLI (not CGo Keychain bindings) | No CGo dependency, simpler cross-compilation, stable across macOS versions. Matches Docker backend's exec pattern |
-| Argon2id + AES-256-GCM for encrypted file | Current best practice for password-based key derivation + authenticated encryption |
-| No env fallback for custom `--secret` keys | If user says `--secret NPM_TOKEN`, they expect it from the secure store. Silent env fallback would undermine security intent. Built-in tokens get env fallback for backward compat only |
-| `~/.spinner/secrets.enc` file location | Consistent with existing `~/.spinner/` config directory. `0600` permissions match Docker temp file pattern |
-| `SPINNER_SECRET_PASSPHRASE` env var for CI | CI environments cannot use interactive prompts or Keychain. Env var for passphrase is the standard CI escape hatch; alternatively CI users just set `GITHUB_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN` as env vars directly (existing workflow, no change needed) |
+| `--secret` separate from `--env` | `--env KEY=VALUE` exposes value on CLI. `--secret KEY` references store only. Different security semantics |
+| Argon2id + AES-256-GCM | Current best practice for password-based key derivation + authenticated encryption |
+| No env fallback for custom `--secret` keys | `--secret NPM_TOKEN` must exist in store. Silent env fallback undermines security intent. Built-in tokens get env fallback for backward compat only |
+| `~/.spinner/secrets.enc` location | Consistent with existing `~/.spinner/` config directory |
+| `SPINNER_SECRET_PASSPHRASE` env var | Standard CI escape hatch; alternatively CI users set tokens as env vars directly (existing workflow) |
 
 ### Dependencies
 
