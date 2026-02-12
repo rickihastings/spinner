@@ -34,6 +34,7 @@ const (
 	flagBakeScript     = "bake-script"
 	flagServiceAccount = "service-account"
 	flagEnv            = "env"
+	flagEnvFile        = "env-file"
 )
 
 // GCP default values.

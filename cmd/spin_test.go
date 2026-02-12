@@ -727,3 +727,76 @@ func TestSpinCommand_EnvFlagReservedVar(t *testing.T) {
 	assert.Contains(t, err.Error(), "cannot override reserved variable")
 	assert.Contains(t, err.Error(), "GITHUB_TOKEN")
 }
+
+// TestSpinCommand_EnvFileFlagParsing tests that --env-file flag is correctly parsed
+func TestSpinCommand_EnvFileFlagParsing(t *testing.T) {
+	// Create a temporary env file
+	tmpfile, err := os.CreateTemp("", "test-env-*.env")
+	assert.NoError(t, err)
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+
+	_, _ = tmpfile.WriteString("NPM_TOKEN=abc123\nAPI_KEY=xyz\n")
+	_ = tmpfile.Close()
+
+	cmd := setupSpinCommandWithMocks(t)
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--env-file", tmpfile.Name(),
+	})
+
+	err = cmd.Execute()
+
+	assert.NoError(t, err)
+}
+
+// TestSpinCommand_EnvFileNotFound tests that --env-file errors when file doesn't exist
+func TestSpinCommand_EnvFileNotFound(t *testing.T) {
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--env-file", "/nonexistent/path/to/.env",
+	})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "--env-file: file does not exist")
+}
+
+// TestSpinCommand_EnvFileAndEnvFlagCombination tests that both --env and --env-file work together
+func TestSpinCommand_EnvFileAndEnvFlagCombination(t *testing.T) {
+	// Create a temporary env file
+	tmpfile, err := os.CreateTemp("", "test-env-*.env")
+	assert.NoError(t, err)
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+
+	_, _ = tmpfile.WriteString("NPM_TOKEN=abc123\n")
+	_ = tmpfile.Close()
+
+	cmd := setupSpinCommandWithMocks(t)
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--env", "MY_VAR=value",
+		"--env-file", tmpfile.Name(),
+	})
+
+	err = cmd.Execute()
+
+	assert.NoError(t, err)
+}

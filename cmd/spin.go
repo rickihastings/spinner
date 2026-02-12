@@ -33,6 +33,7 @@ func NewSpinCommand(f *provider.Factory) *cobra.Command {
 		spinSetup         bool
 		spinWatch         bool
 		spinEnvVars       []string
+		spinEnvFile       string
 	)
 
 	cmd := &cobra.Command{
@@ -49,6 +50,8 @@ GENERAL FLAGS:
   --recreate                 Force recreation of existing instance (optional)
   --watch                    Enter watch mode after instance is ready (optional)
   --backend <backend>        Backend provider: docker, gcp (default: docker)
+  --env <KEY=VALUE>          Custom environment variables (repeatable)
+  --env-file <path>          Path to env file to pass to instance (optional)
 
 SETUP OPTIONS (use with --setup flag):
   --setup                    Build/rebuild the environment before spinning (optional)
@@ -108,6 +111,16 @@ EXAMPLES:
 			envVars, err := parseAndValidateEnvVars(spinEnvVars)
 			if err != nil {
 				return err
+			}
+
+			// Validate env file exists if provided
+			if spinEnvFile != "" {
+				if _, err := os.Stat(spinEnvFile); err != nil {
+					if os.IsNotExist(err) {
+						return fmt.Errorf("--env-file: file does not exist: %s", spinEnvFile)
+					}
+					return fmt.Errorf("--env-file: cannot read file: %w", err)
+				}
 			}
 
 			if spinImage == "" {
@@ -172,6 +185,7 @@ EXAMPLES:
 				MaxIterations: spinMaxIterations,
 				Options:       createOptions,
 				EnvVars:       envVars,
+				EnvFile:       spinEnvFile,
 			}
 
 			name := p.InstanceName(createConfig)
@@ -264,6 +278,7 @@ EXAMPLES:
 	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 	cmd.Flags().BoolVar(&spinWatch, flagWatch, false, "Enter watch mode after instance is ready (optional)")
 	cmd.Flags().StringSliceVar(&spinEnvVars, flagEnv, []string{}, "Custom environment variables (KEY=VALUE, repeatable)")
+	cmd.Flags().StringVar(&spinEnvFile, flagEnvFile, "", "Path to env file to pass to instance (optional)")
 
 	// Docker backend flags
 	cmd.Flags().String(flagBaseImage, "", "Base Docker image (Docker backend, requires --setup)")

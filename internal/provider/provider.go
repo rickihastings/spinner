@@ -64,7 +64,8 @@ type SetupConfig struct {
 // environment. Repo, Prompt, Branch, and MaxIterations are universal —
 // every backend needs to know what code to run and how. Options carries
 // backend-specific keys: e.g. "image" for Docker. EnvVars carries custom
-// environment variables from the --env flag.
+// environment variables from the --env flag. EnvFile carries the path to
+// an env file from the --env-file flag (passed through as-is to backends).
 type CreateConfig struct {
 	Repo          string
 	Prompt        string
@@ -72,6 +73,7 @@ type CreateConfig struct {
 	MaxIterations string
 	Options       map[string]string
 	EnvVars       map[string]string
+	EnvFile       string
 }
 
 // Instance represents an execution environment instance.

@@ -2,10 +2,10 @@
 
 ## 1.0 Add --env-file flag to CLI and provider interface
 
-- [ ] 1.1 Add `EnvFile` field to `provider.CreateConfig` in `internal/provider/provider.go`
-- [ ] 1.2 Add `--env-file` flag to spin command in `cmd/spin.go`: validate file exists with `os.Stat`, set on
+- [x] 1.1 Add `EnvFile` field to `provider.CreateConfig` in `internal/provider/provider.go`
+- [x] 1.2 Add `--env-file` flag to spin command in `cmd/spin.go`: validate file exists with `os.Stat`, set on
   `CreateConfig.EnvFile`
-- [ ] 1.3 Add unit tests in `cmd/spin_test.go`: flag wiring, file not found error
+- [x] 1.3 Add unit tests in `cmd/spin_test.go`: flag wiring, file not found error
 
 ## 2.0 Docker backend: env file passthrough and workspace placement
 
