@@ -92,7 +92,17 @@ SPINNER_PROJECT=my-local-project
 SPINNER_ZONE=us-west1-a
 ```
 
-Place both files in the directory where you run `spinner` commands.
+**Config file search order:**
+
+Spinner searches for `.spinner.json` by traversing up from the current directory to the filesystem root, then falls
+back to `$HOME/.spinner.json` if no file is found. The first file found is used (no merging between config files).
+
+This allows you to:
+- Place `.spinner.json` in your home directory (`~/.spinner.json`) for personal defaults across all projects
+- Override home defaults with a `.spinner.json` in any repository or parent directory
+- Use team-shared config by committing `.spinner.json` to a repository
+
+The `.env` file is only loaded from the current directory (no traversal).
 
 ### Configuration Precedence
 
@@ -100,9 +110,13 @@ Configuration values are applied in this order (highest to lowest priority):
 
 1. Command-line flags
 2. Environment variables (`SPINNER_*`)
-3. `.env` file
-4. `.spinner.json` file
+3. `.env` file (current directory only)
+4. `.spinner.json` file (nearest ancestor or `$HOME/.spinner.json`)
 5. Default values
+
+Note: When searching for `.spinner.json`, Spinner uses the first file found when traversing from the current directory
+upward to the filesystem root. If no file is found in the ancestor path, `$HOME/.spinner.json` is used as a fallback.
+Only one config file is loaded (no merging).
 
 ### GCP Backend
 

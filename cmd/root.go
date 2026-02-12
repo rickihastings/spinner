@@ -3,12 +3,46 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/rickihastings/spinner/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+// findConfigFile searches for .spinner.json starting from startDir,
+// traversing up to the filesystem root, then checking homeDir as fallback.
+// Returns the path to the first file found, or "" if none exists.
+func findConfigFile(startDir, homeDir string) string {
+	const configFileName = ".spinner.json"
+
+	// Traverse up from startDir to filesystem root
+	current := startDir
+	for {
+		configPath := filepath.Join(current, configFileName)
+		if _, err := os.Stat(configPath); err == nil {
+			return configPath
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			// Reached filesystem root
+			break
+		}
+		current = parent
+	}
+
+	// Fallback to home directory
+	if homeDir != "" {
+		homeConfigPath := filepath.Join(homeDir, configFileName)
+		if _, err := os.Stat(homeConfigPath); err == nil {
+			return homeConfigPath
+		}
+	}
+
+	return ""
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "spinner",
@@ -54,17 +88,19 @@ func init() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
-	// Primary config: .spinner.json in repo root (committed, team-shared)
-	viper.SetConfigName(".spinner")
-	viper.SetConfigType("json")
-	viper.AddConfigPath(".")
-
-	_ = viper.ReadInConfig() // Ignore error if .spinner.json doesn't exist
+	// Primary config: .spinner.json (traverses from cwd up to root, then checks $HOME)
+	cwd, _ := os.Getwd()
+	home, _ := os.UserHomeDir()
+	if configPath := findConfigFile(cwd, home); configPath != "" {
+		viper.SetConfigFile(configPath)
+		_ = viper.ReadInConfig() // Ignore error if config can't be read
+	}
 
 	// Secondary: .env file (not committed, local overrides)
 	// Viper only reads one config file, so load .env separately via MergeInConfig.
 	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
+	viper.AddConfigPath(".")
 
 	_ = viper.MergeInConfig() // Ignore error if .env doesn't exist
 }
