@@ -329,7 +329,7 @@ spinner watch <instance-name>
 The watch UI displays:
 
 - **Instance status** — whether it is running, stopped, or terminated
-- **Resource usage** — CPU and memory consumption (via Google Cloud Ops Agent)
+- **Resource usage** — CPU and memory consumption (via GCS state file)
 - **Streaming logs** — real-time output from the agent loop
 
 Press `q` or `Ctrl+C` to exit watch mode. The VM keeps running in the background.
@@ -383,13 +383,15 @@ gsutil cat gs://<state-bucket>/<instance-name>/state.json
 
 The state file tracks:
 
-| Field           | Description                                                      |
-|-----------------|------------------------------------------------------------------|
-| `iteration`     | Current iteration number                                         |
-| `status`        | `running`, `completed`, `rate_limited`, `error`, or `auth_error` |
-| `started_at`    | When execution started                                           |
-| `completed_at`  | When execution finished (if done)                                |
-| `error_message` | Error details (if any)                                           |
+| Field            | Description                                                      |
+|------------------|------------------------------------------------------------------|
+| `iteration`      | Current iteration number                                         |
+| `status`         | `running`, `completed`, `rate_limited`, `error`, or `auth_error` |
+| `started_at`     | When execution started                                           |
+| `completed_at`   | When execution finished (if done)                                |
+| `error_message`  | Error details (if any)                                           |
+| `cpu_percent`    | CPU usage percentage (0-100), read from `/proc/stat`             |
+| `memory_percent` | Memory usage percentage (0-100), read from `/proc/meminfo`       |
 
 ## Rate Limiting
 
@@ -430,16 +432,14 @@ Configuration precedence (highest to lowest):
 
 ## Monitoring
 
-The GCP backend automatically installs
-the [Google Cloud Ops Agent](https://cloud.google.com/stackdriver/docs/solutions/agents/ops-agent) during image baking.
-This provides:
+The GCP backend collects system metrics (CPU and memory) from `/proc` inside the VM. These are written to the GCS state
+file after each iteration and polled by the watch UI at 5-second intervals.
 
-- **CPU metrics** — real-time CPU utilization (visible in watch mode)
-- **Memory metrics** — real-time memory usage percentage (visible in watch mode)
-- **System metrics** — additional metrics available in the Cloud Monitoring console
+- **CPU metrics** — usage percentage computed from `/proc/stat`
+- **Memory metrics** — usage percentage computed from `/proc/meminfo`
 
-No additional configuration is required. If the Ops Agent is not running, watch mode will display "N/A" for memory
-metrics while CPU metrics continue to work via the standard Compute Engine metrics API.
+No additional agents or Cloud Monitoring setup is required. Metrics update once per iteration (when the exec loop saves
+state).
 
 ## Quick Reference
 

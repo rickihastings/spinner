@@ -72,28 +72,6 @@ type serialPortOutput struct {
 	Next int64
 }
 
-// metricsQuery holds parameters for a Cloud Monitoring time series query.
-type metricsQuery struct {
-	// MetricType is the fully-qualified metric type
-	// (e.g., "compute.googleapis.com/instance/cpu/utilization").
-	MetricType string
-
-	// InstanceName is the VM instance name to filter on.
-	InstanceName string
-
-	// Zone is the GCP zone to filter on.
-	Zone string
-
-	// IntervalSeconds is how far back to query (in seconds from now).
-	IntervalSeconds int64
-}
-
-// metricPoint holds a single data point from a metrics query.
-type metricPoint struct {
-	// Value is the metric value (e.g., CPU utilization as 0.0-1.0).
-	Value float64
-}
-
 // vmStatus represents the status of a GCP VM instance as reported by the API.
 type vmStatus string
 

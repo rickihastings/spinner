@@ -391,6 +391,7 @@ func TestRunner_Run_ConsecutiveErrors(t *testing.T) {
 
 	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
 		callCount++
+
 		return &mockExecutor{
 			result: &agent.Result{
 				Error:        fmt.Errorf("claude CLI failed"),

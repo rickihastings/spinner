@@ -7,13 +7,7 @@ import (
 
 	compute "cloud.google.com/go/compute/apiv1"
 	"cloud.google.com/go/compute/apiv1/computepb"
-	monitoring "cloud.google.com/go/monitoring/apiv3/v2"
-	"cloud.google.com/go/monitoring/apiv3/v2/monitoringpb"
 	"cloud.google.com/go/storage"
-	"google.golang.org/api/iterator"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"time"
 )
 
 // Client defines the interface for GCP operations.
@@ -43,9 +37,6 @@ type Client interface {
 	ObjectSize(ctx context.Context, bucket, object string) (int64, error)
 	ObjectExists(ctx context.Context, bucket, object string) (bool, error)
 
-	// Monitoring
-	QueryTimeSeries(ctx context.Context, project string, query metricsQuery) ([]metricPoint, error)
-
 	// Close releases all underlying SDK clients.
 	Close() error
 }
@@ -53,10 +44,9 @@ type Client interface {
 // RealGCPClient implements Client using the official GCP Go SDK.
 // It uses Application Default Credentials (ADC) for authentication.
 type RealGCPClient struct {
-	instances  *compute.InstancesClient
-	images     *compute.ImagesClient
-	storage    *storage.Client
-	monitoring *monitoring.MetricClient
+	instances *compute.InstancesClient
+	images    *compute.ImagesClient
+	storage   *storage.Client
 }
 
 // NewRealGCPClient creates a new RealGCPClient with all SDK clients initialized
@@ -88,20 +78,10 @@ func NewRealGCPClient(ctx context.Context) (*RealGCPClient, error) {
 		return nil, fmt.Errorf("failed to create storage client: %w", err)
 	}
 
-	monitoringClient, err := monitoring.NewMetricClient(ctx)
-	if err != nil {
-		_ = instancesClient.Close()
-		_ = imagesClient.Close()
-		_ = storageClient.Close()
-
-		return nil, fmt.Errorf("failed to create monitoring client: %w", err)
-	}
-
 	return &RealGCPClient{
-		instances:  instancesClient,
-		images:     imagesClient,
-		storage:    storageClient,
-		monitoring: monitoringClient,
+		instances: instancesClient,
+		images:    imagesClient,
+		storage:   storageClient,
 	}, nil
 }
 
@@ -118,10 +98,6 @@ func (c *RealGCPClient) Close() error {
 	}
 
 	if err := c.storage.Close(); err != nil && firstErr == nil {
-		firstErr = err
-	}
-
-	if err := c.monitoring.Close(); err != nil && firstErr == nil {
 		firstErr = err
 	}
 
@@ -468,49 +444,6 @@ func (c *RealGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 	}
 
 	return true, nil
-}
-
-// QueryTimeSeries queries Cloud Monitoring for time series data points.
-func (c *RealGCPClient) QueryTimeSeries(ctx context.Context, project string, query metricsQuery) ([]metricPoint, error) {
-	now := time.Now()
-	startTime := now.Add(-time.Duration(query.IntervalSeconds) * time.Second)
-
-	filter := fmt.Sprintf(
-		`metric.type = "%s" AND resource.labels.instance_name = "%s" AND resource.labels.zone = "%s"`,
-		query.MetricType, query.InstanceName, query.Zone,
-	)
-
-	req := &monitoringpb.ListTimeSeriesRequest{
-		Name:   fmt.Sprintf("projects/%s", project),
-		Filter: filter,
-		Interval: &monitoringpb.TimeInterval{
-			StartTime: timestamppb.New(startTime),
-			EndTime:   timestamppb.New(now),
-		},
-	}
-
-	it := c.monitoring.ListTimeSeries(ctx, req)
-
-	var points []metricPoint
-
-	for {
-		ts, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to read time series: %w", err)
-		}
-
-		for _, p := range ts.GetPoints() {
-			points = append(points, metricPoint{
-				Value: p.GetValue().GetDoubleValue(),
-			})
-		}
-	}
-
-	return points, nil
 }
 
 // strPtr returns a pointer to the given string.

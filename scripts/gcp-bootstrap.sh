@@ -95,7 +95,6 @@ APIS=(
     compute.googleapis.com
     storage.googleapis.com
     logging.googleapis.com
-    monitoring.googleapis.com
 )
 
 echo "--- Enabling APIs ---"
@@ -141,7 +140,6 @@ echo ""
 PROJECT_ROLES=(
     roles/compute.instanceAdmin.v1
     roles/logging.viewer
-    roles/monitoring.viewer
 )
 
 echo "--- Binding IAM roles ---"

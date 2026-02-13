@@ -136,118 +136,7 @@ func TestGetVMState_UnknownStatus(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestQueryCPUUtilization_WithData(t *testing.T) {
-	client := new(MockGCPClient)
-	ctx := context.Background()
-
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{
-		{Value: 0.25},
-		{Value: 0.50},
-	}, nil)
-
-	cpuPercent, err := queryCPUUtilization(ctx, client, "proj", "zone", "vm-1")
-	assert.NoError(t, err)
-	// Last point (0.50) scaled to 50.0%
-	assert.InDelta(t, 50.0, cpuPercent, 0.01)
-	client.AssertExpectations(t)
-}
-
-func TestQueryCPUUtilization_NoData(t *testing.T) {
-	client := new(MockGCPClient)
-	ctx := context.Background()
-
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{}, nil)
-
-	cpuPercent, err := queryCPUUtilization(ctx, client, "proj", "zone", "vm-1")
-	assert.NoError(t, err)
-	assert.Equal(t, 0.0, cpuPercent)
-	client.AssertExpectations(t)
-}
-
-func TestQueryCPUUtilization_Error(t *testing.T) {
-	client := new(MockGCPClient)
-	ctx := context.Background()
-
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return(nil, fmt.Errorf("monitoring API error"))
-
-	cpuPercent, err := queryCPUUtilization(ctx, client, "proj", "zone", "vm-1")
-	assert.Error(t, err)
-	assert.Equal(t, 0.0, cpuPercent)
-	client.AssertExpectations(t)
-}
-
-func TestQueryMemoryUtilization_WithData(t *testing.T) {
-	client := new(MockGCPClient)
-	ctx := context.Background()
-
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{
-		{Value: 45.2},
-		{Value: 52.8},
-	}, nil)
-
-	memoryPercent, err := queryMemoryUtilization(ctx, client, "proj", "zone", "vm-1")
-	assert.NoError(t, err)
-	// Last point (52.8%)
-	assert.InDelta(t, 52.8, memoryPercent, 0.01)
-	client.AssertExpectations(t)
-}
-
-func TestQueryMemoryUtilization_NoData(t *testing.T) {
-	client := new(MockGCPClient)
-	ctx := context.Background()
-
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{}, nil)
-
-	memoryPercent, err := queryMemoryUtilization(ctx, client, "proj", "zone", "vm-1")
-	assert.NoError(t, err)
-	assert.Equal(t, 0.0, memoryPercent)
-	client.AssertExpectations(t)
-}
-
-func TestQueryMemoryUtilization_Error(t *testing.T) {
-	client := new(MockGCPClient)
-	ctx := context.Background()
-
-	// Memory metric error is non-fatal - returns 0 without error
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return(nil, fmt.Errorf("monitoring API error"))
-
-	memoryPercent, err := queryMemoryUtilization(ctx, client, "proj", "zone", "vm-1")
-	assert.NoError(t, err) // Error is silently ignored (Ops Agent not installed)
-	assert.Equal(t, 0.0, memoryPercent)
-	client.AssertExpectations(t)
-}
-
-func TestCollectGCPMetrics_RunningWithCPU(t *testing.T) {
+func TestCollectGCPMetrics_RunningWithGCSState(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
@@ -255,29 +144,22 @@ func TestCollectGCPMetrics_RunningWithCPU(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
 
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 0.75}}, nil)
+	// Mock GCS state file with CPU and memory metrics
+	client.On("ObjectExists", ctx, "my-bucket", "vm-1/state.json").
+		Return(true, nil)
+	client.On("ReadObject", ctx, "my-bucket", "vm-1/state.json").
+		Return([]byte(`{"iteration": 5, "status": "running", "cpu_percent": 75.0, "memory_percent": 60.0}`), nil)
 
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 60.0}}, nil)
-
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "my-bucket")
 	assert.Equal(t, provider.StateRunning, metrics.State)
+	assert.Equal(t, 5, metrics.Iteration)
 	assert.InDelta(t, 75.0, metrics.CPUPercent, 0.01)
 	assert.InDelta(t, 60.0, metrics.MemoryPercent, 0.01)
 	assert.NoError(t, metrics.Error)
 	client.AssertExpectations(t)
 }
 
-func TestCollectGCPMetrics_RunningNoCPUData(t *testing.T) {
+func TestCollectGCPMetrics_RunningNoGCSState(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
@@ -285,29 +167,20 @@ func TestCollectGCPMetrics_RunningNoCPUData(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
 
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{}, nil)
+	// No GCS state file yet
+	client.On("ObjectExists", ctx, "my-bucket", "vm-1/state.json").
+		Return(false, nil)
 
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{}, nil)
-
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
+	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "my-bucket")
 	assert.Equal(t, provider.StateRunning, metrics.State)
+	assert.Equal(t, 0, metrics.Iteration)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
 	assert.Equal(t, 0.0, metrics.MemoryPercent)
 	assert.NoError(t, metrics.Error)
 	client.AssertExpectations(t)
 }
 
-func TestCollectGCPMetrics_RunningCPUError(t *testing.T) {
+func TestCollectGCPMetrics_RunningNoBucket(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
@@ -315,25 +188,11 @@ func TestCollectGCPMetrics_RunningCPUError(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
 
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return(nil, fmt.Errorf("monitoring unavailable"))
-
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 45.0}}, nil)
-
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateRunning, metrics.State)
+	assert.Equal(t, 0, metrics.Iteration)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
-	assert.InDelta(t, 45.0, metrics.MemoryPercent, 0.01)
-	// CPU errors are now non-fatal - no Error field set
+	assert.Equal(t, 0.0, metrics.MemoryPercent)
 	assert.NoError(t, metrics.Error)
 	client.AssertExpectations(t)
 }
@@ -346,7 +205,7 @@ func TestCollectGCPMetrics_Stopped(t *testing.T) {
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &terminated}, nil)
 
-	// Should not query metrics for stopped VMs
+	// Should not read GCS state for stopped VMs
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateStopped, metrics.State)
 	assert.Equal(t, 0.0, metrics.CPUPercent)
@@ -382,59 +241,53 @@ func TestCollectGCPMetrics_APIError(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestCollectGCPMetrics_ReadsIterationFromGCS(t *testing.T) {
+func TestReadStateFromGCS_NoBucket(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	running := "RUNNING"
-	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &running}, nil)
-
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 0.50}}, nil)
-
-	client.On("QueryTimeSeries", ctx, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 40.0}}, nil)
-
-	// Mock GCS state file with iteration 5
-	client.On("ObjectExists", ctx, "my-bucket", "vm-1/state.json").
-		Return(true, nil)
-	client.On("ReadObject", ctx, "my-bucket", "vm-1/state.json").
-		Return([]byte(`{"iteration": 5, "status": "running"}`), nil)
-
-	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "my-bucket")
-	assert.Equal(t, provider.StateRunning, metrics.State)
-	assert.Equal(t, 5, metrics.Iteration)
-	assert.InDelta(t, 50.0, metrics.CPUPercent, 0.01)
-	assert.InDelta(t, 40.0, metrics.MemoryPercent, 0.01)
-	client.AssertExpectations(t)
+	state := readStateFromGCS(ctx, client, "", "vm-1")
+	assert.Equal(t, gcsState{}, state)
 }
 
-func TestReadIterationFromGCS_NoBucket(t *testing.T) {
-	client := new(MockGCPClient)
-	ctx := context.Background()
-
-	iter := readIterationFromGCS(ctx, client, "", "vm-1")
-	assert.Equal(t, 0, iter)
-}
-
-func TestReadIterationFromGCS_NoState(t *testing.T) {
+func TestReadStateFromGCS_NoState(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
 	client.On("ObjectExists", ctx, "bucket", "vm-1/state.json").
 		Return(false, nil)
 
-	iter := readIterationFromGCS(ctx, client, "bucket", "vm-1")
-	assert.Equal(t, 0, iter)
+	state := readStateFromGCS(ctx, client, "bucket", "vm-1")
+	assert.Equal(t, gcsState{}, state)
+	client.AssertExpectations(t)
+}
+
+func TestReadStateFromGCS_WithMetrics(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	client.On("ObjectExists", ctx, "bucket", "vm-1/state.json").
+		Return(true, nil)
+	client.On("ReadObject", ctx, "bucket", "vm-1/state.json").
+		Return([]byte(`{"iteration": 3, "cpu_percent": 42.5, "memory_percent": 67.8}`), nil)
+
+	state := readStateFromGCS(ctx, client, "bucket", "vm-1")
+	assert.Equal(t, 3, state.Iteration)
+	assert.InDelta(t, 42.5, state.CPUPercent, 0.01)
+	assert.InDelta(t, 67.8, state.MemoryPercent, 0.01)
+	client.AssertExpectations(t)
+}
+
+func TestReadStateFromGCS_InvalidJSON(t *testing.T) {
+	client := new(MockGCPClient)
+	ctx := context.Background()
+
+	client.On("ObjectExists", ctx, "bucket", "vm-1/state.json").
+		Return(true, nil)
+	client.On("ReadObject", ctx, "bucket", "vm-1/state.json").
+		Return([]byte(`not json`), nil)
+
+	state := readStateFromGCS(ctx, client, "bucket", "vm-1")
+	assert.Equal(t, gcsState{}, state)
 	client.AssertExpectations(t)
 }
 
@@ -445,23 +298,14 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 	defer cancel()
 
 	running := "RUNNING"
-	// First call for initial metrics
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil).Once()
-	// CPU query
-	client.On("QueryTimeSeries", mock.Anything, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 0.42}}, nil).Once()
-	// Memory query
-	client.On("QueryTimeSeries", mock.Anything, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 55.0}}, nil).Once()
+
+	// GCS state with metrics
+	client.On("ObjectExists", mock.Anything, "my-bucket", "vm-1/state.json").
+		Return(true, nil).Once()
+	client.On("ReadObject", mock.Anything, "my-bucket", "vm-1/state.json").
+		Return([]byte(`{"iteration": 2, "cpu_percent": 42.0, "memory_percent": 55.0}`), nil).Once()
 
 	// Second call (ticker fires) — return stopped to exit the loop
 	terminated := "TERMINATED"
@@ -472,7 +316,7 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		done <- streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "", ch)
+		done <- streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "my-bucket", ch)
 	}()
 
 	// Read initial metrics
@@ -481,11 +325,12 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 		assert.Equal(t, provider.StateRunning, m.State)
 		assert.InDelta(t, 42.0, m.CPUPercent, 0.01)
 		assert.InDelta(t, 55.0, m.MemoryPercent, 0.01)
+		assert.Equal(t, 2, m.Iteration)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for initial metrics")
 	}
 
-	// Cancel to stop the loop (don't wait for 60s ticker)
+	// Cancel to stop the loop (don't wait for ticker)
 	cancel()
 
 	err := <-done
@@ -571,26 +416,16 @@ func TestStreamGCPMetrics_ContextCancellation(t *testing.T) {
 	running := "RUNNING"
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
 		Return(&computepb.Instance{Status: &running}, nil)
-	// CPU query
-	client.On("QueryTimeSeries", mock.Anything, "proj", metricsQuery{
-		MetricType:      cpuMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 0.10}}, nil)
-	// Memory query
-	client.On("QueryTimeSeries", mock.Anything, "proj", metricsQuery{
-		MetricType:      memoryPercentMetricType,
-		InstanceName:    "vm-1",
-		Zone:            "zone",
-		IntervalSeconds: metricsQueryIntervalSeconds,
-	}).Return([]metricPoint{{Value: 30.0}}, nil)
+	client.On("ObjectExists", mock.Anything, "my-bucket", "vm-1/state.json").
+		Return(true, nil)
+	client.On("ReadObject", mock.Anything, "my-bucket", "vm-1/state.json").
+		Return([]byte(`{"iteration": 1, "cpu_percent": 10.0, "memory_percent": 30.0}`), nil)
 
 	ch := make(chan provider.ContainerMetrics, 10)
 	done := make(chan error, 1)
 
 	go func() {
-		done <- streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "", ch)
+		done <- streamGCPMetrics(ctx, client, "proj", "zone", "vm-1", "my-bucket", ch)
 	}()
 
 	// Read initial metrics

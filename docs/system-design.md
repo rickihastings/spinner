@@ -94,7 +94,7 @@ backend-specific types.
 │   │   ├── instance.go            # Instance naming, status mapping
 │   │   ├── types.go               # GCP-specific types (InstanceConfig, VMStatus)
 │   │   ├── logs.go                # GCS log streaming (read/watch)
-│   │   ├── metrics.go             # Cloud Monitoring CPU metrics
+│   │   ├── metrics.go             # System metrics (CPU/memory via GCS state)
 │   │   ├── state.go               # GCS state persistence (read/write)
 │   │   ├── startup.go             # Startup script template loading
 │   │   └── *_test.go              # GCP-specific tests
@@ -123,13 +123,13 @@ The command layer and execution logic operate on the Provider interface without 
 ```go
 // cmd/constructors.go
 func NewSpinCommand(p provider.Provider) *cobra.Command {
-// Works with any Provider implementation
-status, err := p.Status(ctx, name)
-if err == nil && status == provider.Running {
-p.Start(ctx, name)
-} else {
-p.Create(ctx, config)
-}
+    // Works with any Provider implementation
+   status, err := p.Status(ctx, name)
+   if err == nil && status == provider.Running {
+      p.Start(ctx, name)
+   } else {
+      p.Create(ctx, config)
+   }
 }
 ```
 
@@ -161,7 +161,7 @@ Each provider package contains all backend-specific logic:
 - Deterministic instance naming (GCP 63-char constraints)
 - Log streaming via GCS (buffered writes from VM, polled reads from control plane)
 - State persistence via GCS (synced after each state change in exec loop)
-- CPU metrics via Cloud Monitoring API
+- CPU/memory metrics via GCS state file
 - VM status mapping to InstanceStatus
 
 ## Dependency Injection
@@ -171,7 +171,7 @@ Commands receive providers via constructor injection:
 ```go
 // Production wiring (cmd/setup.go, cmd/spin.go)
 var setupCmd = NewSetupCommand(
-docker.NewDockerProvider(docker.NewRealDockerClient())
+    docker.NewDockerProvider(docker.NewRealDockerClient())
 )
 
 // Test wiring (cmd/*_test.go)
@@ -210,14 +210,14 @@ RealDockerClient / MockDockerClient
 
 ```go
 type DockerClient interface {
-BuildImage(ctx context.Context, config BuildConfig) error
-RunContainer(ctx context.Context, args []string, name string) error
-ImageExists(ctx context.Context, image string) (bool, error)
-ContainerExists(ctx context.Context, name string) (bool, ContainerStatus, error)
-StartContainer(ctx context.Context, name string) error
-StopContainer(ctx context.Context, name string) error
-RemoveContainer(ctx context.Context, name string) error
-LogsContainer(ctx context.Context, name string) (io.ReadCloser, error)
+    BuildImage(ctx context.Context, config BuildConfig) error
+    RunContainer(ctx context.Context, args []string, name string) error
+    ImageExists(ctx context.Context, image string) (bool, error)
+    ContainerExists(ctx context.Context, name string) (bool, ContainerStatus, error)
+    StartContainer(ctx context.Context, name string) error
+    StopContainer(ctx context.Context, name string) error
+    RemoveContainer(ctx context.Context, name string) error
+    LogsContainer(ctx context.Context, name string) (io.ReadCloser, error)
 }
 ```
 
@@ -338,12 +338,11 @@ RealGCPClient / MockGCPClient
 
 ### GCP Client Interface
 
-The `Client` interface wraps GCP SDK clients (Compute, Storage, Monitoring) for testability:
+The `Client` interface wraps GCP SDK clients (Compute, Storage) for testability:
 
 - **Instance ops:** CreateInstance, GetInstance, StartInstance, StopInstance, ResetInstance, DeleteInstance
 - **Image ops:** CreateImage, GetImage, DeleteImage
 - **Storage ops:** WriteObject, ReadObject, ReadObjectRange, ObjectSize, ObjectExists
-- **Monitoring:** QueryTimeSeries
 - **Diagnostics:** GetSerialPortOutput
 
 ### State Persistence

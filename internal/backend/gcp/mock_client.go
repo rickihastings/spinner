@@ -122,16 +122,6 @@ func (m *MockGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 	return args.Bool(0), args.Error(1)
 }
 
-// QueryTimeSeries mocks the QueryTimeSeries method.
-func (m *MockGCPClient) QueryTimeSeries(ctx context.Context, project string, query metricsQuery) ([]metricPoint, error) {
-	args := m.Called(ctx, project, query)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-
-	return args.Get(0).([]metricPoint), args.Error(1)
-}
-
 // Close mocks the Close method.
 func (m *MockGCPClient) Close() error {
 	args := m.Called()

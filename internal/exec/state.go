@@ -21,13 +21,15 @@ const (
 
 // State represents the persistent state of the execution loop.
 type State struct {
-	Branch       string    `json:"branch"`
-	Iteration    int       `json:"iteration"`
-	Status       status    `json:"status"`
-	LastUpdated  time.Time `json:"last_updated"`
-	StartedAt    time.Time `json:"started_at"`
-	CompletedAt  time.Time `json:"completed_at,omitempty"`
-	ErrorMessage string    `json:"error_message,omitempty"`
+	Branch        string    `json:"branch"`
+	Iteration     int       `json:"iteration"`
+	Status        status    `json:"status"`
+	LastUpdated   time.Time `json:"last_updated"`
+	StartedAt     time.Time `json:"started_at"`
+	CompletedAt   time.Time `json:"completed_at,omitempty"`
+	ErrorMessage  string    `json:"error_message,omitempty"`
+	CPUPercent    float64   `json:"cpu_percent,omitempty"`
+	MemoryPercent float64   `json:"memory_percent,omitempty"`
 }
 
 // LoadState loads the state from a JSON file.

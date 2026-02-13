@@ -267,32 +267,6 @@ func TestMockObjectExistsNotFound(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestMockQueryTimeSeries(t *testing.T) {
-	mockClient := &MockGCPClient{}
-
-	query := metricsQuery{
-		MetricType:      "compute.googleapis.com/instance/cpu/utilization",
-		InstanceName:    "test-instance",
-		Zone:            "us-central1-a",
-		IntervalSeconds: 300,
-	}
-
-	expected := []metricPoint{
-		{Value: 0.45},
-		{Value: 0.52},
-	}
-
-	mockClient.On("QueryTimeSeries", mock.Anything, "test-project", query).
-		Return(expected, nil)
-
-	points, err := mockClient.QueryTimeSeries(context.Background(), "test-project", query)
-	assert.NoError(t, err)
-	assert.Len(t, points, 2)
-	assert.InDelta(t, 0.45, points[0].Value, 0.001)
-	assert.InDelta(t, 0.52, points[1].Value, 0.001)
-	mockClient.AssertExpectations(t)
-}
-
 func TestMockClose(t *testing.T) {
 	mockClient := &MockGCPClient{}
 

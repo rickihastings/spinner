@@ -219,7 +219,6 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		Scopes: []string{
 			"https://www.googleapis.com/auth/devstorage.read_write",
 			"https://www.googleapis.com/auth/logging.write",
-			"https://www.googleapis.com/auth/monitoring.write",
 		},
 	})
 	if err != nil {
@@ -297,8 +296,8 @@ func (p *Provider) WatchLogs(ctx context.Context, name string, _ int, ch chan<- 
 	return watchLogs(ctx, p.client, p.bucket, name, ch)
 }
 
-// WatchMetrics streams resource metrics from Cloud Monitoring.
-// Polls CPU utilization at 60-second intervals and maps VM state to ContainerMetrics.
+// WatchMetrics streams resource metrics by polling the GCS state file.
+// CPU and memory metrics are written to state.json by the exec loop inside the VM.
 func (p *Provider) WatchMetrics(ctx context.Context, name string, ch chan<- provider.ContainerMetrics) error {
 	return streamGCPMetrics(ctx, p.client, p.project, p.zone, name, p.bucket, ch)
 }

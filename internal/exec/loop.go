@@ -90,7 +90,10 @@ func NewRunner(config *Config, state *State, statePath string, opts ...RunnerOpt
 }
 
 // saveState saves state locally and, if configured, syncs to a remote store.
+// It collects system metrics (CPU/memory from /proc) before saving.
 func (r *Runner) saveState() error {
+	r.state.CPUPercent, r.state.MemoryPercent = collectSystemMetrics()
+
 	err := saveState(r.statePath, r.state)
 	if err == nil && r.stateSync != nil {
 		r.stateSync(r.statePath)

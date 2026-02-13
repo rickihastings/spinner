@@ -177,19 +177,9 @@ export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
 
 **Metrics and Monitoring:**
 
-The GCP backend includes automatic installation of
-the [Google Cloud Ops Agent](https://cloud.google.com/stackdriver/docs/solutions/agents/ops-agent) during image baking.
-The Ops Agent provides:
-
-- **CPU Metrics**: Real-time CPU utilization (available in watch mode)
-- **Memory Metrics**: Real-time memory usage percentage (available in watch mode)
-- **System Metrics**: Additional metrics available in Cloud Monitoring console
-
-The Ops Agent is installed automatically during `spinner setup --backend gcp` and does not require any additional
-configuration. Memory and CPU metrics are displayed in the `spinner watch` TUI.
-
-If the Ops Agent fails to install or isn't running, the watch UI will display "N/A" for memory metrics while CPU metrics
-will continue to work using the standard Compute Engine metrics API.
+The GCP backend collects CPU and memory usage from `/proc` inside the VM and writes them to the GCS state file on each
+iteration. The `spinner watch` TUI reads these metrics by polling the state file at 5-second intervals. No additional
+agents or Cloud Monitoring configuration is required.
 
 ## Development Workflow
 
