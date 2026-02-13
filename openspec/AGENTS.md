@@ -26,6 +26,14 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 - Commit with meaningful message
 - Leave codebase in valid, tested state
 
+## Prerequisites
+
+If the `openspec` command is not available, install it first:
+
+```bash
+npm install -g @fission-ai/openspec@1.1.1
+```
+
 ## Quick Reference
 
 **Essential Commands:**
