@@ -16,6 +16,7 @@ type spinConfig struct {
 	Branch        string
 	MaxIterations string
 	EnvVars       map[string]string
+	EnvFile       string
 }
 
 // ContainerResult contains the result of a container operation.
@@ -167,6 +168,12 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	if hasNpmrc {
 		npmrcPath := filepath.Join(homeDir, ".npmrc")
 		dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/home/spinner/.npmrc", npmrcPath))
+	}
+
+	// Add user's env file if specified
+	if config.EnvFile != "" {
+		dockerArgs = append(dockerArgs, "--env-file", config.EnvFile)
+		dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/tmp/.env:ro", config.EnvFile))
 	}
 
 	// Add image

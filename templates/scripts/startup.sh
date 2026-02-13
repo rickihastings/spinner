@@ -43,6 +43,12 @@ fi
 echo "Verifying repository..."
 git status
 
+# Copy user's env file into workspace if it exists
+if [ -f "/tmp/.env" ]; then
+  echo "Copying env file to workspace..."
+  cp /tmp/.env .env
+fi
+
 # Check for config overrides from the state directory (written by spin on restart)
 if [ -f "/state/prompt.txt" ]; then
   OVERRIDE_PROMPT=$(cat /state/prompt.txt)

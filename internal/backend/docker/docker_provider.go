@@ -77,6 +77,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		Branch:        config.Branch,
 		MaxIterations: config.MaxIterations,
 		EnvVars:       config.EnvVars,
+		EnvFile:       config.EnvFile,
 	}
 
 	args, tmpFile, err := buildDockerRunCommand(sc, containerName, hasNpmrc)

@@ -840,3 +840,97 @@ func TestBuildDockerRunCommand_EnvFileNilCustomVars(t *testing.T) {
 	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
 	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-token\n")
 }
+
+// TestBuildDockerRunCommand_UserEnvFile tests that user's env file is passed through
+func TestBuildDockerRunCommand_UserEnvFile(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	// Create a temporary env file to test with
+	tmpEnvFile, err := os.CreateTemp("", "test-env-*.env")
+	assert.NoError(t, err)
+	defer func() { _ = os.Remove(tmpEnvFile.Name()) }()
+
+	_, _ = tmpEnvFile.WriteString("API_KEY=secret123\nDATABASE_URL=postgres://localhost\n")
+	_ = tmpEnvFile.Close()
+
+	config := spinConfig{
+		Image:   "spinner:test",
+		Repo:    "https://github.com/user/repo.git",
+		EnvFile: tmpEnvFile.Name(),
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tmpFile)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	// Convert args to string for easier assertions
+	argsStr := ""
+	for _, arg := range args {
+		argsStr += arg + " "
+	}
+
+	// Should include the second --env-file flag with the user's file
+	assert.Contains(t, argsStr, "--env-file "+tmpEnvFile.Name())
+
+	// Should include the mount for the user's env file
+	expectedMount := tmpEnvFile.Name() + ":/tmp/.env:ro"
+	assert.Contains(t, argsStr, expectedMount)
+
+	// Should have two --env-file flags in total
+	count := 0
+	for _, arg := range args {
+		if arg == "--env-file" {
+			count++
+		}
+	}
+	assert.Equal(t, 2, count, "should have two --env-file flags")
+}
+
+// TestBuildDockerRunCommand_NoUserEnvFile tests that docker args work correctly without user env file
+func TestBuildDockerRunCommand_NoUserEnvFile(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image:   "spinner:test",
+		Repo:    "https://github.com/user/repo.git",
+		EnvFile: "", // No env file
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tmpFile)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	// Convert args to string for easier assertions
+	argsStr := ""
+	for _, arg := range args {
+		argsStr += arg + " "
+	}
+
+	// Should not include /tmp/.env mount
+	assert.NotContains(t, argsStr, "/tmp/.env")
+
+	// Should have only one --env-file flag (for the system temp file)
+	count := 0
+	for _, arg := range args {
+		if arg == "--env-file" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "should have exactly one --env-file flag")
+}
