@@ -17,8 +17,15 @@ export GOPATH="$HOME/go"
 GOEOF
 chmod +x /etc/profile.d/golang.sh
 
-# Set up GOPATH for spinner user
+# Set up GOPATH and PATH for spinner user
 su - spinner -c 'mkdir -p ~/go/bin'
+
+# Add Go to spinner user's shell profiles so it's available in all shell types
+# (profile.d only works for login shells, not su -m or non-interactive bash)
+GO_PATH_EXPORT='export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
+export GOPATH="$HOME/go"'
+echo "$GO_PATH_EXPORT" >> /home/spinner/.bashrc
+echo "$GO_PATH_EXPORT" >> /home/spinner/.profile
 
 # Verify
 /usr/local/go/bin/go version
