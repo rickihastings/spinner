@@ -41,32 +41,6 @@ configured backends.
 - **WHEN** no GCP project/zone configuration is available
 - **THEN** the CLI SHALL silently skip the GCP backend (no warning)
 
-### Requirement: Backend Filter
-
-The `spinner list` command SHALL support a `--backend` flag to restrict listing to a single backend.
-
-#### Scenario: Filter by backend
-
-- **WHEN** user runs `spinner list --backend docker`
-- **THEN** the CLI SHALL only query the Docker backend
-- **AND** skip all other backends
-
-#### Scenario: Invalid backend
-
-- **WHEN** user provides an unregistered backend name
-- **THEN** the CLI SHALL return an error indicating valid backends
-
-### Requirement: JSON Output
-
-The `spinner list` command SHALL support a `--json` flag for machine-readable output.
-
-#### Scenario: JSON format
-
-- **WHEN** user runs `spinner list --json`
-- **THEN** the CLI SHALL output a JSON array of instance objects
-- **AND** each object SHALL include: name, status, backend, image, repo, branch, agent, iteration,
-  maxIterations, agentStatus, startedAt, lastUpdated
-
 ### Requirement: Rich State Display
 
 The list output SHALL include execution state from state files alongside instance lifecycle status.
