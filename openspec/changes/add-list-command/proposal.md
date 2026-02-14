@@ -4,7 +4,8 @@
 
 Add a `spinner list` command that discovers and displays all spinner-managed instances across all configured backends
 (Docker, GCP). Extend the Provider interface with a `List()` method and add `spinner-managed=true` labels to Docker
-containers to enable consistent label-based discovery across both backends.
+containers to enable consistent label-based discovery across both backends. The command focuses on a simple,
+human-readable table output with no additional flags beyond GCP config.
 
 ## Motivation
 
@@ -22,7 +23,7 @@ that name. Users need a first-class command to answer: "what instances do I have
 - **New provider method**: `List(ctx) ([]InstanceInfo, error)` on the `Provider` interface — backend-agnostic
   instance discovery
 - **Modified capability**: `docker-client` — add `spinner-managed=true` label to containers at creation time;
-  add `ListContainers` to the Docker client interface for label-filtered listing
+  add `ListContainers` to the Docker client interface for label-filtered listing (no name-prefix fallback)
 - **Modified capability**: `gcp-sandbox` — add `ListInstances` to the GCP client interface for label-filtered listing
 - **No breaking changes**: Existing commands are unaffected. The Docker label addition is invisible to users.
 
@@ -33,16 +34,15 @@ that name. Users need a first-class command to answer: "what instances do I have
    errors (e.g., Docker not running) are shown as warnings, not fatal errors.
 
 2. **Label-based discovery**: Both backends use `spinner-managed=true` labels for filtering. Docker containers
-   currently lack these labels, so we add them during `Create()`. Existing unlabeled containers are also discovered
-   via the `spinner-` name prefix as a fallback.
+   currently lack these labels, so we add them during `Create()`. Containers created before this change will not
+   appear in list output — users can recreate them to pick up the label.
 
 3. **Rich state display**: The list output includes execution state from state files (iteration count, agent status,
    started_at, last_updated) alongside lifecycle status. This enables users to spot stale, completed, or errored
    instances at a glance.
 
-4. **Backend filter flag**: Optional `--backend docker|gcp` flag to restrict listing to a single backend.
-
-5. **Output format**: Default is a human-readable table. `--json` flag for machine-readable output.
+4. **Output format**: Human-readable table only. No `--json` flag — the primary consumer is a human at a terminal.
+   Machine-readable output can be added later if a concrete need arises.
 
 ## Impact
 

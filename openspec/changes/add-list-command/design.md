@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `internal/provider/provider.go` | modify | Add `InstanceInfo` struct and `List()` to Provider interface |
 | `internal/backend/docker/client.go` | modify | Add `ListContainers` method to Docker Client interface |
-| `internal/backend/docker/docker_provider.go` | modify | Implement `List()` using label filter + name prefix fallback |
+| `internal/backend/docker/docker_provider.go` | modify | Implement `List()` using label filter |
 | `internal/backend/docker/run.go` | modify | Add `spinner-managed=true` label to container creation |
 | `internal/backend/gcp/client.go` | modify | Add `ListInstances` method to GCP Client interface |
 | `internal/backend/gcp/gcp_provider.go` | modify | Implement `List()` using label filter |
@@ -46,8 +46,8 @@ Add `List(ctx context.Context) ([]InstanceInfo, error)` to the `Provider` interf
 #### 2. Docker Discovery
 
 **Label addition** (in `run.go`): When building the `docker run` command, add `--label spinner-managed=true`.
-This is a one-line change in the argument builder. Existing containers won't have this label, so we also need
-a fallback.
+This is a one-line change in the argument builder. Containers created before this change won't have the label
+and won't appear in list output — users can recreate them to pick it up.
 
 **ListContainers** (in `client.go`): New method on the Docker Client interface using the Docker SDK:
 
@@ -55,10 +55,8 @@ a fallback.
 ListContainers(ctx context.Context, filters map[string][]string) ([]container.Summary, error)
 ```
 
-Implementation uses `client.ContainerList()` with a filter. The provider calls it twice:
-1. Primary: filter by label `spinner-managed=true`
-2. Fallback: filter by name prefix `spinner-` (catches pre-label containers)
-3. Deduplicate by container ID
+Implementation uses `client.ContainerList()` with a single label filter `spinner-managed=true`. No name-prefix
+fallback — label-only discovery keeps the implementation simple and predictable.
 
 **State reading**: For each discovered container, read `~/.spinner/<name>/state/state.json` from the host.
 Parse the state file to extract iteration, agent status, timestamps. If the file doesn't exist, those fields
@@ -96,7 +94,7 @@ The command iterates over all registered backends from the Factory:
    d. Collect results
 3. Merge all InstanceInfo across backends
 4. Sort by backend, then status (running first), then name
-5. Render as table or JSON
+5. Render as table
 ```
 
 GCP backend creation requires project/zone. The command resolves these from:
@@ -108,7 +106,7 @@ If none are available, GCP is silently skipped (most users only use Docker).
 
 #### 5. Output Format
 
-**Table (default)**:
+**Table (only format)**:
 
 ```
 BACKEND  NAME                        STATUS   STATE       ITER   AGE        LAST UPDATE
@@ -124,8 +122,6 @@ gcp      spinner-prod-old-task       running  running     88/100 2d ago     2d a
 - `AGE` = time since started_at
 - `LAST UPDATE` = time since last_updated (with stale warning if >2h for running instances)
 
-**JSON** (`--json`): Array of `InstanceInfo` objects with full timestamps.
-
 ### Key Decisions
 
 - **InstanceInfo vs existing types**: We create a dedicated `InstanceInfo` struct rather than reusing
@@ -133,9 +129,9 @@ gcp      spinner-prod-old-task       running  running     88/100 2d ago     2d a
   carries, (b) a single struct avoids N+1 per-instance metadata queries, (c) the list use case has
   different data needs than watch/status.
 
-- **Label fallback for Docker**: We filter by label first, then by name prefix, to handle the transition
-  period where existing containers don't have labels. After a few releases, the name-prefix fallback could
-  be removed.
+- **No name-prefix fallback for Docker**: We only filter by label. Containers created before this change won't
+  appear in list output. This keeps the implementation simple and avoids listing containers that aren't actually
+  spinner-managed. Users can `--recreate` to pick up the label.
 
 - **No --cleanup flag in v1**: The `destroy` command already handles removal. The list command focuses
   on visibility. A future `spinner list --stale --destroy` or `spinner cleanup` could compose list + destroy
