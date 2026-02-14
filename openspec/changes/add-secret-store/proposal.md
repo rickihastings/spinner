@@ -4,8 +4,8 @@
 
 Add an encrypted secret store (`internal/secret/`) backed by an AES-256-GCM encrypted file, a
 `spinner secret set/list/delete` CLI subcommand, and a `--secret KEY` flag on `spin` that references keys
-from the store. Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) auto-resolve from the store
-first, then fall back to environment variables for backward compatibility.
+from the store. **All tokens are stored in the secret store — there is no environment variable fallback.**
+This is a breaking change from the current env-var-based workflow.
 
 ## Motivation
 
@@ -20,12 +20,27 @@ filesystem access. This is particularly concerning when running agents autonomou
 - **No separation** — non-sensitive config and sensitive tokens share the same `.envrc` file with no
   distinction between them
 - **No secure storage** — there is no way to store secrets outside plaintext files today
+- **Env vars leak into containers** — tokens passed as container env vars are visible to every process
+  inside the sandbox, including unattended agents the user may spin up
 
 An encrypted file store gives users a single, cross-platform way to keep tokens out of plaintext files.
-At spin-time, the store is unlocked once, values are read and forwarded into the container — the same
-pass-through model as today, but with encrypted storage instead of `.envrc`.
+At spin-time, the store is unlocked once, all secrets are encrypted into a per-session blob and delivered
+into the container. Inside the container, secrets are never exposed as environment variables — they are
+decrypted on demand by `spinner exec` or `spinner secret inject`.
 
 ## What Changes
+
+### Breaking Change: Store-Only Token Resolution
+
+`GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` **must** be stored in the secret store via
+`spinner secret set`. Environment variable fallback is removed. Users must run:
+
+```bash
+spinner secret set GITHUB_TOKEN
+spinner secret set CLAUDE_CODE_OAUTH_TOKEN
+```
+
+before `spinner spin` will work. This eliminates plaintext `.envrc` files from the workflow entirely.
 
 ### Added Capability: Secret Store
 
@@ -33,49 +48,61 @@ New `internal/secret/` package with:
 
 - **Store interface** — `Set`, `Get`, `Delete`, `List` methods with `ErrNotFound` sentinel
 - **Encrypted file backend** — AES-256-GCM with Argon2id key derivation (`~/.spinner/secrets.enc`)
-- **Resolver** — centralizes token resolution: store first, then env var fallback
+- **Resolver** — centralizes token resolution: store only, no env fallback
 
 ### Added Capability: `spinner secret` CLI Subcommand
 
 - `spinner secret set <KEY>` — prompts for value (hidden input) or accepts `--value`
 - `spinner secret list` — shows stored key names (not values)
 - `spinner secret delete <KEY>` — removes a key from the store
+- `spinner secret inject -- <command>` — decrypts blob, runs command with secrets injected
 
 ### Modified Capability: `cli-spin`
 
 - **ADDED** `--secret KEY` repeatable flag — references a key in the secret store by name (value never on
   command line)
-- **MODIFIED** token resolution — `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` resolve from secret store
-  first, then `os.Getenv()` fallback; error only if neither source has a value
-- **MODIFIED** reserved variable check — `--secret` rejects the same reserved names as `--env`
+- **MODIFIED** token resolution — all tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, custom keys)
+  resolve from the secret store only. No env var fallback. Error if key not found in store.
+- **REMOVED** reserved variable check for `--secret` — `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` are
+  no longer special-cased; they are regular store keys resolved automatically by the resolver
 
 ### Modified Internal Type: `provider.CreateConfig`
 
-- **ADDED** `Secrets map[string]string` field — carries resolved secret values (built-in tokens + custom
-  `--secret` keys) so backends read from config instead of calling `os.Getenv()` directly
+- **ADDED** `SecretBlob []byte` field — carries the encrypted blob for backend mounting/delivery
+- **REMOVED** direct token fields — backends no longer read `GITHUB_TOKEN` from env or config; all
+  secrets travel via the encrypted blob
 
 ### Modified Capability: In-Container Secret Delivery
 
-Custom `--secret` values are NOT passed as container environment variables. Instead:
+**No secrets are passed as container environment variables.** All secrets (built-in tokens and custom)
+are delivered as an encrypted blob:
 
-- **ADDED** encrypted blob delivery — host re-encrypts resolved custom secrets into a per-session blob,
+- **ADDED** encrypted blob delivery — host encrypts all resolved secrets into a per-session blob,
   mounted read-only into the container at `/run/spinner/secrets.enc`
-- **MODIFIED** `spinner exec` — reads encrypted blob at startup, decrypts into memory, deletes blob,
-  injects secrets via `cmd.Env` on child processes. Secrets never appear in the container's global
-  environment or filesystem after startup.
+- **MODIFIED** `startup.sh` — uses `spinner secret inject` to wrap token-dependent operations
+  (`gh auth setup-git`, `git clone`). After initial setup, `gh` credential cache persists git auth
+  and the token env vars are no longer needed.
+- **MODIFIED** `spinner exec` — reads encrypted blob at startup, decrypts into memory, injects secrets
+  (including `SPINNER_SECRET_PASSPHRASE` for inception) via `cmd.Env` on child processes. Blob is
+  retained on disk for inception scenarios.
 - **ADDED** `spinner secret inject -- <command>` — for no-`--prompt` mode (user SSH). Prompts for
   passphrase, decrypts blob, runs command with secrets injected. Unattended agents without explicit
-  injection get no custom secrets.
+  injection get no secrets at all.
 
-Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) remain as container env vars because
-`startup.sh` requires them for `gh auth setup-git` and git credential configuration.
+### Added Capability: Configurable Store Path
+
+- **ADDED** `SPINNER_SECRET_STORE` environment variable — overrides default store path
+  (`~/.spinner/secrets.enc`). Enables inception scenarios where an outer Spinner's encrypted blob
+  serves as the inner Spinner's store. Same passphrase, same format, each layer reads what it needs
+  and re-encrypts for the next.
 
 ## Impact
 
 ### Affected Specs
 
-- `cli-spin` — new `--secret` flag, modified token resolution, new `spinner secret` subcommand,
-  encrypted blob delivery, `spinner exec` secret injection, `spinner secret inject` command
+- `cli-spin` — new `--secret` flag, store-only token resolution, new `spinner secret` subcommand,
+  encrypted blob delivery, `spinner exec` secret injection, `spinner secret inject` command,
+  `startup.sh` refactor
 
 ### Affected Code
 
@@ -84,48 +111,40 @@ Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) remain as container 
 | `internal/secret/store.go` | New — Store interface, ErrNotFound sentinel |
 | `internal/secret/encrypted.go` | New — AES-256-GCM encrypted file backend |
 | `internal/secret/blob.go` | New — `EncryptBlob` / `DecryptBlob` for per-session secret transport |
-| `internal/secret/resolver.go` | New — token resolution (store → env → error) |
+| `internal/secret/resolver.go` | New — token resolution (store only, no env fallback) |
 | `internal/secret/mock_store.go` | New — testify mock for consumer tests |
 | `cmd/secret.go` | New — `spinner secret` subcommand (set/list/delete/inject) |
 | `cmd/helpers.go` | Modify — add `flagSecret` constant |
-| `cmd/spin.go` | Modify — add `--secret` flag, create Store, resolve secrets, populate `CreateConfig.Secrets` |
-| `internal/provider/provider.go` | Modify — add `Secrets` field to `CreateConfig` |
-| `internal/backend/docker/run.go` | Modify — read built-in tokens from `config.Secrets`; write encrypted blob to host state dir; mount blob into container |
-| `internal/backend/docker/docker_provider.go` | Modify — pass `Secrets` through to `spinConfig` |
-| `internal/backend/gcp/gcp_provider.go` | Modify — read built-in tokens from `config.Secrets`; base64-encode blob as `SPINNER_SECRET_BLOB` instance metadata |
-| `internal/exec/loop.go` | Modify — read and decrypt secrets blob at startup, inject into executor config |
+| `cmd/spin.go` | Modify — add `--secret` flag, create Store, resolve all secrets, generate blob |
+| `internal/provider/provider.go` | Modify — add `SecretBlob []byte` to `CreateConfig`, remove direct token access |
+| `internal/backend/docker/run.go` | Modify — mount encrypted blob; remove env-file token writing; pass `SPINNER_SECRET_PASSPHRASE` as sole container env var |
+| `internal/backend/docker/docker_provider.go` | Modify — pass `SecretBlob` from `CreateConfig` to `spinConfig` |
+| `internal/backend/gcp/gcp_provider.go` | Modify — base64-encode blob as `SPINNER_SECRET_BLOB` metadata; pass `SPINNER_SECRET_PASSPHRASE` as metadata |
+| `internal/exec/loop.go` | Modify — decrypt blob at startup, inject into executor config (including passphrase for inception) |
 | `internal/agent/claude/executor.go` | No change — already injects `config.Env` via `cmd.Env` |
 | `internal/prerequisites/prerequisites.go` | Modify — remove `CheckEnvironmentVariables()` (replaced by resolver) |
+| `templates/scripts/startup.sh` | Modify — refactor to use `spinner secret inject` for token-dependent work |
 | Test files | New and updated tests for all changes |
 
 ### Not Affected
 
-- `--env` flag — continues to work identically for inline key-value pairs
+- `--env` flag — continues to work identically for inline non-sensitive key-value pairs
 - `--env-file` proposal — remains a separate feature for non-sensitive bulk config
-- Provider interface — no new methods, just a field on `CreateConfig`
+- Provider interface — no new methods
 - Docker/GCP images — no changes to baked images
 - `setup`, `watch` commands — no changes
-- Built-in token delivery — `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` remain as container env vars
-  (`startup.sh` dependency)
 
 ## Risks & Mitigations
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Encrypted file passphrase UX | Interactive prompt blocks CI | `SPINNER_SECRET_PASSPHRASE` env var for non-interactive use; CI can also use env var fallback (existing workflow) |
-| Backward compatibility | Users relying on env vars must continue to work | Resolver falls back to `os.Getenv()` for built-in tokens; env-only workflow unchanged |
+| **Breaking change** | Existing env-var workflows stop working | No users yet; clean migration path (`spinner secret set` for each token) |
+| Encrypted file passphrase UX | Interactive prompt blocks CI | `SPINNER_SECRET_PASSPHRASE` env var for non-interactive use on the host |
 | Encrypted file corruption | Lost secrets | Clear error message; user can delete file and re-set secrets |
 | Go memory safety | Secret strings cannot be reliably zeroed | Accepted Go limitation; all Go CLI tools share this constraint |
 | Passphrase reuse | Same passphrase encrypts host store and container blob | Container blob uses its own salt; host store file is never inside the container |
-| `SPINNER_SECRET_PASSPHRASE` in --prompt mode | Passphrase briefly in container env | `spinner exec` unsets it immediately after decrypting; window is sub-second |
-| No-prompt mode without passphrase | User must type passphrase for every `inject` | Acceptable UX tradeoff for preventing unattended agent access |
-
-### Added Capability: Configurable Store Path
-
-- **ADDED** `SPINNER_SECRET_STORE` environment variable — overrides default store path
-  (`~/.spinner/secrets.enc`). Enables inception scenarios where an outer Spinner's encrypted blob
-  serves as the inner Spinner's store. Same passphrase, same format, each layer reads what it needs
-  and re-encrypts for the next.
+| `SPINNER_SECRET_PASSPHRASE` in container env | Passphrase discoverable via `/proc/1/environ` (Docker) or metadata API (GCP) | Defense in depth — secrets aren't casually visible via `env`; determined access requires knowing to look in /proc or metadata |
+| Blob retained on disk | Encrypted file persists in container filesystem | Encrypted with Argon2id; useless without passphrase; enables inception |
 
 ## Non-Goals
 
@@ -135,3 +154,4 @@ Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) remain as container 
 - **Encrypted env-file support** — `--env-file` is for non-sensitive config; sensitive values go through `--secret`
 - **Key rotation automation** — users rotate by re-running `spinner secret set`
 - **Multi-user / team secret sharing** — single-user tool; teams use their own secret management
+- **Environment variable fallback** — deliberately removed to eliminate plaintext token workflows
