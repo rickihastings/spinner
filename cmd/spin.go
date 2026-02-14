@@ -234,11 +234,11 @@ EXAMPLES:
 
 				fmt.Printf("To access: gcloud compute ssh %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
 				fmt.Printf("To stop:   gcloud compute instances stop %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
-				fmt.Printf("To remove: gcloud compute instances delete %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
+				fmt.Printf("To destroy: spinner destroy %s\n", instance.Name)
 			} else {
 				fmt.Printf("To access: docker exec -it %s bash\n", instance.Name)
 				fmt.Printf("To stop: docker stop %s\n", instance.Name)
-				fmt.Printf("To remove: docker rm %s\n", instance.Name)
+				fmt.Printf("To destroy: spinner destroy %s\n", instance.Name)
 			}
 
 			// Enter watch mode if --watch flag is set
