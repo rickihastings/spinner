@@ -16,8 +16,8 @@
 
 ## 3.0 GCP backend: env file metadata and runtime script
 
-- [ ] 3.1 Update `Create()` in `internal/backend/gcp/gcp_provider.go`: if `config.EnvFile` is set, read file,
+- [x] 3.1 Update `Create()` in `internal/backend/gcp/gcp_provider.go`: if `config.EnvFile` is set, read file,
   base64-encode content, add as `SPINNER_ENV_FILE` metadata
-- [ ] 3.2 Update `templates/scripts/gcp_runtime.sh`: read `SPINNER_ENV_FILE` metadata, base64-decode, write to
+- [x] 3.2 Update `templates/scripts/gcp_runtime.sh`: read `SPINNER_ENV_FILE` metadata, base64-decode, write to
   workspace `.env`, source it
-- [ ] 3.3 Verify build succeeds and all tests pass
+- [x] 3.3 Verify build succeeds and all tests pass

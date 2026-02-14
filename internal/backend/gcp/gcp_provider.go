@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -196,6 +197,16 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	// Add custom env vars with SPINNER_ENV_ prefix
 	for key, value := range config.EnvVars {
 		metadata["SPINNER_ENV_"+key] = value
+	}
+
+	// If env file is specified, read and base64-encode it for metadata transport
+	if config.EnvFile != "" {
+		envFileContent, readErr := os.ReadFile(config.EnvFile)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read env file: %w", readErr)
+		}
+
+		metadata["SPINNER_ENV_FILE"] = base64.StdEncoding.EncodeToString(envFileContent)
 	}
 
 	labels := map[string]string{

@@ -31,7 +31,7 @@ export SPINNER_LOG_BUCKET SPINNER_INSTANCE_NAME SPINNER_STATE_BUCKET
 # Read custom env vars from metadata (SPINNER_ENV_ prefix)
 echo "Reading custom environment variables..."
 for key in $(curl -sf -H "$META_HEADER" "$META_URL/" 2>/dev/null | grep "^SPINNER_ENV_" || echo ""); do
-    if [ -n "$key" ]; then
+    if [ -n "$key" ] && [ "$key" != "SPINNER_ENV_FILE" ]; then
         value=$(curl -sf -H "$META_HEADER" "$META_URL/$key" 2>/dev/null || echo "")
         # Strip SPINNER_ENV_ prefix and export
         var_name="${key#SPINNER_ENV_}"
@@ -39,6 +39,23 @@ for key in $(curl -sf -H "$META_HEADER" "$META_URL/" 2>/dev/null | grep "^SPINNE
         echo "Exported custom var: $var_name"
     fi
 done
+
+# Handle env file if present in metadata
+SPINNER_ENV_FILE_B64=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_ENV_FILE" 2>/dev/null || echo "")
+if [ -n "$SPINNER_ENV_FILE_B64" ]; then
+    echo "Env file detected in metadata, writing to workspace..."
+    mkdir -p /home/spinner/workspace
+    echo "$SPINNER_ENV_FILE_B64" | base64 -d > /home/spinner/workspace/.env
+    chown spinner:spinner /home/spinner/workspace/.env
+    echo "Env file written to /home/spinner/workspace/.env"
+
+    # Source the env file to make variables available in this shell
+    set -a  # Export all variables
+    # shellcheck disable=SC1091
+    source /home/spinner/workspace/.env
+    set +a
+    echo "Env file sourced into environment"
+fi
 
 # Set log directory and state directory
 export LOG_DIR="/home/spinner/logs"

@@ -2,8 +2,10 @@ package gcp
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
 	"testing"
 
 	"cloud.google.com/go/compute/apiv1/computepb"
@@ -629,6 +631,104 @@ func TestProviderCreateCustomEnvVarsNoCollision(t *testing.T) {
 		},
 		EnvVars: map[string]string{
 			"MY_VAR": "value",
+		},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.NoError(t, err)
+	assert.NotNil(t, instance)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderCreateWithEnvFile(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	// Create temp env file
+	tmpFile := t.TempDir() + "/.env"
+	envContent := "DATABASE_URL=postgres://localhost\nAPI_KEY=secret123"
+	err := os.WriteFile(tmpFile, []byte(envContent), 0644)
+	assert.NoError(t, err)
+
+	// Image exists
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	// CreateInstance - verify env file is base64-encoded in metadata
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
+		envFileB64, hasEnvFile := config.Metadata["SPINNER_ENV_FILE"]
+		if !hasEnvFile {
+			return false
+		}
+
+		// Decode and verify content
+		decoded, err := base64.StdEncoding.DecodeString(envFileB64)
+		if err != nil {
+			return false
+		}
+
+		return string(decoded) == envContent
+	})).Return(nil)
+
+	config := provider.CreateConfig{
+		Repo:    "https://github.com/user/repo.git",
+		Prompt:  "Fix the bug",
+		EnvFile: tmpFile,
+		Options: map[string]string{
+			"image": "my-env",
+		},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.NoError(t, err)
+	assert.NotNil(t, instance)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderCreateWithEnvFileNotFound(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	// Image exists
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	config := provider.CreateConfig{
+		Repo:    "https://github.com/user/repo.git",
+		Prompt:  "Fix the bug",
+		EnvFile: "/nonexistent/.env",
+		Options: map[string]string{
+			"image": "my-env",
+		},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read env file")
+	assert.Nil(t, instance)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderCreateWithEmptyEnvFile(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	// Image exists
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	// CreateInstance - verify no SPINNER_ENV_FILE metadata when EnvFile is empty
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
+		_, hasEnvFile := config.Metadata["SPINNER_ENV_FILE"]
+		return !hasEnvFile
+	})).Return(nil)
+
+	config := provider.CreateConfig{
+		Repo:    "https://github.com/user/repo.git",
+		Prompt:  "Fix the bug",
+		EnvFile: "",
+		Options: map[string]string{
+			"image": "my-env",
 		},
 	}
 
