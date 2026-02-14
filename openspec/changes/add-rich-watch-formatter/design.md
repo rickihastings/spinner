@@ -4,12 +4,14 @@
 
 ### Component Map
 
-| File                                           | Action     | Purpose                                                          |
-|------------------------------------------------|------------|------------------------------------------------------------------|
-| `internal/agent/claude/rich_formatter.go`      | **create** | `RichFormatter` struct + `FormatEvent` implementation            |
-| `internal/agent/claude/rich_formatter_test.go` | **create** | Unit tests for all event type formatting                         |
-| `cmd/watch.go`                                 | **modify** | Wire `NewRichFormatter()` instead of `NewFormatter()` (line 109) |
-| `go.mod` / `go.sum`                            | **modify** | Add `charmbracelet/glamour` dependency                           |
+| File                                           | Action     | Purpose                                                                      |
+|------------------------------------------------|------------|------------------------------------------------------------------------------|
+| `internal/agent/claude/rich_formatter.go`      | **create** | `RichFormatter` struct + `FormatEvent` implementation                        |
+| `internal/agent/claude/rich_formatter_test.go` | **create** | Unit tests for all event type formatting                                     |
+| `internal/tui/watch.go`                        | **modify** | Remove log view border/title/padding; add responsive header with breakpoints |
+| `internal/tui/watch_test.go`                   | **modify** | Add tests for responsive header layout                                       |
+| `cmd/watch.go`                                 | **modify** | Wire `NewRichFormatter()` instead of `NewFormatter()` (line 109)             |
+| `go.mod` / `go.sum`                            | **modify** | Add `charmbracelet/glamour` dependency                                       |
 
 ### Approach
 
@@ -161,3 +163,114 @@ Long parameter values are truncated to ~80 characters with `...` suffix.
 | Truncate tool results by line count       | Prevents TUI flooding from large file reads or command outputs; shows `+N lines` summary                                                     |
 | Extract tool summary from Input JSON      | Gives users actionable context (which file, which command) without showing full JSON                                                         |
 | No `--formatter` CLI flag                 | YAGNI — there's no use case for choosing the old formatter; if needed, add later                                                             |
+
+### TUI Simplification
+
+#### Log View — Borderless
+
+The log view (`logView`) removes all chrome to feel like raw terminal output:
+
+```go
+logView := tview.NewTextView().
+    SetDynamicColors(true).
+    SetScrollable(true)
+// No SetBorder, no SetTitle, no SetBorderPadding
+```
+
+This makes agent output flow naturally, matching Claude Code's own appearance where tool calls and
+markdown text simply appear inline without being boxed.
+
+#### Responsive Header — Width Breakpoints
+
+The header switches between two rendering modes based on terminal width. The width is read from
+`header.GetInnerRect()` (already used today) and checked on each `renderHeader()` call, meaning it
+responds to terminal resizes automatically via tview's redraw cycle.
+
+**Wide mode (≥80 columns):** The existing 3-column grid layout is preserved:
+
+```
+┌─ Container: my-container ──────────────────────────────────────────────┐
+│ Branch:     main        │ Env:        production │ Agent:      opus-4  │
+│ Status:     running     │ Memory:     1.2 GB     │ Container:  abc123  │
+│ Iterations: 5/100       │ CPU:        12.3%      │ Image:      def456  │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+**Compact mode (<80 columns):** Collapses to 1–2 lines showing only essential fields, with the
+header box height reduced accordingly (2–3 rows instead of 5):
+
+```
+┌─ my-container ─────────────────────────────────┐
+│ running │ iter 5/100 │ main │ 12.3% │ 1.2 GB   │
+└────────────────────────────────────────────────┘
+```
+
+Fields hidden in compact mode: environment, container ID, image ID, agent name. These are
+operational details rarely needed during active monitoring.
+
+**Very narrow mode (<40 columns):** Single-line status, minimal header:
+
+```
+┌─ my-container ─────────────┐
+│ running 5/100 12.3% 1.2GB  │
+└────────────────────────────┘
+```
+
+#### Implementation Approach
+
+The `renderHeader()` method already reads terminal width and branches on it. The change adds a
+width check at the top:
+
+```go
+func (ui *WatchUI) renderHeader() {
+    _, _, width, _ := ui.header.GetInnerRect()
+
+    if width < 40 {
+        ui.renderHeaderMinimal(width)
+        return
+    }
+    if width < 80 {
+        ui.renderHeaderCompact(width)
+        return
+    }
+    ui.renderHeaderWide(width)
+}
+```
+
+The header's `AddItem` height in the layout flex needs to be dynamic. One approach: set a fixed
+max height (5 for wide) and let the compact renderers simply use fewer lines within that space.
+Alternatively, the header height could be updated on resize, though this adds complexity. The
+simpler fixed-height approach (always allocate 5 rows, compact modes just leave blank rows) is
+recommended for the initial implementation.
+
+#### Status Bar (Footer)
+
+The current footer ("Press q to quit" in dark gray, right-aligned) is replaced with a solid
+vim/tmux-style status bar. This is a full-width single-line bar with an inverted/highlighted
+background color that displays keyboard shortcuts.
+
+**Appearance:**
+
+```
+ q: quit
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+(entire line has a dark background, e.g., gray on black or similar inverted style)
+```
+
+**Implementation:** The footer `tview.TextView` uses a background color tag to create the solid
+bar effect. In tview, this can be achieved with:
+
+```go
+footer := tview.NewTextView().
+    SetDynamicColors(true).
+    SetTextAlign(tview.AlignLeft)
+footer.SetBackgroundColor(tcell.ColorDarkSlateGray)
+footer.SetText(" [white]q[darkgray]: quit[-]")
+```
+
+The bar spans the full terminal width automatically since it's in a flex layout. The key hint
+format uses a brighter color for the key and a dimmer color for the description, matching the
+tmux status bar convention.
+
+As more keyboard shortcuts are added (from the `add-watch-mode-shortcuts` change), they would
+appear space-separated in this bar: `q: quit  ↑/↓: scroll  f: follow`.
