@@ -31,6 +31,10 @@ approximate this so users can meaningfully monitor agent progress without SSHing
   code blocks with syntax highlighting via `glamour`
 - **MODIFIED** Log Parsing requirement: user messages (tool results) are no longer unconditionally
   skipped — they are rendered when the rich formatter is active
+- **MODIFIED** TUI Layout requirement: log section rendered without borders, title, or padding for a
+  minimal Claude-Code-like appearance; header section uses a responsive layout that collapses to a
+  compact 1–2 line format on narrow terminals (<80 columns); footer replaced with a solid
+  vim/tmux-style status bar showing keyboard shortcuts
 
 ### New Internal Types
 
@@ -48,23 +52,25 @@ approximate this so users can meaningfully monitor agent progress without SSHing
 ### Affected Specs
 
 - `cli-watch` — three ADDED requirements (Rich Tool Call Display, Rich Tool Result Display, Rich
-  Markdown Rendering), one MODIFIED requirement (Log Parsing — user messages no longer skipped)
+  Markdown Rendering), two MODIFIED requirements (Log Parsing — user messages no longer skipped;
+  TUI Layout — borderless logs, responsive header, vim/tmux status bar)
 
 ### Affected Code
 
-| Area                                           | Change Type                                                             |
-|------------------------------------------------|-------------------------------------------------------------------------|
-| `internal/agent/claude/rich_formatter.go`      | **create** — `RichFormatter` implementing `EventFormatter`              |
-| `internal/agent/claude/rich_formatter_test.go` | **create** — unit tests for rich formatting                             |
-| `cmd/watch.go`                                 | **modify** — switch `NewFormatter()` to `NewRichFormatter()` (line 109) |
-| `go.mod` / `go.sum`                            | **modify** — add `charmbracelet/glamour` dependency                     |
+| Area                                           | Change Type                                                                                        |
+|------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `internal/agent/claude/rich_formatter.go`      | **create** — `RichFormatter` implementing `EventFormatter`                                         |
+| `internal/agent/claude/rich_formatter_test.go` | **create** — unit tests for rich formatting                                                        |
+| `internal/tui/watch.go`                        | **modify** — remove log view border/title/padding; add responsive header with compact narrow mode  |
+| `internal/tui/watch_test.go`                   | **modify** — add tests for responsive header rendering                                             |
+| `cmd/watch.go`                                 | **modify** — switch `NewFormatter()` to `NewRichFormatter()` (line 109)                            |
+| `go.mod` / `go.sum`                            | **modify** — add `charmbracelet/glamour` dependency                                                |
 
 ### Not Affected
 
 - `internal/agent/claude/formatter.go` — preserved as-is (fallback / reference)
 - `internal/agent/claude/parser.go` — no parsing changes; all needed data already extracted
 - `internal/agent/claude/types.go` — no type changes; tool_use blocks already have ID, Name, Input
-- `internal/tui/watch.go` — no TUI changes; receives formatted strings via `EventFormatter` interface
 - `internal/agent/agent.go` — `EventFormatter` interface unchanged
 - All other commands (`spin`, `setup`, `exec`, `destroy`)
 

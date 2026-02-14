@@ -85,6 +85,53 @@ support for headings, bold text, bullet points, numbered lists, and syntax-highl
 
 ## MODIFIED Requirements
 
+### Requirement: TUI Layout
+
+The watch command SHALL display a terminal UI with a compact header section at the top showing container
+metadata and metrics, and a borderless log section below that fills the remaining terminal height. The
+layout SHALL adapt to terminal width using responsive breakpoints.
+
+#### Scenario: TUI renders on terminal
+
+- **WHEN** watch mode is active
+- **THEN** the terminal SHALL display a bordered header section with container name, branch, iteration
+  count, CPU usage, and memory usage
+- **AND** the terminal SHALL display a borderless scrolling log section below the header with no title,
+  no border, and no extra padding
+- **AND** the terminal SHALL display a solid status bar at the bottom (vim/tmux-style) showing keyboard
+  shortcuts on a highlighted background
+
+#### Scenario: Wide terminal header layout
+
+- **WHEN** the terminal width is 80 columns or wider
+- **THEN** the header SHALL render container metadata in a multi-column grid layout (3 columns of
+  key-value pairs separated by vertical dividers)
+
+#### Scenario: Narrow terminal compact header
+
+- **WHEN** the terminal width is less than 80 columns
+- **THEN** the header SHALL collapse to a compact 1–2 line format showing only the most essential
+  fields: status, iteration count, branch, CPU percentage, and memory usage
+- **AND** less critical fields (environment, container ID, image ID, agent) SHALL be hidden
+
+#### Scenario: TUI handles terminal resize
+
+- **WHEN** the terminal window is resized during watch mode
+- **THEN** the TUI SHALL automatically adjust layout to fit new dimensions, switching between wide and
+  compact header modes as appropriate
+
+#### Scenario: TUI handles very small terminal
+
+- **WHEN** the terminal width is less than 40 columns
+- **THEN** the TUI SHALL prioritize the log display and render a minimal single-line status indicator
+
+#### Scenario: Status bar displays keyboard shortcuts
+
+- **WHEN** watch mode is active
+- **THEN** the bottom of the terminal SHALL display a single-line solid status bar with an inverted or
+  highlighted background color showing available keyboard shortcuts (e.g., "q: quit")
+- **AND** the status bar SHALL span the full terminal width
+
 ### Requirement: Log Parsing
 
 The CLI SHALL parse JSON-formatted log entries and display them in human-readable format.
