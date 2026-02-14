@@ -54,11 +54,28 @@ New `internal/secret/` package with:
 - **ADDED** `Secrets map[string]string` field — carries resolved secret values (built-in tokens + custom
   `--secret` keys) so backends read from config instead of calling `os.Getenv()` directly
 
+### Modified Capability: In-Container Secret Delivery
+
+Custom `--secret` values are NOT passed as container environment variables. Instead:
+
+- **ADDED** encrypted blob delivery — host re-encrypts resolved custom secrets into a per-session blob,
+  mounted read-only into the container at `/run/spinner/secrets.enc`
+- **MODIFIED** `spinner exec` — reads encrypted blob at startup, decrypts into memory, deletes blob,
+  injects secrets via `cmd.Env` on child processes. Secrets never appear in the container's global
+  environment or filesystem after startup.
+- **ADDED** `spinner secret inject -- <command>` — for no-`--prompt` mode (user SSH). Prompts for
+  passphrase, decrypts blob, runs command with secrets injected. Unattended agents without explicit
+  injection get no custom secrets.
+
+Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) remain as container env vars because
+`startup.sh` requires them for `gh auth setup-git` and git credential configuration.
+
 ## Impact
 
 ### Affected Specs
 
-- `cli-spin` — new `--secret` flag, modified token resolution, new `spinner secret` subcommand
+- `cli-spin` — new `--secret` flag, modified token resolution, new `spinner secret` subcommand,
+  encrypted blob delivery, `spinner exec` secret injection, `spinner secret inject` command
 
 ### Affected Code
 
@@ -66,15 +83,18 @@ New `internal/secret/` package with:
 |---|---|
 | `internal/secret/store.go` | New — Store interface, ErrNotFound sentinel |
 | `internal/secret/encrypted.go` | New — AES-256-GCM encrypted file backend |
+| `internal/secret/blob.go` | New — `EncryptBlob` / `DecryptBlob` for per-session secret transport |
 | `internal/secret/resolver.go` | New — token resolution (store → env → error) |
 | `internal/secret/mock_store.go` | New — testify mock for consumer tests |
-| `cmd/secret.go` | New — `spinner secret` subcommand (set/list/delete) |
+| `cmd/secret.go` | New — `spinner secret` subcommand (set/list/delete/inject) |
 | `cmd/helpers.go` | Modify — add `flagSecret` constant |
 | `cmd/spin.go` | Modify — add `--secret` flag, create Store, resolve secrets, populate `CreateConfig.Secrets` |
 | `internal/provider/provider.go` | Modify — add `Secrets` field to `CreateConfig` |
-| `internal/backend/docker/run.go` | Modify — read tokens from `config.Secrets` instead of `os.Getenv()` |
+| `internal/backend/docker/run.go` | Modify — read built-in tokens from `config.Secrets`; write encrypted blob to host state dir; mount blob into container |
 | `internal/backend/docker/docker_provider.go` | Modify — pass `Secrets` through to `spinConfig` |
-| `internal/backend/gcp/gcp_provider.go` | Modify — read tokens from `config.Secrets` instead of `os.Getenv()` |
+| `internal/backend/gcp/gcp_provider.go` | Modify — read built-in tokens from `config.Secrets`; base64-encode blob as `SPINNER_SECRET_BLOB` instance metadata |
+| `internal/exec/loop.go` | Modify — read and decrypt secrets blob at startup, inject into executor config |
+| `internal/agent/claude/executor.go` | No change — already injects `config.Env` via `cmd.Env` |
 | `internal/prerequisites/prerequisites.go` | Modify — remove `CheckEnvironmentVariables()` (replaced by resolver) |
 | Test files | New and updated tests for all changes |
 
@@ -82,10 +102,11 @@ New `internal/secret/` package with:
 
 - `--env` flag — continues to work identically for inline key-value pairs
 - `--env-file` proposal — remains a separate feature for non-sensitive bulk config
-- Container delivery mechanism — temp env file for Docker, metadata for GCP (unchanged)
 - Provider interface — no new methods, just a field on `CreateConfig`
 - Docker/GCP images — no changes to baked images
-- `setup`, `watch`, `exec` commands — no secret injection needed
+- `setup`, `watch` commands — no changes
+- Built-in token delivery — `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` remain as container env vars
+  (`startup.sh` dependency)
 
 ## Risks & Mitigations
 
@@ -95,6 +116,16 @@ New `internal/secret/` package with:
 | Backward compatibility | Users relying on env vars must continue to work | Resolver falls back to `os.Getenv()` for built-in tokens; env-only workflow unchanged |
 | Encrypted file corruption | Lost secrets | Clear error message; user can delete file and re-set secrets |
 | Go memory safety | Secret strings cannot be reliably zeroed | Accepted Go limitation; all Go CLI tools share this constraint |
+| Passphrase reuse | Same passphrase encrypts host store and container blob | Container blob uses its own salt; host store file is never inside the container |
+| `SPINNER_SECRET_PASSPHRASE` in --prompt mode | Passphrase briefly in container env | `spinner exec` unsets it immediately after decrypting; window is sub-second |
+| No-prompt mode without passphrase | User must type passphrase for every `inject` | Acceptable UX tradeoff for preventing unattended agent access |
+
+### Added Capability: Configurable Store Path
+
+- **ADDED** `SPINNER_SECRET_STORE` environment variable — overrides default store path
+  (`~/.spinner/secrets.enc`). Enables inception scenarios where an outer Spinner's encrypted blob
+  serves as the inner Spinner's store. Same passphrase, same format, each layer reads what it needs
+  and re-encrypts for the next.
 
 ## Non-Goals
 

@@ -79,13 +79,13 @@ environment. Secret values SHALL never appear on the command line.
 
 - **WHEN** user runs `spinner spin --image <image> --repo <repo> --secret NPM_TOKEN`
 - **THEN** the CLI SHALL resolve `NPM_TOKEN` from the secret store
-- **AND** the resolved value SHALL be available as an environment variable inside the instance
+- **AND** the resolved value SHALL be delivered to the container via an encrypted blob (not as an environment variable)
 
 #### Scenario: Multiple secrets provided
 
 - **WHEN** user runs `spinner spin --image <image> --repo <repo> --secret NPM_TOKEN --secret API_KEY`
 - **THEN** the CLI SHALL resolve both `NPM_TOKEN` and `API_KEY` from the secret store
-- **AND** both values SHALL be available as environment variables inside the instance
+- **AND** both values SHALL be delivered to the container via an encrypted blob
 
 #### Scenario: Secret not found in store
 
@@ -100,22 +100,161 @@ environment. Secret values SHALL never appear on the command line.
 - **THEN** the CLI SHALL print an error: `--secret: cannot override reserved variable "GITHUB_TOKEN"`
 - **AND** the CLI SHALL exit with non-zero status
 
-#### Scenario: Secrets written to Docker env file
-
-- **WHEN** the Docker backend creates a container with `--secret` values
-- **THEN** the resolved secret values SHALL be written to the temporary env file alongside built-in and `--env` variables
-- **AND** secret values SHALL NOT appear in `ps aux` output on the host
-
-#### Scenario: Secrets written to GCP metadata
-
-- **WHEN** the GCP backend creates a VM with `--secret` values
-- **THEN** the resolved secret values SHALL be added to instance metadata with the `SPINNER_ENV_` prefix
-- **AND** the runtime script SHALL export them as environment variables
-
 #### Scenario: No secrets provided
 
 - **WHEN** user runs `spinner spin --image <image> --repo <repo>` without any `--secret` flags
 - **THEN** the CLI SHALL behave identically to the current implementation (no change in behavior)
+
+### Requirement: Encrypted Blob Delivery for Custom Secrets
+
+Custom `--secret` values SHALL be delivered to containers as an encrypted blob file, NOT as environment
+variables. Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) SHALL continue to be delivered
+as container environment variables because `startup.sh` requires them.
+
+#### Scenario: Blob generated at spin-time
+
+- **WHEN** the `spin` command resolves custom `--secret` values
+- **THEN** the CLI SHALL encrypt the custom secret values into a blob using the user's store passphrase with a fresh Argon2id salt
+- **AND** the blob SHALL use AES-256-GCM authenticated encryption
+
+#### Scenario: Docker blob delivery
+
+- **WHEN** the Docker backend creates a container with `--secret` values
+- **THEN** the CLI SHALL write the encrypted blob to `~/.spinner/<container>/secrets.enc` on the host
+- **AND** the file SHALL be mounted read-only into the container at `/run/spinner/secrets.enc`
+- **AND** secret values SHALL NOT appear in `ps aux` output, container environment, or Docker env-file
+
+#### Scenario: GCP blob delivery
+
+- **WHEN** the GCP backend creates a VM with `--secret` values
+- **THEN** the CLI SHALL base64-encode the encrypted blob and pass it as instance metadata key `SPINNER_SECRET_BLOB`
+- **AND** the startup script SHALL decode the metadata value and write it to `/run/spinner/secrets.enc`
+- **AND** the blob SHALL be destroyed when the VM is deleted (no orphaned files in GCS)
+- **AND** raw secret values SHALL NOT appear in instance metadata or VM environment variables
+
+#### Scenario: Blob with --prompt mode includes passphrase
+
+- **WHEN** the `spin` command includes both `--secret` and `--prompt` flags
+- **THEN** the CLI SHALL pass `SPINNER_SECRET_PASSPHRASE` as a container environment variable (Docker) or instance metadata key (GCP)
+- **AND** `spinner exec` SHALL use this passphrase to decrypt the blob at startup
+
+#### Scenario: Blob without --prompt mode excludes passphrase
+
+- **WHEN** the `spin` command includes `--secret` but NOT `--prompt`
+- **THEN** the CLI SHALL NOT pass `SPINNER_SECRET_PASSPHRASE` to the container
+- **AND** the encrypted blob SHALL remain on disk, requiring interactive passphrase entry via `spinner secret inject`
+
+#### Scenario: No blob when no custom secrets
+
+- **WHEN** the `spin` command has no `--secret` flags
+- **THEN** no encrypted blob SHALL be generated or mounted
+
+### Requirement: Spinner Exec Secret Injection
+
+When running in `--prompt` mode, `spinner exec` SHALL decrypt the secrets blob at startup, hold secrets
+in memory, and inject them into Claude CLI child processes. After decryption, the blob and passphrase
+SHALL be removed from the container's filesystem and environment.
+
+#### Scenario: Exec decrypts blob at startup
+
+- **WHEN** `spinner exec` starts and `/run/spinner/secrets.enc` exists
+- **AND** `SPINNER_SECRET_PASSPHRASE` is set in the environment
+- **THEN** `spinner exec` SHALL decrypt the blob into memory
+- **AND** `spinner exec` SHALL delete `/run/spinner/secrets.enc` from disk
+- **AND** `spinner exec` SHALL unset `SPINNER_SECRET_PASSPHRASE` from its own process environment
+
+#### Scenario: Exec injects secrets into child processes
+
+- **WHEN** `spinner exec` spawns a Claude CLI child process
+- **AND** decrypted secrets are held in memory
+- **THEN** `spinner exec` SHALL inject the secrets as environment variables on the child process via `cmd.Env`
+- **AND** the secrets SHALL NOT be added to the container's global environment
+
+#### Scenario: Exec without blob continues normally
+
+- **WHEN** `spinner exec` starts and `/run/spinner/secrets.enc` does NOT exist
+- **THEN** `spinner exec` SHALL continue normally without secret injection (backward compatible)
+
+#### Scenario: Exec with corrupted or undecryptable blob
+
+- **WHEN** `spinner exec` starts and the blob exists but cannot be decrypted
+- **THEN** `spinner exec` SHALL log a warning and continue without secret injection
+- **AND** the iteration loop SHALL NOT be blocked
+
+### Requirement: Secret Inject Command
+
+The CLI SHALL provide a `spinner secret inject -- <command>` subcommand for decrypting the secrets blob
+and running a command with secrets injected as environment variables. This is the primary mechanism for
+accessing custom secrets in no-`--prompt` mode (user SSH).
+
+#### Scenario: Inject with valid passphrase
+
+- **WHEN** user runs `spinner secret inject -- claude -p "implement feature"`
+- **AND** `/run/spinner/secrets.enc` exists
+- **THEN** the CLI SHALL prompt for the passphrase with hidden input
+- **AND** the CLI SHALL decrypt the blob and run the specified command with secrets as environment variables
+- **AND** secrets SHALL only exist in the child command's process tree
+
+#### Scenario: Inject into subshell
+
+- **WHEN** user runs `spinner secret inject -- bash`
+- **THEN** the CLI SHALL start a bash subshell with secrets available as environment variables
+- **AND** processes started from that subshell SHALL inherit the secrets
+
+#### Scenario: Inject with wrong passphrase
+
+- **WHEN** user runs `spinner secret inject -- <command>` with an incorrect passphrase
+- **THEN** the CLI SHALL print an error indicating authentication failed
+- **AND** the CLI SHALL exit with non-zero status without running the command
+
+#### Scenario: Inject without blob file
+
+- **WHEN** user runs `spinner secret inject -- <command>` and `/run/spinner/secrets.enc` does NOT exist
+- **THEN** the CLI SHALL print an error indicating no secrets blob was found
+- **AND** the CLI SHALL exit with non-zero status
+
+#### Scenario: Inject without command argument
+
+- **WHEN** user runs `spinner secret inject` without `-- <command>`
+- **THEN** the CLI SHALL print usage instructions and exit with non-zero status
+
+#### Scenario: Unattended agent cannot access secrets
+
+- **WHEN** an agent is started inside the container via `docker exec` or a separate SSH session
+- **AND** the agent does not use `spinner secret inject`
+- **THEN** the agent SHALL NOT have access to custom `--secret` values
+- **AND** the agent SHALL have access to built-in tokens (`GITHUB_TOKEN`) via container environment variables
+
+### Requirement: Configurable Secret Store Path
+
+The CLI SHALL support a `SPINNER_SECRET_STORE` environment variable to override the default store file
+path (`~/.spinner/secrets.enc`). This enables inception scenarios where an encrypted blob from an outer
+Spinner layer serves as the store for an inner layer.
+
+#### Scenario: Custom store path via environment variable
+
+- **WHEN** `SPINNER_SECRET_STORE=/run/spinner/secrets.enc` is set
+- **AND** user runs `spinner spin --secret NPM_TOKEN ...`
+- **THEN** the CLI SHALL resolve `NPM_TOKEN` from `/run/spinner/secrets.enc` instead of `~/.spinner/secrets.enc`
+
+#### Scenario: Default store path when env var not set
+
+- **WHEN** `SPINNER_SECRET_STORE` is not set
+- **THEN** the CLI SHALL use `~/.spinner/secrets.enc` as the store path
+
+#### Scenario: Inception — spinner inside spinner
+
+- **WHEN** an outer Spinner creates a VM/container with `--secret` flags
+- **AND** the user SSHs into the instance and runs an inner `spinner spin --secret ...`
+- **AND** `SPINNER_SECRET_STORE` points to the outer blob at `/run/spinner/secrets.enc`
+- **THEN** the inner Spinner SHALL resolve secrets from the outer blob (same encryption format)
+- **AND** the inner Spinner SHALL generate a new encrypted blob for the inner container
+
+#### Scenario: Store path for secret CLI commands
+
+- **WHEN** `SPINNER_SECRET_STORE` is set
+- **AND** user runs `spinner secret list` or `spinner secret set`
+- **THEN** the CLI SHALL operate on the file at the custom path
 
 ## MODIFIED Requirements
 
