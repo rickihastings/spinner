@@ -176,10 +176,13 @@ func TestDestroyCommand_StateDirectoryCleanup(t *testing.T) {
 	_, err = os.Stat(stateDir)
 	assert.NoError(t, err)
 
-	// Mock provider
+	// Mock provider - simulate state cleanup like real providers do
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("Status", mock.Anything, instanceName).Return(provider.InstanceStatusRunning, nil)
-	mockProvider.On("Remove", mock.Anything, instanceName).Return(nil)
+	mockProvider.On("Remove", mock.Anything, instanceName).Run(func(args mock.Arguments) {
+		// Simulate provider removing state directory
+		_ = os.RemoveAll(stateDir)
+	}).Return(nil)
 
 	cmd := NewDestroyCommand(testFactory(mockProvider))
 

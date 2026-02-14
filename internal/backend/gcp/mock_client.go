@@ -128,6 +128,12 @@ func (m *MockGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 	return args.Bool(0), args.Error(1)
 }
 
+// DeleteObjectsWithPrefix mocks the DeleteObjectsWithPrefix method.
+func (m *MockGCPClient) DeleteObjectsWithPrefix(ctx context.Context, bucket, prefix string) error {
+	args := m.Called(ctx, bucket, prefix)
+	return args.Error(0)
+}
+
 // Close mocks the Close method.
 func (m *MockGCPClient) Close() error {
 	args := m.Called()

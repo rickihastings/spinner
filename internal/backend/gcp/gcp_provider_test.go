@@ -242,6 +242,8 @@ func TestProviderRemoveSuccess(t *testing.T) {
 
 	mockClient.On("DeleteInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
 		Return(nil)
+	mockClient.On("DeleteObjectsWithPrefix", mock.Anything, "test-bucket", "test-vm/").
+		Return(nil)
 
 	err := p.Remove(context.Background(), "test-vm")
 	assert.NoError(t, err)

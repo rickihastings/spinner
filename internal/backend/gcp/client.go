@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	compute "cloud.google.com/go/compute/apiv1"
 	"cloud.google.com/go/compute/apiv1/computepb"
 	"cloud.google.com/go/storage"
+	"google.golang.org/api/iterator"
 )
 
 // Client defines the interface for GCP operations.
@@ -37,6 +39,7 @@ type Client interface {
 	ReadObjectRange(ctx context.Context, bucket, object string, offset int64) ([]byte, error)
 	ObjectSize(ctx context.Context, bucket, object string) (int64, error)
 	ObjectExists(ctx context.Context, bucket, object string) (bool, error)
+	DeleteObjectsWithPrefix(ctx context.Context, bucket, prefix string) error
 
 	// Close releases all underlying SDK clients.
 	Close() error
@@ -465,6 +468,35 @@ func (c *RealGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 	}
 
 	return true, nil
+}
+
+// DeleteObjectsWithPrefix deletes all objects in a bucket with the given prefix.
+func (c *RealGCPClient) DeleteObjectsWithPrefix(ctx context.Context, bucket, prefix string) error {
+	bkt := c.storage.Bucket(bucket)
+	it := bkt.Objects(ctx, &storage.Query{Prefix: prefix})
+
+	var errs []string
+
+	for {
+		attrs, err := it.Next()
+		if err != nil {
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+
+			return fmt.Errorf("failed to iterate objects: %w", err)
+		}
+
+		if err := bkt.Object(attrs.Name).Delete(ctx); err != nil {
+			errs = append(errs, fmt.Sprintf("failed to delete %s: %v", attrs.Name, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to delete some objects: %s", strings.Join(errs, "; "))
+	}
+
+	return nil
 }
 
 // strPtr returns a pointer to the given string.

@@ -189,7 +189,7 @@ func (p *Provider) Stop(ctx context.Context, name string) error {
 	return p.client.StopContainer(ctx, name)
 }
 
-// Remove force-removes a container.
+// Remove force-removes a container and cleans up its state directory.
 func (p *Provider) Remove(ctx context.Context, name string) error {
 	result, err := p.client.RemoveContainer(ctx, name)
 	if err != nil {
@@ -198,6 +198,17 @@ func (p *Provider) Remove(ctx context.Context, name string) error {
 
 	if !result.Success {
 		return fmt.Errorf("failed to remove instance: %s", result.Error)
+	}
+
+	// Clean up state directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	stateDir := filepath.Join(homeDir, ".spinner", name)
+	if err := os.RemoveAll(stateDir); err != nil {
+		return fmt.Errorf("failed to remove state directory: %w", err)
 	}
 
 	return nil

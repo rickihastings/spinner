@@ -3,8 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/spf13/cobra"
@@ -69,25 +67,10 @@ EXAMPLES:
 					continue
 				}
 
-				// Remove the instance
+				// Remove the instance (providers handle state cleanup)
 				if err := p.Remove(ctx, instanceName); err != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "✗ Failed to destroy instance '%s': %s\n", instanceName, err.Error())
 					failures = append(failures, instanceName)
-					continue
-				}
-
-				// Remove state directory
-				homeDir, err := os.UserHomeDir()
-				if err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "⚠ Warning: Failed to get home directory for '%s': %s\n", instanceName, err.Error())
-					fmt.Fprintf(cmd.OutOrStdout(), "✓ Instance '%s' destroyed (state directory not cleaned)\n", instanceName)
-					continue
-				}
-
-				stateDir := filepath.Join(homeDir, ".spinner", instanceName)
-				if err := os.RemoveAll(stateDir); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "⚠ Warning: Failed to remove state directory for '%s': %s\n", instanceName, err.Error())
-					fmt.Fprintf(cmd.OutOrStdout(), "✓ Instance '%s' destroyed (state directory not cleaned)\n", instanceName)
 					continue
 				}
 

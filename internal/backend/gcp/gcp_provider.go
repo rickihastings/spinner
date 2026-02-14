@@ -313,9 +313,33 @@ func (p *Provider) Stop(ctx context.Context, name string) error {
 	return p.client.StopInstance(ctx, p.project, p.zone, name)
 }
 
-// Remove deletes a VM instance and its boot disk.
+// Remove deletes a VM instance, its boot disk, GCS state, and local cache.
 func (p *Provider) Remove(ctx context.Context, name string) error {
-	return p.client.DeleteInstance(ctx, p.project, p.zone, name)
+	// Delete the VM instance and boot disk
+	if err := p.client.DeleteInstance(ctx, p.project, p.zone, name); err != nil {
+		return err
+	}
+
+	// Clean up GCS bucket state (logs, state.json, etc.)
+	if p.bucket != "" {
+		prefix := name + "/"
+		if err := p.client.DeleteObjectsWithPrefix(ctx, p.bucket, prefix); err != nil {
+			return fmt.Errorf("failed to clean up GCS state: %w", err)
+		}
+	}
+
+	// Clean up local state cache
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	stateDir := filepath.Join(homeDir, ".spinner", name)
+	if err := os.RemoveAll(stateDir); err != nil {
+		return fmt.Errorf("failed to remove local state directory: %w", err)
+	}
+
+	return nil
 }
 
 // Logs returns the VM's full log output from GCS.
