@@ -118,21 +118,16 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 		return fmt.Errorf("failed to write Dockerfile: %w", err)
 	}
 
-	// Copy build files to build context
+	// Write build files to build context
 	templatesDir := filepath.Join(buildContextDir, "templates")
 	for _, bf := range buildFiles {
-		srcPath, err := util.ResolveTemplatePath(filepath.Join("templates", bf.src))
-		if err != nil {
-			return fmt.Errorf("failed to find %s: %w", bf.src, err)
-		}
-
 		dstPath := filepath.Join(templatesDir, bf.dst)
 		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
 			return fmt.Errorf("failed to create directory for %s: %w", bf.dst, err)
 		}
 
-		if err := copyFile(srcPath, dstPath); err != nil {
-			return fmt.Errorf("failed to copy %s: %w", bf.src, err)
+		if err := os.WriteFile(dstPath, []byte(bf.file), 0644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", bf.dst, err)
 		}
 	}
 

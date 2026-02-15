@@ -1,9 +1,16 @@
 package util
 
 import (
+	_ "embed"
 	"os"
 	"path/filepath"
 )
+
+//go:embed templates/scripts/startup.sh
+var startupScript string
+
+//go:embed templates/scripts/install_spinner.sh
+var installSpinnerScript string
 
 // FindProjectRoot walks up the directory tree to find the project root
 // (indicated by the presence of go.mod file)
@@ -49,4 +56,16 @@ func ResolveTemplatePath(relativePath string) (string, error) {
 	}
 
 	return absolutePath, nil
+}
+
+// LoadStartupScript reads the standard startup.sh template used inside containers/VMs.
+// This script handles repo cloning, branch checkout, and spinner exec invocation.
+func LoadStartupScript() string {
+	return startupScript
+}
+
+// LoadInstallSpinnerScript reads the shared install_spinner.sh script.
+// This script handles binary installation from either GitHub releases or local dev.
+func LoadInstallSpinnerScript() string {
+	return installSpinnerScript
 }

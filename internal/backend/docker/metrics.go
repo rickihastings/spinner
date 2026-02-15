@@ -83,10 +83,26 @@ func detectDockerHost() (string, error) {
 	return "", nil
 }
 
+// cpuSnapshot holds raw CPU counters from a single stats read.
+// We track these ourselves between polls because Docker's PreCPUStats
+// is unreliable with stream=false on Docker Desktop for macOS.
+type cpuSnapshot struct {
+	totalUsage  uint64
+	systemUsage uint64
+	onlineCPUs  uint32
+	percpuLen   int
+}
+
 // streamMetrics streams real-time resource metrics for a container
 func streamMetrics(ctx context.Context, cli metricsAPIClient, containerName string, ch chan<- provider.ContainerMetrics) error {
-	// Send initial metrics immediately
-	metrics := collectMetrics(ctx, cli, containerName)
+	var prev *cpuSnapshot
+
+	// Send initial metrics immediately (no previous snapshot, so CPU will be 0)
+	metrics, snap := collectMetrics(ctx, cli, containerName, prev)
+	if snap != nil {
+		prev = snap
+	}
+
 	select {
 	case ch <- metrics:
 	case <-ctx.Done():
@@ -111,7 +127,10 @@ func streamMetrics(ctx context.Context, cli metricsAPIClient, containerName stri
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			metrics := collectMetrics(ctx, cli, containerName)
+			metrics, snap := collectMetrics(ctx, cli, containerName, prev)
+			if snap != nil {
+				prev = snap
+			}
 
 			// Send metrics to channel
 			select {
@@ -133,15 +152,17 @@ func streamMetrics(ctx context.Context, cli metricsAPIClient, containerName stri
 	}
 }
 
-// collectMetrics collects metrics for a single poll
-func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName string) provider.ContainerMetrics {
+// collectMetrics collects metrics for a single poll.
+// It accepts an optional previous CPU snapshot for delta calculation and returns
+// the current snapshot so callers can track it across polls.
+func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName string, prev *cpuSnapshot) (provider.ContainerMetrics, *cpuSnapshot) {
 	// First, inspect the container to get its state
 	inspect, err := cli.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return provider.ContainerMetrics{
 			State: provider.StateUnknown,
 			Error: fmt.Errorf("failed to inspect container: %w", err),
-		}
+		}, nil
 	}
 
 	// Determine container state
@@ -151,7 +172,7 @@ func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName str
 	if state != provider.StateRunning {
 		return provider.ContainerMetrics{
 			State: state,
-		}
+		}, nil
 	}
 
 	// Get container stats
@@ -160,7 +181,7 @@ func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName str
 		return provider.ContainerMetrics{
 			State: state,
 			Error: fmt.Errorf("failed to get container stats: %w", err),
-		}
+		}, nil
 	}
 
 	defer func() {
@@ -176,11 +197,20 @@ func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName str
 		return provider.ContainerMetrics{
 			State: state,
 			Error: fmt.Errorf("failed to decode stats: %w", err),
-		}
+		}, nil
 	}
 
-	// Calculate CPU percentage
-	cpuPercent := calculateCPUPercent(&stats)
+	// Build current CPU snapshot
+	current := &cpuSnapshot{
+		totalUsage:  stats.CPUStats.CPUUsage.TotalUsage,
+		systemUsage: stats.CPUStats.SystemUsage,
+		onlineCPUs:  stats.CPUStats.OnlineCPUs,
+		percpuLen:   len(stats.CPUStats.CPUUsage.PercpuUsage),
+	}
+
+	// Calculate CPU percentage using our own tracked previous snapshot
+	// instead of Docker's PreCPUStats, which is unreliable with stream=false
+	cpuPercent := calculateCPUPercent(prev, current)
 
 	// Extract memory metrics
 	memoryUsed := stats.MemoryStats.Usage
@@ -202,7 +232,7 @@ func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName str
 	// Read iteration count from state file
 	metrics.Iteration = readIterationFromState(containerName)
 
-	return metrics
+	return metrics, current
 }
 
 // readIterationFromState reads the current iteration count from the container's state file.
@@ -239,21 +269,22 @@ func mapDockerStateToMetrics(state *containertypes.State) provider.ContainerStat
 	return provider.StateStopped
 }
 
-// calculateCPUPercent calculates CPU usage percentage from Docker stats
-// Algorithm based on Docker CLI implementation
-func calculateCPUPercent(stats *containertypes.StatsResponse) float64 {
-	// Get CPU delta
-	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage) - float64(stats.PreCPUStats.CPUUsage.TotalUsage)
+// calculateCPUPercent calculates CPU usage percentage from two snapshots.
+// Algorithm based on Docker CLI implementation, but uses our own tracked
+// previous values instead of Docker's PreCPUStats (unreliable with stream=false).
+func calculateCPUPercent(prev *cpuSnapshot, current *cpuSnapshot) float64 {
+	if prev == nil || current == nil {
+		return 0.0
+	}
 
-	// Get system delta
-	systemDelta := float64(stats.CPUStats.SystemUsage) - float64(stats.PreCPUStats.SystemUsage)
+	cpuDelta := float64(current.totalUsage) - float64(prev.totalUsage)
+	systemDelta := float64(current.systemUsage) - float64(prev.systemUsage)
 
 	if systemDelta > 0.0 && cpuDelta > 0.0 {
-		// Number of CPUs
-		numCPUs := float64(stats.CPUStats.OnlineCPUs)
+		numCPUs := float64(current.onlineCPUs)
 
 		if numCPUs == 0 {
-			numCPUs = float64(len(stats.CPUStats.CPUUsage.PercpuUsage))
+			numCPUs = float64(current.percpuLen)
 		}
 
 		if numCPUs == 0 {

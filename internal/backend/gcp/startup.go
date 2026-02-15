@@ -2,13 +2,17 @@ package gcp
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"os"
-	"path/filepath"
 	"text/template"
-
-	"github.com/rickihastings/spinner/internal/util"
 )
+
+//go:embed templates/scripts/gcp_bake.sh
+var bakeScript string
+
+//go:embed templates/scripts/gcp_runtime.sh
+var runtimeScript string
 
 // bakeTemplateData holds the template variables for the GCP bake script.
 type bakeTemplateData struct {
@@ -22,17 +26,7 @@ type bakeTemplateData struct {
 // bake script contents. If customBakeScript is empty, the template block
 // is omitted and the default bake runs unchanged.
 func loadBakeScript(customBakeScript string) (string, error) {
-	scriptPath, err := util.ResolveTemplatePath(filepath.Join("templates", "scripts", "gcp_bake.sh"))
-	if err != nil {
-		return "", fmt.Errorf("failed to find bake script: %w", err)
-	}
-
-	data, err := os.ReadFile(scriptPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read bake script: %w", err)
-	}
-
-	tmpl, err := template.New("gcp_bake").Parse(string(data))
+	tmpl, err := template.New("gcp_bake").Parse(bakeScript)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse bake script template: %w", err)
 	}
@@ -64,51 +58,9 @@ func loadBakeScriptFile(path string) (string, error) {
 	return string(data), nil
 }
 
-// loadStartupScript reads the standard startup.sh template used inside containers/VMs.
-// This script handles repo cloning, branch checkout, and spinner exec invocation.
-func loadStartupScript() (string, error) {
-	scriptPath, err := util.ResolveTemplatePath(filepath.Join("templates", "scripts", "startup.sh"))
-	if err != nil {
-		return "", fmt.Errorf("failed to find startup script: %w", err)
-	}
-
-	data, err := os.ReadFile(scriptPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read startup script: %w", err)
-	}
-
-	return string(data), nil
-}
-
 // loadRuntimeScript reads the GCP runtime startup script template from
 // templates/scripts/gcp_runtime.sh. This script reads instance metadata,
 // sets environment variables, and delegates to startup.sh.
-func loadRuntimeScript() (string, error) {
-	scriptPath, err := util.ResolveTemplatePath(filepath.Join("templates", "scripts", "gcp_runtime.sh"))
-	if err != nil {
-		return "", fmt.Errorf("failed to find runtime script: %w", err)
-	}
-
-	data, err := os.ReadFile(scriptPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read runtime script: %w", err)
-	}
-
-	return string(data), nil
-}
-
-// loadInstallSpinnerScript reads the shared install_spinner.sh script.
-// This script handles binary installation from either GitHub releases or local dev.
-func loadInstallSpinnerScript() (string, error) {
-	scriptPath, err := util.ResolveTemplatePath(filepath.Join("templates", "scripts", "install_spinner.sh"))
-	if err != nil {
-		return "", fmt.Errorf("failed to find install script: %w", err)
-	}
-
-	data, err := os.ReadFile(scriptPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read install script: %w", err)
-	}
-
-	return string(data), nil
+func loadRuntimeScript() string {
+	return runtimeScript
 }

@@ -77,16 +77,10 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 
 	// Load the standard startup.sh so it can be embedded in the baked image.
 	// The bake script reads this from metadata and installs it at /usr/local/bin/startup.sh.
-	startupScript, err := loadStartupScript()
-	if err != nil {
-		return fmt.Errorf("failed to load startup script: %w", err)
-	}
+	startupScript := util.LoadStartupScript()
 
 	// Load the shared install_spinner.sh script
-	installScript, err := loadInstallSpinnerScript()
-	if err != nil {
-		return fmt.Errorf("failed to load install script: %w", err)
-	}
+	installScript := util.LoadInstallSpinnerScript()
 
 	stateBucket := config.Options["state-bucket"]
 
@@ -154,10 +148,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	}
 
 	// Load runtime startup script
-	runtimeScript, err := loadRuntimeScript()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load runtime script: %w", err)
-	}
+	runtimeScript := loadRuntimeScript()
 
 	machineType := config.Options["machine-type"]
 	if machineType == "" {

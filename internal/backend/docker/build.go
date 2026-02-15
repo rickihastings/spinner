@@ -19,16 +19,16 @@ type BuildConfig struct {
 
 // buildFile defines a file to copy into the Docker build context
 type buildFile struct {
-	// Source path relative to the templates directory
-	src string
+	// File contents
+	file string
 	// Destination path relative to the build context templates directory
 	dst string
 }
 
 // buildFiles lists all files to copy into the Docker build context
 var buildFiles = []buildFile{
-	{src: "scripts/startup.sh", dst: "scripts/startup.sh"},
-	{src: "scripts/install_spinner.sh", dst: "scripts/install_spinner.sh"},
+	{file: util.LoadStartupScript(), dst: "scripts/startup.sh"},
+	{file: util.LoadInstallSpinnerScript(), dst: "scripts/install_spinner.sh"},
 }
 
 // copyFile copies a file from src to dst

@@ -152,15 +152,19 @@ The CLI SHALL create persistent containers that run in detached mode, implemente
 - **AND** the working directory is /workspace
 
 ### Requirement: Container Lifecycle Management
+
 The CLI SHALL display container management instructions after creation, implemented using Go's fmt package.
 
 #### Scenario: Display management instructions
+
 - **WHEN** the container is created successfully
-- **THEN** the CLI SHALL print instructions for accessing the container (docker exec) and cleaning up (docker stop, docker rm)
+- **THEN** the CLI SHALL print instructions for accessing the container (docker exec or gcloud ssh) and destroying it
+  (`spinner destroy <instance-name>`)
 
 #### Scenario: Container cleanup
-- **WHEN** user runs suggested cleanup commands
-- **THEN** the container SHALL be stopped and removed (manual operation by user)
+
+- **WHEN** user runs the suggested destroy command
+- **THEN** the instance SHALL be forcefully removed along with its host-side state directory
 
 ### Requirement: Container Startup Command
 The CLI SHALL execute the appropriate startup command based on flags, implemented using Go's string building or text/template.

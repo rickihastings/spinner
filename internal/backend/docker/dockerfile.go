@@ -1,12 +1,12 @@
 package docker
 
 import (
-	"os"
-	"path/filepath"
+	_ "embed"
 	"strings"
-
-	"github.com/rickihastings/spinner/internal/util"
 )
+
+//go:embed templates/docker/extending.template
+var extendingTemplate string
 
 // dockerfileConfig contains configuration for generating a Dockerfile.
 type dockerfileConfig struct {
@@ -15,17 +15,5 @@ type dockerfileConfig struct {
 
 // generateDockerfile generates a Dockerfile from a template with the given configuration.
 func generateDockerfile(config dockerfileConfig) (string, error) {
-	templatePath, err := util.ResolveTemplatePath(filepath.Join("templates", "docker", "extending.template"))
-	if err != nil {
-		return "", err
-	}
-
-	templateBytes, err := os.ReadFile(templatePath)
-	if err != nil {
-		return "", err
-	}
-
-	template := string(templateBytes)
-
-	return strings.ReplaceAll(template, "${BASE_IMAGE}", config.BaseImage), nil
+	return strings.ReplaceAll(extendingTemplate, "${BASE_IMAGE}", config.BaseImage), nil
 }
