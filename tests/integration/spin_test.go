@@ -780,6 +780,62 @@ func TestSpin_EnvVarsValueWithEquals(t *testing.T) {
 		"env value containing '=' should be preserved correctly")
 }
 
+// TestSpin_ModelFlagSetsEnvVar tests that --model sets ANTHROPIC_MODEL in container environment
+func TestSpin_ModelFlagSetsEnvVar(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	_, imageName := testutil.SetupTestImage(t)
+
+	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--model", "claude-sonnet-4-5-20250929"}
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Inspect container env vars
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	envVars := string(output)
+	assert.Contains(t, envVars, "ANTHROPIC_MODEL=claude-sonnet-4-5-20250929", "ANTHROPIC_MODEL should be set to the specified model")
+}
+
+// TestSpin_NoModelFlagOmitsEnvVar tests that ANTHROPIC_MODEL is not set when --model is not provided
+func TestSpin_NoModelFlagOmitsEnvVar(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	_, imageName := testutil.SetupTestImage(t)
+
+	args := []string{"spin", "--image", imageName, "--repo", testRepo}
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Inspect container env vars
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	envVars := string(output)
+
+	// Verify ANTHROPIC_MODEL is not set
+	lines := strings.Split(envVars, "\n")
+	modelSet := false
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "ANTHROPIC_MODEL=") {
+			modelSet = true
+			break
+		}
+	}
+
+	assert.False(t, modelSet, "ANTHROPIC_MODEL should not be set when --model is not provided")
+}
+
 // TestSpin_SetupRebuildsExistingImage tests that --setup rebuilds image even if it exists
 func TestSpin_SetupRebuildsExistingImage(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)

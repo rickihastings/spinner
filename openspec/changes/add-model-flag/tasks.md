@@ -30,9 +30,9 @@
 
 ## 4.0 Docker integration tests
 
-- [ ] 4.1 Add integration test: spin with `--model`, verify `ANTHROPIC_MODEL` is set in container environment
-- [ ] 4.2 Add integration test: spin without `--model`, verify `ANTHROPIC_MODEL` is not set
-- [ ] 4.3 Verify build succeeds and all integration tests pass
+- [x] 4.1 Add integration test: spin with `--model`, verify `ANTHROPIC_MODEL` is set in container environment
+- [x] 4.2 Add integration test: spin without `--model`, verify `ANTHROPIC_MODEL` is not set
+- [x] 4.3 Verify build succeeds and all integration tests pass
 
 ## 5.0 GCP integration tests
 
