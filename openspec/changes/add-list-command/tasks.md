@@ -37,10 +37,10 @@
 
 ## 4.0 Docker integration tests
 
-- [ ] 4.1 Create `tests/integration/list_test.go` with Docker integration tests: spin up a container via
+- [x] 4.1 Create `tests/integration/list_test.go` with Docker integration tests: spin up a container via
   `spinner spin`, verify `spinner list` shows it with correct status/state/labels
-- [ ] 4.2 Test label presence on newly created containers (`docker inspect` to confirm `spinner-managed=true`)
-- [ ] 4.3 Verify build succeeds and all integration tests pass
+- [x] 4.2 Test label presence on newly created containers (`docker inspect` to confirm `spinner-managed=true`)
+- [x] 4.3 Verify build succeeds and all integration tests pass
 
 ## 5.0 GCP integration tests
 
