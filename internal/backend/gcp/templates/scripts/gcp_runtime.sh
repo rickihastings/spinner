@@ -91,7 +91,7 @@ set +e
 
 # Switch to spinner user and run startup in the workspace directory
 # Use su -m to preserve environment variables (including custom ones)
-su -m spinner -c "export HOME=/home/spinner && export PATH=\"/home/spinner/.claude/bin:\$PATH\" && cd /home/spinner/workspace && \
+su -m spinner -c "export HOME=/home/spinner && export PATH=\"/home/spinner/.local/bin:\$PATH\" && cd /home/spinner/workspace && \
     /usr/local/bin/startup.sh"
 EXIT_CODE=$?
 
