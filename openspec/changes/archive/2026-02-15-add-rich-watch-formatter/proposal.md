@@ -10,14 +10,18 @@ indicators.
 
 ## Motivation
 
-The current `Formatter` produces minimal output: timestamps + "Assistant:" prefixes with truncated
-plain text (200 char limit). Tool use events are silently hidden. Tool results (user messages) are
-entirely skipped. This means users watching a long-running agent see almost nothing of what it's
+The previous `Formatter` produced minimal output: timestamps + "Assistant:" prefixes with truncated
+plain text (200 char limit). Tool use events were silently hidden. Tool results (user messages) were
+entirely skipped. This meant users watching a long-running agent saw almost nothing of what it was
 doing — no tool calls, no tool output, no markdown formatting.
 
 The Claude CLI itself renders a rich experience: tool invocations as `ToolName(summary)`, markdown
 with bullet points and code blocks, and tool output with line counts. Spinner's watch mode should
 approximate this so users can meaningfully monitor agent progress without SSHing into the container.
+
+Timestamps are removed from formatter output — the TUI header already shows timing context, and
+per-line timestamps add visual noise without value. The old basic formatter is replaced entirely
+by the rich formatter (consolidated into `formatter.go`).
 
 ## What Changes
 
@@ -36,10 +40,12 @@ approximate this so users can meaningfully monitor agent progress without SSHing
   compact 1–2 line format on narrow terminals (<80 columns); footer replaced with a solid
   vim/tmux-style status bar showing keyboard shortcuts
 
-### New Internal Types
+### Consolidated Formatter
 
-- `RichFormatter` struct implementing `agent.EventFormatter` — maintains tool_use_id → tool_name
+- The old basic `Formatter` is replaced by the rich formatter, consolidated into `formatter.go`
+- `Formatter` struct implements `agent.EventFormatter` — maintains tool_use_id → tool_name
   mapping for correlating tool results with their invocations
+- Timestamps removed from all formatted output — no per-event timestamp prefix
 - No new interfaces — uses existing `agent.EventFormatter`
 
 ### New Dependency
@@ -59,16 +65,15 @@ approximate this so users can meaningfully monitor agent progress without SSHing
 
 | Area                                           | Change Type                                                                                        |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------|
-| `internal/agent/claude/rich_formatter.go`      | **create** — `RichFormatter` implementing `EventFormatter`                                         |
-| `internal/agent/claude/rich_formatter_test.go` | **create** — unit tests for rich formatting                                                        |
+| `internal/agent/claude/formatter.go`           | **replace** — old basic formatter replaced with rich `Formatter` (no timestamps, markdown, tools)  |
+| `internal/agent/claude/formatter_test.go`      | **replace** — old tests replaced with comprehensive rich formatter tests                           |
 | `internal/tui/watch.go`                        | **modify** — remove log view border/title/padding; add responsive header with compact narrow mode  |
 | `internal/tui/watch_test.go`                   | **modify** — add tests for responsive header rendering                                             |
-| `cmd/watch.go`                                 | **modify** — switch `NewFormatter()` to `NewRichFormatter()` (line 109)                            |
+| `cmd/watch.go`                                 | **modify** — uses `NewFormatter()` (unchanged call site, new implementation)                       |
 | `go.mod` / `go.sum`                            | **modify** — add `charmbracelet/glamour` dependency                                                |
 
 ### Not Affected
 
-- `internal/agent/claude/formatter.go` — preserved as-is (fallback / reference)
 - `internal/agent/claude/parser.go` — no parsing changes; all needed data already extracted
 - `internal/agent/claude/types.go` — no type changes; tool_use blocks already have ID, Name, Input
 - `internal/agent/agent.go` — `EventFormatter` interface unchanged
@@ -87,8 +92,8 @@ approximate this so users can meaningfully monitor agent progress without SSHing
 
 - **Streaming/partial rendering** — events arrive as complete JSON objects; no incremental token
   rendering needed
-- **Configurable formatter selection** — always use `RichFormatter`; the old `Formatter` remains in
-  code but is not wired as an option
+- **Configurable formatter selection** — there is only one `Formatter`; if alternative formats are
+  needed they can be added later
 - **Custom themes or color schemes** — use glamour's default dark style; theming can be added later
 - **Image or binary content rendering** — tool results containing non-text content are shown as
   `(binary content)` placeholder

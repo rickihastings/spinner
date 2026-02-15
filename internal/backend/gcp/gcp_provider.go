@@ -479,6 +479,7 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 			if image, ok := labels["spinner-image"]; ok {
 				info.Image = image
 			}
+
 			if repo, ok := labels["spinner-repo"]; ok {
 				info.Repo = repo
 			}
@@ -498,7 +499,7 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 				case "ANTHROPIC_MODEL":
 					info.Agent = value
 				case "MAX_ITERATIONS":
-					fmt.Sscanf(value, "%d", &info.MaxIterations)
+					_, _ = fmt.Sscanf(value, "%d", &info.MaxIterations)
 				case "BRANCH":
 					info.Branch = value
 				}

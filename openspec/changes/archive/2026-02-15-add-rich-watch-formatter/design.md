@@ -4,45 +4,45 @@
 
 ### Component Map
 
-| File                                           | Action     | Purpose                                                                      |
-|------------------------------------------------|------------|------------------------------------------------------------------------------|
-| `internal/agent/claude/rich_formatter.go`      | **create** | `RichFormatter` struct + `FormatEvent` implementation                        |
-| `internal/agent/claude/rich_formatter_test.go` | **create** | Unit tests for all event type formatting                                     |
-| `internal/tui/watch.go`                        | **modify** | Remove log view border/title/padding; add responsive header with breakpoints |
-| `internal/tui/watch_test.go`                   | **modify** | Add tests for responsive header layout                                       |
-| `cmd/watch.go`                                 | **modify** | Wire `NewRichFormatter()` instead of `NewFormatter()` (line 109)             |
-| `go.mod` / `go.sum`                            | **modify** | Add `charmbracelet/glamour` dependency                                       |
+| File                                           | Action      | Purpose                                                                      |
+|------------------------------------------------|-------------|------------------------------------------------------------------------------|
+| `internal/agent/claude/formatter.go`           | **replace** | Rich `Formatter` replaces old basic formatter (no timestamps, markdown, tools)|
+| `internal/agent/claude/formatter_test.go`      | **replace** | Comprehensive tests for rich formatting                                      |
+| `internal/tui/watch.go`                        | **modify**  | Remove log view border/title/padding; add responsive header with breakpoints |
+| `internal/tui/watch_test.go`                   | **modify**  | Add tests for responsive header layout                                       |
+| `cmd/watch.go`                                 | **modify**  | Uses `NewFormatter()` (same call, new rich implementation)                   |
+| `go.mod` / `go.sum`                            | **modify**  | Add `charmbracelet/glamour` dependency                                       |
 
 ### Approach
 
 #### Architecture
 
-The `RichFormatter` implements the existing `agent.EventFormatter` interface — the same single-method
-interface (`FormatEvent(*Event) (string, bool)`) that the current `Formatter` implements. This means:
+The rich `Formatter` replaces the old basic formatter entirely — consolidated into `formatter.go`.
+It implements the same `agent.EventFormatter` interface. This means:
 
 - No interface changes
 - No TUI changes — `WatchUI` already consumes formatted strings via the interface
-- Single wiring point: `cmd/watch.go:109` switches from `NewFormatter()` to `NewRichFormatter()`
+- Same `NewFormatter()` call site in `cmd/watch.go`, new rich implementation behind it
 
-The key architectural addition is **statefulness**: unlike the current `Formatter` which is
-stateless, the `RichFormatter` maintains a `map[string]string` of `tool_use_id → tool_name`. When
-an assistant message contains tool_use blocks, the formatter records each tool's ID and name. When a
-subsequent user message contains a `tool_result` block referencing that ID, the formatter can display
-the tool name alongside the result.
+Key design decisions:
+- **No timestamps** — per-event timestamps removed; the TUI header provides timing context
+- **No left padding** — output flows naturally without indentation for timestamp alignment
+- **Stateful** — maintains a `map[string]string` of `tool_use_id → tool_name` to correlate
+  tool results with their invocations
 
 ```
-RichFormatter
+Formatter
 ├── toolNames map[string]string  // tool_use_id → tool_name (e.g., "toolu_abc" → "Bash")
-├── glamourRenderer *glamour.TermRenderer  // reused across calls
+├── renderer *glamour.TermRenderer  // reused across calls
 └── FormatEvent(*Event) (string, bool)
-    ├── system_init → same as current (model info line)
+    ├── system_init → model info line (no timestamp)
     ├── assistant_message → rich formatting:
     │   ├── text blocks → glamour markdown rendering → tview.TranslateANSI()
-    │   └── tool_use blocks → "ToolName(param_summary)" format + record in toolNames
+    │   └── tool_use blocks → "⏺ ToolName(param_summary)" format + record in toolNames
     ├── user_message → tool result rendering:
     │   └── tool_result blocks → look up tool name, show output with line count
-    ├── result → same as current (success/error indicator)
-    └── error → same as current (error message)
+    ├── result → success/error indicator
+    └── error → error message
 ```
 
 #### Event Rendering Details
@@ -156,13 +156,14 @@ Long parameter values are truncated to ~80 characters with `...` suffix.
 
 | Decision                                  | Rationale                                                                                                                                    |
 |-------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| New `RichFormatter` (not modify existing) | Clean separation; old formatter preserved as reference/fallback; no risk of breaking existing behavior                                       |
+| Replace old formatter (not keep both)     | Single formatter reduces complexity; no use case for the old basic output                                                                   |
+| Remove timestamps from output             | TUI header provides timing context; per-event timestamps add visual noise without value                                                      |
+| Remove left padding                       | Padding existed to align with timestamp prefix; without timestamps, it's unnecessary                                                         |
 | Stateful formatter (tool ID map)          | Required to correlate tool results with their invocations; map cleaned up after each result                                                  |
 | `glamour` for markdown rendering          | De facto standard in Go CLI tools (used by `gh`, `glow`); handles headings, bold, lists, code blocks with syntax highlighting out of the box |
 | `tview.TranslateANSI()` for conversion    | Built-in tview function specifically designed for this purpose; avoids manual ANSI parsing                                                   |
 | Truncate tool results by line count       | Prevents TUI flooding from large file reads or command outputs; shows `+N lines` summary                                                     |
 | Extract tool summary from Input JSON      | Gives users actionable context (which file, which command) without showing full JSON                                                         |
-| No `--formatter` CLI flag                 | YAGNI — there's no use case for choosing the old formatter; if needed, add later                                                             |
 
 ### TUI Simplification
 

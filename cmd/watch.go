@@ -107,7 +107,7 @@ func performWatch(ctx context.Context, p provider.Provider, containerName string
 
 	// Create parser and formatter - the only place in cmd that imports claude
 	parser := claude.NewParser()
-	formatter := claude.NewRichFormatter()
+	formatter := claude.NewFormatter()
 
 	// Gather context information for the watch UI
 	uiContext := gatherWatchContext(ctx, p, containerName)

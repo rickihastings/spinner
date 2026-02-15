@@ -84,6 +84,7 @@ func TestGCPLifecycle_FullCycle(t *testing.T) {
 		if strings.Contains(line, instanceName) {
 			assert.Contains(t, line, "running", "instance line should show running status")
 			assert.Contains(t, line, "gcp", "instance line should show gcp backend")
+
 			break
 		}
 	}
@@ -262,6 +263,7 @@ func TestGCPList_StateEnrichmentFromGCS(t *testing.T) {
 			// AGE or LAST UPDATE columns should have a time value (not "-")
 			// Since state was written, last_updated should be populated
 			assert.NotContains(t, line, "\t-\t-\n", "instance should have populated time fields")
+
 			break
 		}
 	}

@@ -567,6 +567,7 @@ func (ui *WatchUI) renderHeaderMinimal(m provider.ContainerMetrics) {
 // compactStatus returns a short colored status string.
 func (ui *WatchUI) compactStatus(m provider.ContainerMetrics) string {
 	stateText := string(m.State)
+
 	var color string
 
 	switch m.State {
@@ -578,6 +579,7 @@ func (ui *WatchUI) compactStatus(m provider.ContainerMetrics) string {
 		color = "green"
 	default:
 		color = "gray"
+
 		if stateText == "" {
 			stateText = "unknown"
 		}
@@ -607,6 +609,7 @@ func (ui *WatchUI) compactBranch(width int) string {
 	if maxLen < 8 {
 		maxLen = 8
 	}
+
 	if len(branch) > maxLen {
 		branch = branch[:maxLen-3] + "..."
 	}

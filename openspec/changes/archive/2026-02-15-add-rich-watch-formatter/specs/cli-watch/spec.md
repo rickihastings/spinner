@@ -135,11 +135,13 @@ layout SHALL adapt to terminal width using responsive breakpoints.
 ### Requirement: Log Parsing
 
 The CLI SHALL parse JSON-formatted log entries and display them in human-readable format.
+The formatter SHALL NOT include per-event timestamps in its output — timing context is provided
+by the TUI header.
 
 #### Scenario: Parse JSON log entry
 
 - **WHEN** a log entry is in JSON format with timestamp, level, and message fields
-- **THEN** the CLI SHALL format it as "[timestamp] [level] message"
+- **THEN** the CLI SHALL format it in human-readable form without per-event timestamp prefixes
 
 #### Scenario: Parse non-JSON log entry
 

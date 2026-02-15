@@ -148,6 +148,7 @@ func EnrichFromStateData(info *InstanceInfo, data []byte) {
 	if !state.StartedAt.IsZero() {
 		info.StartedAt = &state.StartedAt
 	}
+
 	if !state.LastUpdated.IsZero() {
 		info.LastUpdated = &state.LastUpdated
 	}

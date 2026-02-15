@@ -79,6 +79,7 @@ func runList(cmd *cobra.Command, f *provider.Factory) error {
 	bindGCPFlags(cmd)
 
 	ctx := context.Background()
+
 	var allInstances []provider.InstanceInfo
 
 	for _, backend := range f.Available() {
@@ -91,13 +92,13 @@ func runList(cmd *cobra.Command, f *provider.Factory) error {
 
 		p, err := f.Create(backend)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "⚠ %s: %s\n", backend, err.Error())
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "⚠ %s: %s\n", backend, err.Error())
 			continue
 		}
 
 		instances, err := p.List(ctx)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "⚠ %s: %s\n", backend, err.Error())
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "⚠ %s: %s\n", backend, err.Error())
 			continue
 		}
 
@@ -105,7 +106,7 @@ func runList(cmd *cobra.Command, f *provider.Factory) error {
 	}
 
 	if len(allInstances) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No instances found.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No instances found.")
 		return nil
 	}
 
@@ -114,9 +115,11 @@ func runList(cmd *cobra.Command, f *provider.Factory) error {
 		if allInstances[i].Backend != allInstances[j].Backend {
 			return allInstances[i].Backend < allInstances[j].Backend
 		}
+
 		if allInstances[i].Status != allInstances[j].Status {
 			return allInstances[i].Status == provider.InstanceStatusRunning
 		}
+
 		return allInstances[i].Name < allInstances[j].Name
 	})
 
@@ -134,7 +137,7 @@ func gcpConfigured() bool {
 func renderTable(cmd *cobra.Command, instances []provider.InstanceInfo) {
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
 
-	fmt.Fprintln(w, "BACKEND\tNAME\tSTATUS\tSTATE\tITER\tAGE\tLAST UPDATE")
+	_, _ = fmt.Fprintln(w, "BACKEND\tNAME\tSTATUS\tSTATE\tITER\tAGE\tLAST UPDATE")
 
 	now := time.Now()
 
@@ -150,7 +153,7 @@ func renderTable(cmd *cobra.Command, instances []provider.InstanceInfo) {
 			}
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			inst.Backend,
 			inst.Name,
 			string(inst.Status),
@@ -161,7 +164,7 @@ func renderTable(cmd *cobra.Command, instances []provider.InstanceInfo) {
 		)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 }
 
 // formatIter formats the iteration counter as "current/max" or "-" if unknown.
@@ -169,9 +172,11 @@ func formatIter(current, max int) string {
 	if current == 0 && max == 0 {
 		return "-"
 	}
+
 	if max == 0 {
 		return fmt.Sprintf("%d", current)
 	}
+
 	return fmt.Sprintf("%d/%d", current, max)
 }
 
@@ -180,6 +185,7 @@ func formatState(status string) string {
 	if status == "" {
 		return "-"
 	}
+
 	return status
 }
 

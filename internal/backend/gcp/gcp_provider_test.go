@@ -432,6 +432,7 @@ func TestProviderStartWithModel(t *testing.T) {
 					return true
 				}
 			}
+
 			return false
 		})).Return(nil)
 	mockClient.On("StartInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
@@ -470,6 +471,7 @@ func TestProviderStartWithoutModelDoesNotUpdateMetadata(t *testing.T) {
 					return false
 				}
 			}
+
 			return true
 		})).Return(nil)
 	mockClient.On("StartInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").

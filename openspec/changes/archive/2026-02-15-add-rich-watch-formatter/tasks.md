@@ -33,3 +33,12 @@
 - [x] 4.6 Replace footer with solid vim/tmux-style status bar: inverted background, left-aligned keyboard shortcuts
 - [x] 4.7 Add unit tests for responsive header rendering at different widths and status bar content
 - [x] 4.8 Verify build and all tests pass
+
+## 5.0 Consolidate Formatter — Remove Old, Remove Timestamps ✓
+
+- [x] 5.1 Replace old basic `Formatter` with rich formatter, consolidated into `formatter.go`
+- [x] 5.2 Remove per-event timestamps from all formatted output
+- [x] 5.3 Remove left-hand padding that existed for timestamp alignment
+- [x] 5.4 Replace old `formatter_test.go` with rich formatter tests (renamed from `rich_formatter_test.go`)
+- [x] 5.5 Update openspec design, proposal, and spec to reflect consolidation and timestamp removal
+- [x] 5.6 Verify build and all tests pass

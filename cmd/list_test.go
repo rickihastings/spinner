@@ -65,6 +65,7 @@ func TestListCommand_MultiBackendListing(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
+
 	output := b.String()
 	assert.Contains(t, output, "BACKEND")
 	assert.Contains(t, output, "NAME")
@@ -92,6 +93,7 @@ func TestListCommand_BackendUnavailableWarning(t *testing.T) {
 	cmd := NewListCommand(f)
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
+
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{})
@@ -147,6 +149,7 @@ func TestListCommand_StaleWarning(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
+
 	output := b.String()
 	assert.Contains(t, output, "spinner-stale-instance")
 	assert.Contains(t, output, "⚠ stale")
@@ -180,6 +183,7 @@ func TestListCommand_StoppedInstanceNoStaleWarning(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
+
 	output := b.String()
 	assert.Contains(t, output, "spinner-stopped-old")
 	assert.NotContains(t, output, "⚠ stale")
@@ -218,6 +222,7 @@ func TestListCommand_SortOrder(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
+
 	output := b.String()
 	// Running instance should appear before stopped instance
 	runningIdx := bytes.Index([]byte(output), []byte("a-running"))
@@ -232,6 +237,7 @@ func TestListCommand_BackendListError(t *testing.T) {
 	cmd := NewListCommand(testFactory(dockerMock))
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
+
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{})
@@ -294,6 +300,7 @@ func TestListCommand_MissingStateFields(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
+
 	output := b.String()
 	assert.Contains(t, output, "spinner-no-state")
 	// Dash placeholders for missing data

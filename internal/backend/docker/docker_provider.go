@@ -361,14 +361,17 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 		if repo, ok := envVars["REPO_URL"]; ok {
 			info.Repo = repo
 		}
+
 		if branch, ok := envVars["BRANCH"]; ok {
 			info.Branch = branch
 		}
+
 		if model, ok := envVars["ANTHROPIC_MODEL"]; ok {
 			info.Agent = model
 		}
+
 		if maxIter, ok := envVars["MAX_ITERATIONS"]; ok {
-			fmt.Sscanf(maxIter, "%d", &info.MaxIterations)
+			_, _ = fmt.Sscanf(maxIter, "%d", &info.MaxIterations)
 		}
 
 		// Read state file from host for execution state
