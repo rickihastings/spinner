@@ -90,3 +90,13 @@ func defaultLogStreamOptions() LogStreamOptions {
 		Stderr:     true,
 	}
 }
+
+// ContainerListEntry represents a container returned by ListContainers.
+// This replaces the Docker SDK's container.Summary type.
+type ContainerListEntry struct {
+	ID     string
+	Names  []string
+	Image  string
+	State  string
+	Labels map[string]string
+}

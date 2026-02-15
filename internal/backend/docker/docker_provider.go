@@ -342,7 +342,7 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 	var instances []provider.InstanceInfo
 
 	for _, c := range containers {
-		name := strings.TrimPrefix(c.Names[0], "/")
+		name := c.Names[0]
 
 		status := provider.InstanceStatusStopped
 		if c.State == "running" {

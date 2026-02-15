@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -442,15 +441,15 @@ func TestDockerProvider_List_ContainersWithLabels(t *testing.T) {
 	ctx := context.Background()
 
 	client.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(
-		[]container.Summary{
+		[]ContainerListEntry{
 			{
-				Names:  []string{"/spinner-test-repo"},
+				Names:  []string{"spinner-test-repo"},
 				Image:  "spinner:test",
 				State:  "running",
 				Labels: map[string]string{"spinner-managed": "true"},
 			},
 			{
-				Names:  []string{"/spinner-test-other"},
+				Names:  []string{"spinner-test-other"},
 				Image:  "spinner:test",
 				State:  "exited",
 				Labels: map[string]string{"spinner-managed": "true"},
@@ -481,7 +480,7 @@ func TestDockerProvider_List_NoContainers(t *testing.T) {
 	ctx := context.Background()
 
 	client.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(
-		[]container.Summary{}, nil,
+		[]ContainerListEntry{}, nil,
 	)
 
 	instances, err := p.List(ctx)
@@ -537,9 +536,9 @@ func TestDockerProvider_List_StateEnrichment(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(stateDir, "state.json"), stateData, 0644))
 
 	client.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(
-		[]container.Summary{
+		[]ContainerListEntry{
 			{
-				Names:  []string{"/" + containerName},
+				Names:  []string{containerName},
 				Image:  "spinner:test",
 				State:  "running",
 				Labels: map[string]string{"spinner-managed": "true"},

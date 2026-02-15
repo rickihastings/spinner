@@ -9,20 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewSDKClient(t *testing.T) {
-	sdk := newSDKClient()
-	assert.NotNil(t, sdk)
-	assert.Nil(t, sdk.cli)
-}
-
-func TestSDKClient_Close_NilClient(t *testing.T) {
-	sdk := newSDKClient()
-
-	// Closing a nil client should not error
-	err := sdk.close()
-	assert.NoError(t, err)
-}
-
 func TestDefaultLogStreamOptions(t *testing.T) {
 	opts := defaultLogStreamOptions()
 
@@ -200,6 +186,157 @@ func TestLogStreamOptions_CustomValues(t *testing.T) {
 	assert.Equal(t, "2024-12-31T23:59:59Z", opts.Until)
 	assert.True(t, opts.Stdout)
 	assert.False(t, opts.Stderr)
+}
+
+func TestContainerListEntry_Fields(t *testing.T) {
+	entry := ContainerListEntry{
+		ID:     "abc123",
+		Names:  []string{"test-container"},
+		Image:  "spinner:test",
+		State:  "running",
+		Labels: map[string]string{"spinner-managed": "true"},
+	}
+
+	assert.Equal(t, "abc123", entry.ID)
+	assert.Equal(t, []string{"test-container"}, entry.Names)
+	assert.Equal(t, "spinner:test", entry.Image)
+	assert.Equal(t, "running", entry.State)
+	assert.Equal(t, "true", entry.Labels["spinner-managed"])
+}
+
+func TestParseContainerListOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []ContainerListEntry
+		wantErr  bool
+	}{
+		{
+			name:     "empty output",
+			input:    "",
+			expected: nil,
+		},
+		{
+			name:     "whitespace only",
+			input:    "  \n  ",
+			expected: nil,
+		},
+		{
+			name:  "single container",
+			input: `{"ID":"abc123","Names":"my-container","Image":"spinner:test","State":"running","Labels":"spinner-managed=true"}`,
+			expected: []ContainerListEntry{
+				{
+					ID:     "abc123",
+					Names:  []string{"my-container"},
+					Image:  "spinner:test",
+					State:  "running",
+					Labels: map[string]string{"spinner-managed": "true"},
+				},
+			},
+		},
+		{
+			name: "multiple containers",
+			input: `{"ID":"abc123","Names":"container-1","Image":"spinner:test","State":"running","Labels":"spinner-managed=true"}
+{"ID":"def456","Names":"container-2","Image":"spinner:test","State":"exited","Labels":"spinner-managed=true"}`,
+			expected: []ContainerListEntry{
+				{
+					ID:     "abc123",
+					Names:  []string{"container-1"},
+					Image:  "spinner:test",
+					State:  "running",
+					Labels: map[string]string{"spinner-managed": "true"},
+				},
+				{
+					ID:     "def456",
+					Names:  []string{"container-2"},
+					Image:  "spinner:test",
+					State:  "exited",
+					Labels: map[string]string{"spinner-managed": "true"},
+				},
+			},
+		},
+		{
+			name:  "multiple labels",
+			input: `{"ID":"abc","Names":"c1","Image":"img","State":"running","Labels":"key1=val1,key2=val2"}`,
+			expected: []ContainerListEntry{
+				{
+					ID:     "abc",
+					Names:  []string{"c1"},
+					Image:  "img",
+					State:  "running",
+					Labels: map[string]string{"key1": "val1", "key2": "val2"},
+				},
+			},
+		},
+		{
+			name:  "empty labels",
+			input: `{"ID":"abc","Names":"c1","Image":"img","State":"running","Labels":""}`,
+			expected: []ContainerListEntry{
+				{
+					ID:     "abc",
+					Names:  []string{"c1"},
+					Image:  "img",
+					State:  "running",
+					Labels: map[string]string{},
+				},
+			},
+		},
+		{
+			name:    "invalid json",
+			input:   `{invalid}`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseContainerListOutput(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestListContainers_MockClient(t *testing.T) {
+	mockClient := new(MockDockerClient)
+	ctx := context.Background()
+
+	expected := []ContainerListEntry{
+		{
+			ID:     "abc123",
+			Names:  []string{"spinner-test"},
+			Image:  "spinner:test",
+			State:  "running",
+			Labels: map[string]string{"spinner-managed": "true"},
+		},
+	}
+
+	mockClient.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(expected, nil)
+
+	result, err := mockClient.ListContainers(ctx, map[string]string{"spinner-managed": "true"})
+	assert.NoError(t, err)
+	assert.Equal(t, expected, result)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestListContainers_MockClient_Error(t *testing.T) {
+	mockClient := new(MockDockerClient)
+	ctx := context.Background()
+
+	expectedErr := errors.New("docker unavailable")
+	mockClient.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(nil, expectedErr)
+
+	result, err := mockClient.ListContainers(ctx, map[string]string{"spinner-managed": "true"})
+	assert.Error(t, err)
+	assert.Nil(t, result)
+
+	mockClient.AssertExpectations(t)
 }
 
 // Ensure MockDockerClient implements Client interface

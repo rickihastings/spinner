@@ -13,7 +13,7 @@ all container operations except build, list, streaming logs, and metrics use CLI
 - [x] 1.5 Replace `RemoveContainer` — use `docker rm -f`
 - [x] 1.6 Replace `LogsContainer` — use `docker logs`
 - [x] 1.7 Replace `VerifyContainerStatus` — use `docker inspect` + `docker logs --tail 100`
-- [x] 1.8 ~~Remove `getSDKClient` method and `sdk` field from `RealDockerClient`~~ Deferred to 5.0 — `StreamContainerLogs` and `ListContainers` still use the SDK client
+- [x] 1.8 ~~Remove `getSDKClient` method and `sdk` field from `RealDockerClient`~~ Completed in 3.0 — `StreamContainerLogs` and `ListContainers` migrated to CLI
 - [x] 1.9 Update unit tests for changed methods
 - [x] 1.10 Verify build passes and existing tests pass
 
@@ -35,14 +35,14 @@ JSON message parsing, and `moby/term` terminal detection.
 Replace SDK-based log streaming (`StreamContainerLogs`) and container listing (`ListContainers`)
 with CLI equivalents. Introduce local `ContainerListEntry` type to replace `container.Summary`.
 
-- [ ] 3.1 Replace `StreamContainerLogs` — use `docker logs --follow` with line reader
-- [ ] 3.2 Remove `streamLogs` (8-byte Docker header parser, no longer needed)
-- [ ] 3.3 Define local `ContainerListEntry` struct replacing `container.Summary`
-- [ ] 3.4 Replace `ListContainers` — use `docker ps -a --filter --format json`
-- [ ] 3.5 Update `mock_client.go` for new `ContainerListEntry` type
-- [ ] 3.6 Update `docker_provider.go` `List()` for new `ContainerListEntry` type
-- [ ] 3.7 Update tests for streaming and listing changes
-- [ ] 3.8 Verify build passes and existing tests pass
+- [x] 3.1 Replace `StreamContainerLogs` — use `docker logs --follow` with line reader
+- [x] 3.2 Remove `streamLogs` (8-byte Docker header parser, no longer needed)
+- [x] 3.3 Define local `ContainerListEntry` struct replacing `container.Summary`
+- [x] 3.4 Replace `ListContainers` — use `docker ps -a --filter --format json`
+- [x] 3.5 Update `mock_client.go` for new `ContainerListEntry` type
+- [x] 3.6 Update `docker_provider.go` `List()` for new `ContainerListEntry` type
+- [x] 3.7 Update tests for streaming and listing changes
+- [x] 3.8 Verify build passes and existing tests pass
 
 ## 4.0 Metrics Migration
 
@@ -61,7 +61,7 @@ Replace SDK-based metrics collection with CLI-based collection using `docker sta
 
 Delete SDK wrapper, remove all Docker SDK imports, and clean up dependencies.
 
-- [ ] 5.1 Delete `internal/backend/docker/sdk.go`
+- [x] 5.1 Delete `internal/backend/docker/sdk.go` — completed in 3.0 (linter required removal of unused code)
 - [ ] 5.2 Remove unused SDK-specific types from `events.go` (`buildEvent`, `buildErrorDetail`, `buildAux`)
 - [ ] 5.3 Remove all `github.com/docker/docker` imports from remaining files
 - [ ] 5.4 Remove `containerd/errdefs` import (used for SDK not-found detection)

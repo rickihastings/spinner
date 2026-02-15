@@ -3,17 +3,14 @@ package docker
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 
 	"github.com/rickihastings/spinner/internal/util"
 )
@@ -57,27 +54,18 @@ type Client interface {
 
 	// ListContainers lists containers matching the given label filters.
 	// The filters map keys are filter names (e.g. "label") and values are filter values.
-	ListContainers(ctx context.Context, filterLabels map[string]string) ([]container.Summary, error)
+	ListContainers(ctx context.Context, filterLabels map[string]string) ([]ContainerListEntry, error)
 
 	// ContainerEnvVars reads environment variables from a container.
 	ContainerEnvVars(ctx context.Context, name string) (map[string]string, error)
 }
 
-// RealDockerClient implements Client using the Docker SDK.
-type RealDockerClient struct {
-	sdk *sdkClient
-}
+// RealDockerClient implements Client using the Docker CLI.
+type RealDockerClient struct{}
 
 // NewRealDockerClient creates a new RealDockerClient instance.
 func NewRealDockerClient() *RealDockerClient {
-	return &RealDockerClient{
-		sdk: newSDKClient(),
-	}
-}
-
-// getSDKClient returns the underlying Docker SDK client.
-func (c *RealDockerClient) getSDKClient(ctx context.Context) (*client.Client, error) {
-	return c.sdk.getClient(ctx)
+	return &RealDockerClient{}
 }
 
 // BuildImage builds a Docker image with the given configuration using the Docker CLI.
@@ -396,148 +384,183 @@ func (c *RealDockerClient) getContainerLogsTail(ctx context.Context, name string
 	return strings.TrimSpace(string(output))
 }
 
-// StreamContainerLogs streams container logs in real-time using the Docker SDK.
+// StreamContainerLogs streams container logs in real-time using the Docker CLI.
 // It returns a channel that receives LogEvent entries as they arrive from the container.
 // The channel is closed when:
 //   - The context is cancelled
 //   - The container stops (if Follow is true)
 //   - An error occurs (error is sent in LogEvent.Error before closing)
-//
-// Usage example:
-//
-//	events, err := client.StreamContainerLogs(ctx, "my-container", LogStreamOptions{Follow: true})
-//	if err != nil {
-//	    return err
-//	}
-//	for event := range events {
-//	    if event.Error != nil {
-//	        log.Printf("Stream error: %v", event.Error)
-//	        break
-//	    }
-//	    fmt.Printf("[%s] %s", event.Stream, event.Message)
-//	}
 func (c *RealDockerClient) StreamContainerLogs(ctx context.Context, name string, opts LogStreamOptions) (<-chan LogEvent, error) {
-	cli, err := c.getSDKClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Docker client: %w", err)
+	args := []string{"logs"}
+
+	if opts.Follow {
+		args = append(args, "--follow")
 	}
 
-	// Build container logs options from our LogStreamOptions
-	logsOpts := container.LogsOptions{
-		ShowStdout: opts.Stdout,
-		ShowStderr: opts.Stderr,
-		Follow:     opts.Follow,
-		Timestamps: opts.Timestamps,
-		Tail:       opts.Tail,
-		Since:      opts.Since,
-		Until:      opts.Until,
+	if opts.Timestamps {
+		args = append(args, "--timestamps")
 	}
 
-	logsReader, err := cli.ContainerLogs(ctx, name, logsOpts)
+	if opts.Tail != "" && opts.Tail != "all" {
+		args = append(args, "--tail", opts.Tail)
+	}
+
+	if opts.Since != "" {
+		args = append(args, "--since", opts.Since)
+	}
+
+	if opts.Until != "" {
+		args = append(args, "--until", opts.Until)
+	}
+
+	args = append(args, name)
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+
+	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container logs: %w", err)
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start docker logs: %w", err)
 	}
 
 	events := make(chan LogEvent)
 
 	go func() {
 		defer close(events)
-		defer func() { _ = logsReader.Close() }()
 
-		c.streamLogs(ctx, logsReader, events)
+		var wg sync.WaitGroup
+
+		if opts.Stdout {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				scanner := bufio.NewScanner(stdoutPipe)
+				for scanner.Scan() {
+					select {
+					case events <- LogEvent{
+						Timestamp: time.Now(),
+						Stream:    "stdout",
+						Message:   scanner.Text() + "\n",
+					}:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+		}
+
+		if opts.Stderr {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				scanner := bufio.NewScanner(stderrPipe)
+				for scanner.Scan() {
+					select {
+					case events <- LogEvent{
+						Timestamp: time.Now(),
+						Stream:    "stderr",
+						Message:   scanner.Text() + "\n",
+					}:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+		}
+
+		wg.Wait()
+		_ = cmd.Wait()
 	}()
 
 	return events, nil
 }
 
-// streamLogs reads from the Docker logs reader and sends events to the channel.
-// Docker multiplexes stdout and stderr with an 8-byte header:
-// [stream_type(1)][0(3)][size(4)][payload(size)]
-// stream_type: 0=stdin, 1=stdout, 2=stderr
-func (c *RealDockerClient) streamLogs(ctx context.Context, reader io.Reader, events chan<- LogEvent) {
-	bufReader := bufio.NewReader(reader)
-	header := make([]byte, 8)
+// ListContainers lists containers matching the given label filters using the Docker CLI.
+func (c *RealDockerClient) ListContainers(ctx context.Context, filterLabels map[string]string) ([]ContainerListEntry, error) {
+	args := []string{"ps", "-a", "--no-trunc", "--format", "json"}
 
-	for {
-		select {
-		case <-ctx.Done():
-			events <- LogEvent{
-				Timestamp: time.Now(),
-				Error:     ctx.Err(),
-			}
-
-			return
-		default:
-		}
-
-		// Read the 8-byte header
-		_, err := io.ReadFull(bufReader, header)
-		if err != nil {
-			if err != io.EOF {
-				events <- LogEvent{
-					Timestamp: time.Now(),
-					Error:     fmt.Errorf("error reading log header: %w", err),
-				}
-			}
-
-			return
-		}
-
-		// Parse stream type from header[0]
-		streamType := "stdout"
-		if header[0] == 2 {
-			streamType = "stderr"
-		}
-
-		// Parse payload size from header[4:8] (big-endian)
-		size := int(header[4])<<24 | int(header[5])<<16 | int(header[6])<<8 | int(header[7])
-
-		if size == 0 {
-			continue
-		}
-
-		// Read the payload
-		payload := make([]byte, size)
-
-		_, err = io.ReadFull(bufReader, payload)
-		if err != nil {
-			events <- LogEvent{
-				Timestamp: time.Now(),
-				Error:     fmt.Errorf("error reading log payload: %w", err),
-			}
-
-			return
-		}
-
-		events <- LogEvent{
-			Timestamp: time.Now(),
-			Stream:    streamType,
-			Message:   string(payload),
-		}
-	}
-}
-
-// ListContainers lists containers matching the given label filters using the Docker SDK.
-func (c *RealDockerClient) ListContainers(ctx context.Context, filterLabels map[string]string) ([]container.Summary, error) {
-	cli, err := c.getSDKClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Docker client: %w", err)
-	}
-
-	filterArgs := filters.NewArgs()
 	for key, value := range filterLabels {
-		filterArgs.Add("label", fmt.Sprintf("%s=%s", key, value))
+		args = append(args, "--filter", fmt.Sprintf("label=%s=%s", key, value))
 	}
 
-	containers, err := cli.ContainerList(ctx, container.ListOptions{
-		All:     true,
-		Filters: filterArgs,
-	})
+	cmd := exec.CommandContext(ctx, "docker", args...)
+
+	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
+	return parseContainerListOutput(string(output))
+}
+
+// dockerPSJSON represents the JSON output from docker ps --format json.
+type dockerPSJSON struct {
+	ID     string `json:"ID"`
+	Names  string `json:"Names"`
+	Image  string `json:"Image"`
+	State  string `json:"State"`
+	Labels string `json:"Labels"`
+}
+
+// parseContainerListOutput parses the line-delimited JSON from docker ps --format json.
+func parseContainerListOutput(output string) ([]ContainerListEntry, error) {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return nil, nil
+	}
+
+	var containers []ContainerListEntry
+
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		var raw dockerPSJSON
+		if err := json.Unmarshal([]byte(line), &raw); err != nil {
+			return nil, fmt.Errorf("failed to parse container entry: %w", err)
+		}
+
+		containers = append(containers, containerListEntryFromJSON(raw))
+	}
+
 	return containers, nil
+}
+
+// containerListEntryFromJSON converts docker ps JSON output to a ContainerListEntry.
+func containerListEntryFromJSON(raw dockerPSJSON) ContainerListEntry {
+	names := strings.Split(raw.Names, ",")
+
+	labels := make(map[string]string)
+
+	if raw.Labels != "" {
+		for _, label := range strings.Split(raw.Labels, ",") {
+			if idx := strings.IndexByte(label, '='); idx >= 0 {
+				labels[label[:idx]] = label[idx+1:]
+			}
+		}
+	}
+
+	return ContainerListEntry{
+		ID:     raw.ID,
+		Names:  names,
+		Image:  raw.Image,
+		State:  raw.State,
+		Labels: labels,
+	}
 }
 
 // ContainerEnvVars reads environment variables from a container using docker inspect.

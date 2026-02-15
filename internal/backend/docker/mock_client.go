@@ -3,7 +3,6 @@ package docker
 import (
 	"context"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -81,13 +80,13 @@ func (m *MockDockerClient) StreamContainerLogs(ctx context.Context, name string,
 }
 
 // ListContainers mocks the ListContainers method.
-func (m *MockDockerClient) ListContainers(ctx context.Context, filterLabels map[string]string) ([]container.Summary, error) {
+func (m *MockDockerClient) ListContainers(ctx context.Context, filterLabels map[string]string) ([]ContainerListEntry, error) {
 	args := m.Called(ctx, filterLabels)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).([]container.Summary), args.Error(1)
+	return args.Get(0).([]ContainerListEntry), args.Error(1)
 }
 
 // ContainerEnvVars mocks the ContainerEnvVars method.
