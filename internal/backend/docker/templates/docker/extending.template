@@ -19,9 +19,12 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
+# Create non-root user with proper home directory permissions
 RUN useradd -m -s /bin/bash spinner && \
-    echo "spinner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+    echo "spinner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    mkdir -p /home/spinner && \
+    chown -R spinner:spinner /home/spinner && \
+    chmod 755 /home/spinner
 
 # Switch to spinner user for Claude installation
 USER spinner

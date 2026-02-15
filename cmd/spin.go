@@ -69,15 +69,15 @@ GCP BACKEND FLAGS:
 
 EXAMPLES:
   # Docker (default)
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git
-  spinner spin --setup --image my-env --repo git@github.com:octocat/Hello-World.git --prompt "Fix the bug"
+  spinner spin --image spinner:my-env --repo https://github.com/octocat/Hello-World.git
+  spinner spin --setup --image my-env --repo https://github.com/octocat/Hello-World.git --prompt "Fix the bug"
 
   # GCP
-  spinner spin --backend gcp --image my-env --repo git@github.com:octocat/Hello-World.git \
+  spinner spin --backend gcp --image my-env --repo https://github.com/octocat/Hello-World.git \
     --project my-proj --zone us-central1-a --state-bucket my-bucket --prompt "Fix the bug"
 
   # With .spinner.json config, GCP flags can be omitted:
-  spinner spin --image my-env --repo git@github.com:octocat/Hello-World.git --prompt "Fix the bug"`,
+  spinner spin --image my-env --repo https://github.com/octocat/Hello-World.git --prompt "Fix the bug"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind general flags to Viper
 			_ = viper.BindPFlag(flagImage, cmd.Flags().Lookup(flagImage))

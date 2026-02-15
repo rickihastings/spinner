@@ -121,11 +121,11 @@ func TestGCPLifecycle_VMAutoStopsOnCompletion(t *testing.T) {
 	})
 
 	// Poll GCS state until status is "completed" (with timeout)
-	testutil.WaitForGCSStateStatus(t, cfg.Bucket, instanceName, "completed", 120)
+	testutil.WaitForGCSStateStatus(t, cfg.Bucket, instanceName, "completed", 300)
 
 	// Poll VM status until it becomes TERMINATED (with timeout)
 	// GCP can take a while to report TERMINATED after poweroff
-	testutil.WaitForGCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName, "TERMINATED", 120)
+	testutil.WaitForGCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName, "TERMINATED", 300)
 
 	// Verify final state
 	status := testutil.GCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName)

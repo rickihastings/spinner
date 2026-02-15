@@ -18,7 +18,7 @@ func TestSpinCommand_MissingImageFlag(t *testing.T) {
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
 	cmd.SetErr(b)
-	cmd.SetArgs([]string{"--repo", "git@github.com:test/repo.git"})
+	cmd.SetArgs([]string{"--repo", "https://github.com/test/repo.git"})
 
 	err := cmd.Execute()
 

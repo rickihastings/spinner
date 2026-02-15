@@ -27,6 +27,9 @@ apt-get install -y gh
 echo "Creating spinner user..."
 useradd -m -s /bin/bash spinner
 echo "spinner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+mkdir -p /home/spinner
+chown -R spinner:spinner /home/spinner
+chmod 755 /home/spinner
 
 # Install Claude Code CLI
 echo "Installing Claude Code CLI..."

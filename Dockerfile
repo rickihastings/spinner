@@ -15,12 +15,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # Install golangci-lint
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
-WORKDIR /workspace
-
-# Cache Go module dependencies
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
+WORKDIR /home/spinner/workspace
 
 CMD ["/bin/bash"]

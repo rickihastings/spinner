@@ -205,7 +205,7 @@ To create a VM you can SSH into and use manually:
 ```bash
 spinner spin \
   --image my-sandbox \
-  --repo git@github.com:your-org/your-repo.git \
+  --repo https://github.com/your-org/your-repo.git \
   --branch main
 ```
 
@@ -229,7 +229,7 @@ To kick off an autonomous agent loop that works on a task without supervision:
 ```bash
 spinner spin \
   --image my-sandbox \
-  --repo git@github.com:your-org/your-repo.git \
+  --repo https://github.com/your-org/your-repo.git \
   --branch main \
   --prompt "Refactor the authentication module to use JWT tokens"
 ```
@@ -250,7 +250,7 @@ By default, the loop runs up to **100 iterations**. To change this:
 ```bash
 spinner spin \
   --image my-sandbox \
-  --repo git@github.com:your-org/your-repo.git \
+  --repo https://github.com/your-org/your-repo.git \
   --prompt "Fix all linting errors" \
   --max-iterations 25
 ```
@@ -263,7 +263,7 @@ You can bake the image and spin up a VM in a single command using `--setup`:
 spinner spin \
   --setup \
   --image my-sandbox \
-  --repo git@github.com:your-org/your-repo.git \
+  --repo https://github.com/your-org/your-repo.git \
   --prompt "Add unit tests for the auth module"
 ```
 
@@ -274,7 +274,7 @@ spinner spin \
   --setup \
   --image node-env \
   --bake-script ./custom-install.sh \
-  --repo git@github.com:your-org/your-repo.git \
+  --repo https://github.com/your-org/your-repo.git \
   --prompt "Fix the build pipeline"
 ```
 
@@ -285,7 +285,7 @@ Use the `--env` flag to inject custom environment variables (API keys, tokens, c
 ```bash
 spinner spin \
   --image my-sandbox \
-  --repo git@github.com:your-org/your-repo.git \
+  --repo https://github.com/your-org/your-repo.git \
   --prompt "Publish the package" \
   --env NPM_TOKEN=npm_abc123 \
   --env MY_API_KEY=sk-xyz
@@ -311,7 +311,7 @@ Add `--watch` when spinning up to immediately enter watch mode after the VM star
 ```bash
 spinner spin \
   --image my-sandbox \
-  --repo git@github.com:your-org/your-repo.git \
+  --repo https://github.com/your-org/your-repo.git \
   --prompt "Implement the new API endpoints" \
   --watch
 ```
@@ -367,7 +367,7 @@ To start fresh, destroying the existing VM and its state:
 ```bash
 spinner spin \
   --image my-sandbox \
-  --repo git@github.com:your-org/your-repo.git \
+  --repo https://github.com/your-org/your-repo.git \
   --prompt "Start over on the auth refactor" \
   --recreate
 ```

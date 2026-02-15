@@ -5,6 +5,7 @@ project_name: spinner
 before:
   hooks:
     - go mod tidy
+    - go clean -cache
 
 builds:
   - id: spinner

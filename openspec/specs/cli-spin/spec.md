@@ -125,19 +125,19 @@ The CLI SHALL create persistent containers that run in detached mode, implemente
 - **THEN** docker run SHALL be executed with -d flag for detached mode
 
 #### Scenario: Deterministic container naming without branch
-- **WHEN** user spins up a container with `--image spinner:default --repo git@github.com:user/my-project.git`
+- **WHEN** user spins up a container with `--image spinner:default --repo https://github.com/user/my-project.git`
 - **THEN** the container is named `spinner-default-my-project`
 - **AND** the container name is displayed to the user
 - **AND** the naming logic SHALL be implemented in Go using string manipulation
 
 #### Scenario: Deterministic container naming with branch
-- **WHEN** user spins up a container with `--image spinner:default --repo git@github.com:user/my-project.git --branch feature/auth-v2`
+- **WHEN** user spins up a container with `--image spinner:default --repo https://github.com/user/my-project.git --branch feature/auth-v2`
 - **THEN** the container is named `spinner-default-my-project-feature-auth-v2`
 - **AND** the container name is displayed to the user
 - **AND** the Go implementation SHALL append the sanitized branch name to the container name
 
 #### Scenario: Container name sanitization
-- **WHEN** the image is `spinner:my-env`, repo is `git@github.com:user/my.project.git`, and branch is `feature/auth-v2`
+- **WHEN** the image is `spinner:my-env`, repo is `https://github.com/user/my.project.git`, and branch is `feature/auth-v2`
 - **THEN** the container name is `spinner-my-env-my-project-feature-auth-v2`
 - **AND** special characters (`:`, `/`, `.`) are replaced with hyphens
 - **AND** the sanitization SHALL be implemented in Go using regex or strings package
@@ -245,7 +245,7 @@ The CLI SHALL support both HTTPS and SSH repository URLs, with URL handling impl
 The CLI SHALL check if a container with the deterministic name already exists before creating a new one, implemented using Go's exec.Command to invoke docker inspect. If a container with the same name exists and is running, the CLI SHALL reuse it. If a container with the same name exists but is stopped, the CLI SHALL restart it. The CLI output SHALL clearly indicate whether a container was created, reused, or restarted.
 
 #### Scenario: Reuse running container
-- **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git`
+- **WHEN** user runs `spin --image spinner:default --repo https://github.com/user/my-project.git`
 - **AND** a container named `spinner-default-my-project` is already running
 - **THEN** the CLI does not create a new container
 - **AND** the CLI displays "Reusing running container: spinner-default-my-project"
@@ -253,7 +253,7 @@ The CLI SHALL check if a container with the deterministic name already exists be
 - **AND** the check SHALL be implemented in Go using `docker inspect -f '{{.State.Status}}' <container-name>`
 
 #### Scenario: Restart stopped container
-- **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git`
+- **WHEN** user runs `spin --image spinner:default --repo https://github.com/user/my-project.git`
 - **AND** a container named `spinner-default-my-project` exists but is stopped
 - **THEN** the CLI restarts the existing container with `docker start`
 - **AND** the CLI displays "Restarted container: spinner-default-my-project"
@@ -261,7 +261,7 @@ The CLI SHALL check if a container with the deterministic name already exists be
 - **AND** the restart SHALL be implemented in Go using exec.Command
 
 #### Scenario: Create new container when none exists
-- **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git`
+- **WHEN** user runs `spin --image spinner:default --repo https://github.com/user/my-project.git`
 - **AND** no container named `spinner-default-my-project` exists
 - **THEN** the CLI creates a new container with that name
 - **AND** the CLI displays "Container created successfully: spinner-default-my-project"
@@ -272,7 +272,7 @@ The CLI SHALL check if a container with the deterministic name already exists be
 The CLI SHALL accept an optional `--recreate` boolean flag, implemented using Cobra's BoolP flag type. When provided, the CLI SHALL remove any existing container with the deterministic name and create a fresh container. This allows users to force a clean slate when reuse is not desired.
 
 #### Scenario: Recreate removes running container
-- **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git --recreate`
+- **WHEN** user runs `spin --image spinner:default --repo https://github.com/user/my-project.git --recreate`
 - **AND** a container named `spinner-default-my-project` is currently running
 - **THEN** the CLI stops and removes the existing container using `docker rm -f`
 - **AND** the CLI creates a new container with the same name
@@ -280,14 +280,14 @@ The CLI SHALL accept an optional `--recreate` boolean flag, implemented using Co
 - **AND** the removal SHALL be implemented in Go using exec.Command
 
 #### Scenario: Recreate removes stopped container
-- **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git --recreate`
+- **WHEN** user runs `spin --image spinner:default --repo https://github.com/user/my-project.git --recreate`
 - **AND** a container named `spinner-default-my-project` exists but is stopped
 - **THEN** the CLI removes the existing container using `docker rm`
 - **AND** the CLI creates a new container with the same name
 - **AND** the CLI displays "Container recreated: spinner-default-my-project"
 
 #### Scenario: Recreate creates when no container exists
-- **WHEN** user runs `spin --image spinner:default --repo git@github.com:user/my-project.git --recreate`
+- **WHEN** user runs `spin --image spinner:default --repo https://github.com/user/my-project.git --recreate`
 - **AND** no container named `spinner-default-my-project` exists
 - **THEN** the CLI creates a new container with that name
 - **AND** the CLI displays "Container created successfully: spinner-default-my-project"

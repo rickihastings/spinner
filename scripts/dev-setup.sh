@@ -12,7 +12,7 @@ fi
 # Build the spinner binary
 echo "Building spinner binary..."
 mkdir -p dist
-go build -o dist/spinner .
+go clean -cache && go build -o dist/spinner .
 
 # Build for linux/amd64 (for Docker/GCP)
 echo "Building linux/amd64 binary..."

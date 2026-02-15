@@ -11,6 +11,7 @@ LDFLAGS := -s -w \
 
 # Build the spinner binary
 build:
+	go clean -cache
 	go build -ldflags "$(LDFLAGS)" -o dist/spinner
 
 # Run unit tests
@@ -23,7 +24,7 @@ test-docker:
 
 # Run gcp tests
 test-gcp:
-	go test ./tests/integration/ -v -run GCP -timeout 20m
+	go test ./tests/integration/ -v -run GCP -timeout 60m
 
 # Run all tests
 test-all: test test-docker test-gcp

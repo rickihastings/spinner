@@ -522,8 +522,6 @@ func WaitForGCSStateStatus(t *testing.T, bucket, instanceName, expectedStatus st
 					t.Logf("GCS state reached expected status: %s", expectedStatus)
 					return
 				}
-
-				t.Logf("Current status: %s (waiting for %s)", state.Status, expectedStatus)
 			}
 		}
 
@@ -547,7 +545,6 @@ func WaitForGCPInstanceStatus(t *testing.T, project, zone, instanceName, expecte
 			return
 		}
 
-		t.Logf("Current VM status: %s (waiting for %s)", status, expectedStatus)
 		time.Sleep(2 * time.Second)
 	}
 

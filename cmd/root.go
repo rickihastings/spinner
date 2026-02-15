@@ -64,11 +64,11 @@ GENERAL OPTIONS:
 EXAMPLES:
   # Docker (default)
   spinner setup --name my-sandbox
-  spinner spin --image spinner:my-env --repo git@github.com:octocat/Hello-World.git
+  spinner spin --image spinner:my-env --repo https://github.com/octocat/Hello-World.git
 
   # GCP
   spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket
-  spinner spin --backend gcp --image my-env --repo git@github.com:octocat/Hello-World.git
+  spinner spin --backend gcp --image my-env --repo https://github.com/octocat/Hello-World.git
 
   # Configuration file (.spinner.json) provides defaults for backend-specific flags
   # Precedence: CLI flags > env vars (SPINNER_*) > .spinner.json > defaults
