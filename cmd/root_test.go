@@ -3,12 +3,22 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// resetViperWithDefaults resets Viper and re-applies the env settings from init().
+// Tests that call viper.Reset() must use this to avoid polluting later tests.
+func resetViperWithDefaults() {
+	viper.Reset()
+	viper.SetEnvPrefix("SPINNER")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
+}
 
 func TestFindConfigFile(t *testing.T) {
 	tests := []struct {
@@ -177,7 +187,7 @@ func TestConfigPrecedence(t *testing.T) {
 				cleanup := func() {
 					_ = os.Setenv("HOME", origHome)
 
-					viper.Reset()
+					resetViperWithDefaults()
 				}
 
 				return workDir, cleanup
@@ -202,7 +212,7 @@ func TestConfigPrecedence(t *testing.T) {
 				cleanup := func() {
 					_ = os.Setenv("HOME", origHome)
 
-					viper.Reset()
+					resetViperWithDefaults()
 				}
 
 				return workDir, cleanup
@@ -231,7 +241,7 @@ func TestConfigPrecedence(t *testing.T) {
 				cleanup := func() {
 					_ = os.Setenv("HOME", origHome)
 
-					viper.Reset()
+					resetViperWithDefaults()
 				}
 
 				return workDir, cleanup
@@ -254,12 +264,8 @@ func TestConfigPrecedence(t *testing.T) {
 			// Change to test working directory
 			require.NoError(t, os.Chdir(workDir))
 
-			// Reset viper to clean state
-			viper.Reset()
-
-			// Simulate the config loading from init()
-			viper.SetEnvPrefix("SPINNER")
-			viper.AutomaticEnv()
+			// Reset viper to clean state and restore env settings from init()
+			resetViperWithDefaults()
 
 			cwd, _ := os.Getwd()
 
