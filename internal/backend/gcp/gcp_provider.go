@@ -179,6 +179,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		"GITHUB_TOKEN":            os.Getenv("GITHUB_TOKEN"),
 		"CLAUDE_CODE_OAUTH_TOKEN": os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"),
 		"SPINNER_INSTANCE_NAME":   name,
+		"ANTHROPIC_MODEL":         config.Model,
 	}
 
 	if p.bucket != "" {
@@ -276,6 +277,10 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 
 	if config.MaxIterations != "" {
 		updates["MAX_ITERATIONS"] = config.MaxIterations
+	}
+
+	if config.Model != "" {
+		updates["ANTHROPIC_MODEL"] = config.Model
 	}
 
 	// Update existing metadata items in-place

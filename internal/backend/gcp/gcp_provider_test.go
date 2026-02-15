@@ -358,6 +358,132 @@ func TestProviderCreateSuccess(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestProviderCreateWithModel(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
+		return config.Metadata["ANTHROPIC_MODEL"] == "claude-sonnet-4-5-20250929"
+	})).Return(nil)
+
+	config := provider.CreateConfig{
+		Repo:   "https://github.com/user/repo.git",
+		Prompt: "Fix the bug",
+		Model:  "claude-sonnet-4-5-20250929",
+		Options: map[string]string{
+			"image": "my-env",
+		},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.NoError(t, err)
+	assert.NotNil(t, instance)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderCreateWithoutModel(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
+		return config.Metadata["ANTHROPIC_MODEL"] == ""
+	})).Return(nil)
+
+	config := provider.CreateConfig{
+		Repo:   "https://github.com/user/repo.git",
+		Prompt: "Fix the bug",
+		Options: map[string]string{
+			"image": "my-env",
+		},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.NoError(t, err)
+	assert.NotNil(t, instance)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderStartWithModel(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	fingerprint := "abc123"
+	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(&computepb.Instance{
+			Name: strPtr("test-vm"),
+			Metadata: &computepb.Metadata{
+				Fingerprint: &fingerprint,
+				Items: []*computepb.Items{
+					{Key: strPtr("PROMPT"), Value: strPtr("old prompt")},
+				},
+			},
+		}, nil)
+	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm",
+		mock.MatchedBy(func(m *computepb.Metadata) bool {
+			// Verify ANTHROPIC_MODEL was added to metadata
+			for _, item := range m.Items {
+				if item.GetKey() == "ANTHROPIC_MODEL" && item.GetValue() == "claude-opus-4-6" {
+					return true
+				}
+			}
+			return false
+		})).Return(nil)
+	mockClient.On("StartInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(nil)
+
+	config := provider.CreateConfig{
+		Prompt: "new prompt",
+		Model:  "claude-opus-4-6",
+	}
+	instance, err := p.Start(context.Background(), "test-vm", config)
+	assert.NoError(t, err)
+	assert.Equal(t, "test-vm", instance.Name)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderStartWithoutModelDoesNotUpdateMetadata(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	fingerprint := "abc123"
+	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(&computepb.Instance{
+			Name: strPtr("test-vm"),
+			Metadata: &computepb.Metadata{
+				Fingerprint: &fingerprint,
+				Items: []*computepb.Items{
+					{Key: strPtr("PROMPT"), Value: strPtr("old prompt")},
+				},
+			},
+		}, nil)
+	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm",
+		mock.MatchedBy(func(m *computepb.Metadata) bool {
+			// Verify ANTHROPIC_MODEL was NOT added when model is empty
+			for _, item := range m.Items {
+				if item.GetKey() == "ANTHROPIC_MODEL" {
+					return false
+				}
+			}
+			return true
+		})).Return(nil)
+	mockClient.On("StartInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(nil)
+
+	config := provider.CreateConfig{
+		Prompt: "new prompt",
+	}
+	instance, err := p.Start(context.Background(), "test-vm", config)
+	assert.NoError(t, err)
+	assert.Equal(t, "test-vm", instance.Name)
+	mockClient.AssertExpectations(t)
+}
+
 func TestProviderCreateWithCustomOptions(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)

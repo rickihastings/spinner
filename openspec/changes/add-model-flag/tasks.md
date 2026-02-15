@@ -21,12 +21,12 @@
 
 ## 3.0 GCP metadata and runtime script
 
-- [ ] 3.1 Add `ANTHROPIC_MODEL` to initial metadata map in `Create()` in `internal/backend/gcp/gcp_provider.go`
-- [ ] 3.2 Add `ANTHROPIC_MODEL` to `updates` map in `updateMetadata()` for restart override
-- [ ] 3.3 Read and export `ANTHROPIC_MODEL` from metadata in
+- [x] 3.1 Add `ANTHROPIC_MODEL` to initial metadata map in `Create()` in `internal/backend/gcp/gcp_provider.go`
+- [x] 3.2 Add `ANTHROPIC_MODEL` to `updates` map in `updateMetadata()` for restart override
+- [x] 3.3 Read and export `ANTHROPIC_MODEL` from metadata in
   `internal/backend/gcp/templates/scripts/gcp_runtime.sh`
-- [ ] 3.4 Add unit tests for GCP metadata inclusion and update
-- [ ] 3.5 Verify build succeeds and all tests pass
+- [x] 3.4 Add unit tests for GCP metadata inclusion and update
+- [x] 3.5 Verify build succeeds and all tests pass
 
 ## 4.0 Docker integration tests
 
