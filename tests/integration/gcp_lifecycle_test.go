@@ -105,6 +105,7 @@ func TestGCPLifecycle_VMAutoStopsOnCompletion(t *testing.T) {
 		"--backend", "gcp",
 		"--image", imageName,
 		"--repo", testRepo,
+		"--branch", "test-auto-stop",
 		"--prompt", "list files and output ~~ FEATURE_COMPLETED ~~",
 		"--project", cfg.Project,
 		"--zone", cfg.Zone,
@@ -182,6 +183,7 @@ func TestGCPLifecycle_VMStaysRunningWithoutPrompt(t *testing.T) {
 		"--backend", "gcp",
 		"--image", imageName,
 		"--repo", testRepo,
+		"--branch", "test-no-prompt",
 		// Note: NO --prompt flag
 		"--project", cfg.Project,
 		"--zone", cfg.Zone,

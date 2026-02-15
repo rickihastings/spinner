@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"testing"
 
@@ -772,6 +773,41 @@ func TestSpinCommand_EnvFileNotFound(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "--env-file: file does not exist")
+}
+
+// TestSpinCommand_StartFailsFallbackToCreate tests that when Start() fails on a stopped instance
+// and Status() then reports InstanceStatusNone (TOCTOU race), the command falls through to Create().
+func TestSpinCommand_StartFailsFallbackToCreate(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	mockProvider := new(provider.MockProvider)
+	mockProvider.On("InstanceName", mock.Anything).Return("test-container")
+	// First Status() call returns Stopped
+	mockProvider.On("Status", mock.Anything, "test-container").Return(provider.InstanceStatusStopped, nil).Once()
+	// Start() fails (instance was deleted between Status and Start)
+	mockProvider.On("Start", mock.Anything, "test-container", mock.Anything).Return(
+		(*provider.Instance)(nil), fmt.Errorf("instance not found"),
+	)
+	// Second Status() call (retry) returns None — instance is gone
+	mockProvider.On("Status", mock.Anything, "test-container").Return(provider.InstanceStatusNone, nil).Once()
+	// Create() succeeds
+	mockProvider.On("Create", mock.Anything, mock.Anything).Return(
+		&provider.Instance{Name: "test-container", Status: provider.InstanceStatusRunning}, nil,
+	)
+
+	cmd := NewSpinCommand(testFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{"--image", "spinner:test", "--repo", "https://github.com/test/repo.git"})
+
+	err := cmd.Execute()
+
+	assert.NoError(t, err)
+	mockProvider.AssertCalled(t, "Start", mock.Anything, "test-container", mock.Anything)
+	mockProvider.AssertCalled(t, "Create", mock.Anything, mock.Anything)
 }
 
 // TestSpinCommand_EnvFileAndEnvFlagCombination tests that both --env and --env-file work together

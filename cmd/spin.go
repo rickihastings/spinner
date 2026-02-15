@@ -230,13 +230,26 @@ EXAMPLES:
 			case provider.InstanceStatusStopped:
 				instance, err = p.Start(ctx, name, createConfig)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
-					return err
+					// Instance may have been deleted between Status() and Start() (TOCTOU race).
+					// Re-check: if gone, create a fresh one instead of failing.
+					retryStatus, statusErr := p.Status(ctx, name)
+					if statusErr == nil && retryStatus == provider.InstanceStatusNone {
+						fmt.Println("Instance was removed, creating fresh instance...")
+						instance, err = p.Create(ctx, createConfig)
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+							return err
+						}
+						fmt.Printf("✓ Instance created successfully: %s\n", instance.Name)
+					} else {
+						fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+						return err
+					}
+				} else {
+					fmt.Printf("✓ Instance restarted: %s\n", instance.Name)
+					fmt.Println()
+					fmt.Println("Note: Reusing existing instance. Use --recreate flag to force recreation.")
 				}
-
-				fmt.Printf("✓ Instance restarted: %s\n", instance.Name)
-				fmt.Println()
-				fmt.Println("Note: Reusing existing instance. Use --recreate flag to force recreation.")
 			}
 
 			// Display backend-specific management commands
