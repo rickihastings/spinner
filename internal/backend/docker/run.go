@@ -15,6 +15,7 @@ type spinConfig struct {
 	Prompt        string
 	Branch        string
 	MaxIterations string
+	Model         string
 	EnvVars       map[string]string
 	EnvFile       string
 }
@@ -125,6 +126,11 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	// Add branch if specified
 	if config.Branch != "" {
 		_, _ = fmt.Fprintf(tmpFile, "BRANCH=%s\n", config.Branch)
+	}
+
+	// Add model if specified
+	if config.Model != "" {
+		_, _ = fmt.Fprintf(tmpFile, "ANTHROPIC_MODEL=%s\n", config.Model)
 	}
 
 	// Add Ralph loop environment variables if prompt is provided

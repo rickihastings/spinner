@@ -35,6 +35,7 @@ const (
 	flagServiceAccount = "service-account"
 	flagEnv            = "env"
 	flagEnvFile        = "env-file"
+	flagModel          = "model"
 )
 
 // GCP default values.

@@ -29,6 +29,7 @@ func NewSpinCommand(f *provider.Factory) *cobra.Command {
 		spinPrompt        string
 		spinBranch        string
 		spinMaxIterations string
+		spinModel         string
 		spinRecreate      bool
 		spinSetup         bool
 		spinWatch         bool
@@ -47,6 +48,7 @@ GENERAL FLAGS:
   --prompt <prompt>          Task prompt for autonomous execution (optional)
   --branch <branch>          Git branch to checkout (optional)
   --max-iterations <num>     Maximum iterations (optional, default: 100)
+  --model <model>            Claude model to use (optional, e.g. claude-sonnet-4-5-20250929)
   --recreate                 Force recreation of existing instance (optional)
   --watch                    Enter watch mode after instance is ready (optional)
   --backend <backend>        Backend provider: docker, gcp (default: docker)
@@ -85,6 +87,7 @@ EXAMPLES:
 			_ = viper.BindPFlag(flagPrompt, cmd.Flags().Lookup(flagPrompt))
 			_ = viper.BindPFlag(flagBranch, cmd.Flags().Lookup(flagBranch))
 			_ = viper.BindPFlag(flagMaxIterations, cmd.Flags().Lookup(flagMaxIterations))
+			_ = viper.BindPFlag(flagModel, cmd.Flags().Lookup(flagModel))
 			_ = viper.BindPFlag(flagRecreate, cmd.Flags().Lookup(flagRecreate))
 			_ = viper.BindPFlag(flagSetup, cmd.Flags().Lookup(flagSetup))
 			_ = viper.BindPFlag(flagBaseImage, cmd.Flags().Lookup(flagBaseImage))
@@ -103,6 +106,7 @@ EXAMPLES:
 			spinPrompt = viper.GetString(flagPrompt)
 			spinBranch = viper.GetString(flagBranch)
 			spinMaxIterations = viper.GetString(flagMaxIterations)
+			spinModel = viper.GetString(flagModel)
 			spinRecreate = viper.GetBool(flagRecreate)
 			spinSetup = viper.GetBool(flagSetup)
 			spinWatch = viper.GetBool(flagWatch)
@@ -184,6 +188,7 @@ EXAMPLES:
 				Prompt:        spinPrompt,
 				Branch:        spinBranch,
 				MaxIterations: spinMaxIterations,
+				Model:         spinModel,
 				Options:       createOptions,
 				EnvVars:       envVars,
 				EnvFile:       spinEnvFile,
@@ -289,6 +294,7 @@ EXAMPLES:
 	cmd.Flags().StringVar(&spinPrompt, flagPrompt, "", "Task prompt for autonomous execution (optional)")
 	cmd.Flags().StringVar(&spinBranch, flagBranch, "", "Git branch to checkout (optional)")
 	cmd.Flags().StringVar(&spinMaxIterations, flagMaxIterations, "", "Maximum iterations (optional, default: 100)")
+	cmd.Flags().StringVar(&spinModel, flagModel, "", "Claude model to use (optional, e.g. claude-sonnet-4-5-20250929)")
 	cmd.Flags().BoolVar(&spinRecreate, flagRecreate, false, "Force recreation of existing instance (optional)")
 	cmd.Flags().BoolVar(&spinSetup, flagSetup, false, "Build/rebuild the environment before spinning (optional)")
 	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
@@ -330,6 +336,7 @@ func parseAndValidateEnvVars(envVars []string) (map[string]string, error) {
 		"SPINNER_LOG_BUCKET":      true,
 		"SPINNER_STATE_BUCKET":    true,
 		"SPINNER_INSTANCE_NAME":   true,
+		"ANTHROPIC_MODEL":         true,
 	}
 
 	for _, env := range envVars {

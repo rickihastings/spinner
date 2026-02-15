@@ -73,6 +73,7 @@ type CreateConfig struct {
 	Prompt        string
 	Branch        string
 	MaxIterations string
+	Model         string
 	Options       map[string]string
 	EnvVars       map[string]string
 	EnvFile       string

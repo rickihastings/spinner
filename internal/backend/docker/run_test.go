@@ -898,6 +898,65 @@ func TestBuildDockerRunCommand_UserEnvFile(t *testing.T) {
 	assert.Equal(t, 2, count, "should have two --env-file flags")
 }
 
+// TestBuildDockerRunCommand_EnvFileWithModel tests that ANTHROPIC_MODEL is written to env file when model is set
+func TestBuildDockerRunCommand_EnvFileWithModel(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image: "spinner:test",
+		Repo:  "https://github.com/user/repo.git",
+		Model: "claude-sonnet-4-5-20250929",
+	}
+
+	_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tmpFile)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+
+	contentStr := string(content)
+
+	assert.Contains(t, contentStr, "ANTHROPIC_MODEL=claude-sonnet-4-5-20250929\n")
+}
+
+// TestBuildDockerRunCommand_EnvFileWithoutModel tests that ANTHROPIC_MODEL is NOT written when model is empty
+func TestBuildDockerRunCommand_EnvFileWithoutModel(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image: "spinner:test",
+		Repo:  "https://github.com/user/repo.git",
+	}
+
+	_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tmpFile)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+
+	contentStr := string(content)
+
+	assert.NotContains(t, contentStr, "ANTHROPIC_MODEL=")
+}
+
 // TestBuildDockerRunCommand_NoUserEnvFile tests that docker args work correctly without user env file
 func TestBuildDockerRunCommand_NoUserEnvFile(t *testing.T) {
 	_ = os.Setenv("GITHUB_TOKEN", "test-token")

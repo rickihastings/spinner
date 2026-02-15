@@ -2,15 +2,15 @@
 
 ## 1.0 Model flag on spin command and Docker creation
 
-- [ ] 1.1 Add `flagModel` constant to `cmd/helpers.go` and `Model` field to `CreateConfig` in
+- [x] 1.1 Add `flagModel` constant to `cmd/helpers.go` and `Model` field to `CreateConfig` in
   `internal/provider/provider.go`
-- [ ] 1.2 Add `--model` flag to spin command in `cmd/spin.go` with Viper binding for `.spinner.json` support,
+- [x] 1.2 Add `--model` flag to spin command in `cmd/spin.go` with Viper binding for `.spinner.json` support,
   add `ANTHROPIC_MODEL` to reserved env var list, wire into `CreateConfig`
-- [ ] 1.3 Add `Model` field to Docker `spinConfig` in `internal/backend/docker/run.go`, write `ANTHROPIC_MODEL`
+- [x] 1.3 Add `Model` field to Docker `spinConfig` in `internal/backend/docker/run.go`, write `ANTHROPIC_MODEL`
   to env-file in `buildDockerRunCommand()` when model is set
-- [ ] 1.4 Add unit tests for model flag: flag parsing, reserved var rejection, config file default, env-file
+- [x] 1.4 Add unit tests for model flag: flag parsing, reserved var rejection, config file default, env-file
   inclusion
-- [ ] 1.5 Verify build succeeds and all tests pass
+- [x] 1.5 Verify build succeeds and all tests pass
 
 ## 2.0 Docker restart override and startup.sh
 

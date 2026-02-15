@@ -76,6 +76,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		Prompt:        config.Prompt,
 		Branch:        config.Branch,
 		MaxIterations: config.MaxIterations,
+		Model:         config.Model,
 		EnvVars:       config.EnvVars,
 		EnvFile:       config.EnvFile,
 	}

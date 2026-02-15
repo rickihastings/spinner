@@ -656,6 +656,7 @@ func TestParseAndValidateEnvVars_ReservedVars(t *testing.T) {
 		"SPINNER_LOG_BUCKET",
 		"SPINNER_STATE_BUCKET",
 		"SPINNER_INSTANCE_NAME",
+		"ANTHROPIC_MODEL",
 	}
 
 	for _, reserved := range reservedVars {
@@ -809,6 +810,45 @@ func TestSpinCommand_StartFailsFallbackToCreate(t *testing.T) {
 	assert.NoError(t, err)
 	mockProvider.AssertCalled(t, "Start", mock.Anything, "test-container", mock.Anything)
 	mockProvider.AssertCalled(t, "Create", mock.Anything, mock.Anything)
+}
+
+// TestSpinCommand_ModelFlagParsing tests that --model flag is correctly parsed
+func TestSpinCommand_ModelFlagParsing(t *testing.T) {
+	cmd := setupSpinCommandWithMocks(t)
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--model", "claude-sonnet-4-5-20250929",
+	})
+
+	err := cmd.Execute()
+
+	assert.NoError(t, err)
+}
+
+// TestSpinCommand_EnvFlagReservedVarAnthropicModel tests that ANTHROPIC_MODEL cannot be set via --env
+func TestSpinCommand_EnvFlagReservedVarAnthropicModel(t *testing.T) {
+	mockProvider := new(provider.MockProvider)
+	cmd := NewSpinCommand(testFactory(mockProvider))
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--env", "ANTHROPIC_MODEL=claude-sonnet-4-5-20250929",
+	})
+
+	err := cmd.Execute()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot override reserved variable")
+	assert.Contains(t, err.Error(), "ANTHROPIC_MODEL")
 }
 
 // TestSpinCommand_EnvFileAndEnvFlagCombination tests that both --env and --env-file work together
