@@ -49,13 +49,13 @@ with CLI equivalents. Introduce local `ContainerListEntry` type to replace `cont
 Replace SDK-based metrics collection with CLI-based collection using `docker stats` and
 `docker inspect`.
 
-- [ ] 4.1 Replace `metricsAPIClient` interface and `createMetricsClient` with CLI-based collection
-- [ ] 4.2 Replace `collectMetrics` — use `docker stats --no-stream --format json` and `docker inspect`
-- [ ] 4.3 Remove `cpuSnapshot` struct and `calculateCPUPercent` (CLI provides pre-calculated values)
-- [ ] 4.4 Remove `mapDockerStateToMetrics` or update to work with CLI inspect output
-- [ ] 4.5 Update `streamMetrics` to use new CLI-based collection
-- [ ] 4.6 Update metrics tests
-- [ ] 4.7 Verify build passes and existing tests pass
+- [x] 4.1 Replace `metricsAPIClient` interface and `createMetricsClient` with CLI-based collection
+- [x] 4.2 Replace `collectMetrics` — use `docker stats --no-stream --format json` and `docker inspect`
+- [x] 4.3 Remove `cpuSnapshot` struct and `calculateCPUPercent` (CLI provides pre-calculated values)
+- [x] 4.4 Update `mapDockerStateToMetrics` to work with local `dockerInspectState` struct from CLI inspect output
+- [x] 4.5 Update `streamMetrics` to use new CLI-based collection (no longer requires `metricsAPIClient`)
+- [x] 4.6 Add metrics tests for parsing and state mapping
+- [x] 4.7 Verify build passes and existing tests pass
 
 ## 5.0 SDK Removal and Dependency Cleanup
 

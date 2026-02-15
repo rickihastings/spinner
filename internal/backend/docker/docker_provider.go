@@ -278,18 +278,7 @@ func (p *Provider) WatchLogs(ctx context.Context, name string, tailLines int, ch
 
 // WatchMetrics implements provider.Provider.WatchMetrics for Docker containers.
 func (p *Provider) WatchMetrics(ctx context.Context, name string, ch chan<- provider.ContainerMetrics) error {
-	// Create Docker client for metrics
-	cli, err := createMetricsClient()
-	if err != nil {
-		return fmt.Errorf("failed to create metrics client: %w", err)
-	}
-
-	defer func() {
-		_ = cli.Close()
-	}()
-
-	// Stream metrics using the helper function
-	return streamMetrics(ctx, cli, name, ch)
+	return streamMetrics(ctx, name, ch)
 }
 
 // GetInstanceMetadata returns metadata about a Docker container.

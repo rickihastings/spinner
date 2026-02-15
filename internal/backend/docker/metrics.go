@@ -4,104 +4,35 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
-	containertypes "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 	execpkg "github.com/rickihastings/spinner/internal/exec"
 	"github.com/rickihastings/spinner/internal/provider"
 )
 
-// metricsAPIClient defines the Docker API methods needed for metrics collection
-// This interface enables mocking for tests
-type metricsAPIClient interface {
-	ContainerInspect(ctx context.Context, containerID string) (containertypes.InspectResponse, error)
-	ContainerStats(ctx context.Context, containerID string, stream bool) (containertypes.StatsResponseReader, error)
-	Close() error
+// dockerStatsJSON represents the JSON output from docker stats --no-stream --format json.
+type dockerStatsJSON struct {
+	CPUPerc  string `json:"CPUPerc"`
+	MemUsage string `json:"MemUsage"`
 }
 
-// createMetricsClient creates a Docker client for metrics collection
-func createMetricsClient() (metricsAPIClient, error) {
-	// Detect the correct Docker host
-	host, err := detectDockerHost()
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect Docker host: %w", err)
-	}
-
-	// Build client options
-	opts := []client.Opt{client.WithAPIVersionNegotiation()}
-	if host != "" {
-		opts = append(opts, client.WithHost(host))
-	} else {
-		opts = append(opts, client.FromEnv)
-	}
-
-	cli, err := client.NewClientWithOpts(opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Docker client: %w", err)
-	}
-
-	return cli, nil
+// dockerInspectState represents the State field from docker inspect JSON output.
+type dockerInspectState struct {
+	Running   bool `json:"Running"`
+	Dead      bool `json:"Dead"`
+	OOMKilled bool `json:"OOMKilled"`
+	ExitCode  int  `json:"ExitCode"`
 }
 
-// detectDockerHost detects the correct Docker socket path by checking:
-// 1. DOCKER_HOST environment variable
-// 2. Current Docker context
-// 3. Common socket locations for Docker Desktop on macOS
-func detectDockerHost() (string, error) {
-	// Check if DOCKER_HOST is already set
-	if host := os.Getenv("DOCKER_HOST"); host != "" {
-		return "", nil // FromEnv will handle it
-	}
-
-	// Try to get the host from the current Docker context
-	cmd := exec.Command("docker", "context", "inspect", "-f", "{{.Endpoints.docker.Host}}")
-
-	output, err := cmd.Output()
-	if err == nil && len(output) > 0 {
-		host := strings.TrimSpace(string(output))
-		if host != "" && host != "<no value>" {
-			return host, nil
-		}
-	}
-
-	// On macOS, check for Docker Desktop socket
-	homeDir, err := os.UserHomeDir()
-	if err == nil {
-		macSocketPath := filepath.Join(homeDir, ".docker", "run", "docker.sock")
-		if _, err := os.Stat(macSocketPath); err == nil {
-			return "unix://" + macSocketPath, nil
-		}
-	}
-
-	// Return empty to use default behavior
-	return "", nil
-}
-
-// cpuSnapshot holds raw CPU counters from a single stats read.
-// We track these ourselves between polls because Docker's PreCPUStats
-// is unreliable with stream=false on Docker Desktop for macOS.
-type cpuSnapshot struct {
-	totalUsage  uint64
-	systemUsage uint64
-	onlineCPUs  uint32
-	percpuLen   int
-}
-
-// streamMetrics streams real-time resource metrics for a container
-func streamMetrics(ctx context.Context, cli metricsAPIClient, containerName string, ch chan<- provider.ContainerMetrics) error {
-	var prev *cpuSnapshot
-
-	// Send initial metrics immediately (no previous snapshot, so CPU will be 0)
-	metrics, snap := collectMetrics(ctx, cli, containerName, prev)
-	if snap != nil {
-		prev = snap
-	}
+// streamMetrics streams real-time resource metrics for a container using CLI commands.
+func streamMetrics(ctx context.Context, containerName string, ch chan<- provider.ContainerMetrics) error {
+	// Send initial metrics immediately
+	metrics := collectMetrics(ctx, containerName)
 
 	select {
 	case ch <- metrics:
@@ -127,10 +58,7 @@ func streamMetrics(ctx context.Context, cli metricsAPIClient, containerName stri
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			metrics, snap := collectMetrics(ctx, cli, containerName, prev)
-			if snap != nil {
-				prev = snap
-			}
+			metrics := collectMetrics(ctx, containerName)
 
 			// Send metrics to channel
 			select {
@@ -152,69 +80,35 @@ func streamMetrics(ctx context.Context, cli metricsAPIClient, containerName stri
 	}
 }
 
-// collectMetrics collects metrics for a single poll.
-// It accepts an optional previous CPU snapshot for delta calculation and returns
-// the current snapshot so callers can track it across polls.
-func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName string, prev *cpuSnapshot) (provider.ContainerMetrics, *cpuSnapshot) {
+// collectMetrics collects metrics for a single poll using Docker CLI commands.
+func collectMetrics(ctx context.Context, containerName string) provider.ContainerMetrics {
 	// First, inspect the container to get its state
-	inspect, err := cli.ContainerInspect(ctx, containerName)
+	state, err := inspectContainerState(ctx, containerName)
 	if err != nil {
 		return provider.ContainerMetrics{
 			State: provider.StateUnknown,
 			Error: fmt.Errorf("failed to inspect container: %w", err),
-		}, nil
+		}
 	}
 
 	// Determine container state
-	state := mapDockerStateToMetrics(inspect.State)
+	containerState := mapDockerStateToMetrics(state)
 
 	// If container is not running, return state without stats
-	if state != provider.StateRunning {
+	if containerState != provider.StateRunning {
 		return provider.ContainerMetrics{
-			State: state,
-		}, nil
+			State: containerState,
+		}
 	}
 
-	// Get container stats
-	statsResp, err := cli.ContainerStats(ctx, containerName, false) // stream=false for single read
+	// Get container stats using docker stats CLI
+	cpuPercent, memoryUsed, memoryLimit, err := getContainerStats(ctx, containerName)
 	if err != nil {
 		return provider.ContainerMetrics{
-			State: state,
+			State: containerState,
 			Error: fmt.Errorf("failed to get container stats: %w", err),
-		}, nil
+		}
 	}
-
-	defer func() {
-		_ = statsResp.Body.Close()
-	}()
-
-	// Parse stats response
-	var stats containertypes.StatsResponse
-	if err := json.NewDecoder(statsResp.Body).Decode(&stats); err != nil {
-		// Read and discard remaining data to avoid resource leaks
-		_, _ = io.Copy(io.Discard, statsResp.Body)
-
-		return provider.ContainerMetrics{
-			State: state,
-			Error: fmt.Errorf("failed to decode stats: %w", err),
-		}, nil
-	}
-
-	// Build current CPU snapshot
-	current := &cpuSnapshot{
-		totalUsage:  stats.CPUStats.CPUUsage.TotalUsage,
-		systemUsage: stats.CPUStats.SystemUsage,
-		onlineCPUs:  stats.CPUStats.OnlineCPUs,
-		percpuLen:   len(stats.CPUStats.CPUUsage.PercpuUsage),
-	}
-
-	// Calculate CPU percentage using our own tracked previous snapshot
-	// instead of Docker's PreCPUStats, which is unreliable with stream=false
-	cpuPercent := calculateCPUPercent(prev, current)
-
-	// Extract memory metrics
-	memoryUsed := stats.MemoryStats.Usage
-	memoryLimit := stats.MemoryStats.Limit
 
 	memoryPercent := 0.0
 	if memoryLimit > 0 {
@@ -222,7 +116,7 @@ func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName str
 	}
 
 	metrics := provider.ContainerMetrics{
-		State:         state,
+		State:         containerState,
 		CPUPercent:    cpuPercent,
 		MemoryUsed:    memoryUsed,
 		MemoryLimit:   memoryLimit,
@@ -232,7 +126,106 @@ func collectMetrics(ctx context.Context, cli metricsAPIClient, containerName str
 	// Read iteration count from state file
 	metrics.Iteration = readIterationFromState(containerName)
 
-	return metrics, current
+	return metrics
+}
+
+// inspectContainerState gets the container's state using docker inspect.
+func inspectContainerState(ctx context.Context, containerName string) (*dockerInspectState, error) {
+	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{json .State}}", containerName)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker inspect failed: %w", err)
+	}
+
+	var state dockerInspectState
+	if err := json.Unmarshal(output, &state); err != nil {
+		return nil, fmt.Errorf("failed to parse inspect state: %w", err)
+	}
+
+	return &state, nil
+}
+
+// getContainerStats gets CPU and memory stats using docker stats CLI.
+// Returns cpuPercent, memoryUsed (bytes), memoryLimit (bytes), error.
+func getContainerStats(ctx context.Context, containerName string) (float64, uint64, uint64, error) {
+	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream", "--format", "json", containerName)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("docker stats failed: %w", err)
+	}
+
+	var stats dockerStatsJSON
+	if err := json.Unmarshal(output, &stats); err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to parse stats: %w", err)
+	}
+
+	cpuPercent := parseCPUPercent(stats.CPUPerc)
+	memUsed, memLimit := parseMemUsage(stats.MemUsage)
+
+	return cpuPercent, memUsed, memLimit, nil
+}
+
+// parseCPUPercent parses the CPU percentage string from docker stats (e.g. "1.23%").
+func parseCPUPercent(s string) float64 {
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, "%")
+
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0.0
+	}
+
+	return val
+}
+
+// parseMemUsage parses the memory usage string from docker stats (e.g. "100MiB / 1.94GiB").
+// Returns memoryUsed and memoryLimit in bytes.
+func parseMemUsage(s string) (uint64, uint64) {
+	parts := strings.Split(s, "/")
+	if len(parts) != 2 {
+		return 0, 0
+	}
+
+	used := parseMemoryValue(strings.TrimSpace(parts[0]))
+	limit := parseMemoryValue(strings.TrimSpace(parts[1]))
+
+	return used, limit
+}
+
+// parseMemoryValue parses a memory value string like "100MiB", "1.94GiB", "512KiB", "1024B".
+func parseMemoryValue(s string) uint64 {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+
+	// Try binary suffixes (Docker uses these)
+	suffixes := []struct {
+		suffix     string
+		multiplier uint64
+	}{
+		{"GiB", 1024 * 1024 * 1024},
+		{"MiB", 1024 * 1024},
+		{"KiB", 1024},
+		{"B", 1},
+	}
+
+	for _, sf := range suffixes {
+		if strings.HasSuffix(s, sf.suffix) {
+			numStr := strings.TrimSuffix(s, sf.suffix)
+
+			val, err := strconv.ParseFloat(numStr, 64)
+			if err != nil {
+				return 0
+			}
+
+			return uint64(val * float64(sf.multiplier))
+		}
+	}
+
+	return 0
 }
 
 // readIterationFromState reads the current iteration count from the container's state file.
@@ -252,8 +245,8 @@ func readIterationFromState(containerName string) int {
 	return state.Iteration
 }
 
-// mapDockerStateToMetrics converts Docker container state to provider.ContainerState type
-func mapDockerStateToMetrics(state *containertypes.State) provider.ContainerState {
+// mapDockerStateToMetrics converts Docker container inspect state to provider.ContainerState type.
+func mapDockerStateToMetrics(state *dockerInspectState) provider.ContainerState {
 	if state == nil {
 		return provider.StateUnknown
 	}
@@ -267,32 +260,4 @@ func mapDockerStateToMetrics(state *containertypes.State) provider.ContainerStat
 	}
 
 	return provider.StateStopped
-}
-
-// calculateCPUPercent calculates CPU usage percentage from two snapshots.
-// Algorithm based on Docker CLI implementation, but uses our own tracked
-// previous values instead of Docker's PreCPUStats (unreliable with stream=false).
-func calculateCPUPercent(prev *cpuSnapshot, current *cpuSnapshot) float64 {
-	if prev == nil || current == nil {
-		return 0.0
-	}
-
-	cpuDelta := float64(current.totalUsage) - float64(prev.totalUsage)
-	systemDelta := float64(current.systemUsage) - float64(prev.systemUsage)
-
-	if systemDelta > 0.0 && cpuDelta > 0.0 {
-		numCPUs := float64(current.onlineCPUs)
-
-		if numCPUs == 0 {
-			numCPUs = float64(current.percpuLen)
-		}
-
-		if numCPUs == 0 {
-			numCPUs = 1.0
-		}
-
-		return (cpuDelta / systemDelta) * numCPUs * 100.0
-	}
-
-	return 0.0
 }
