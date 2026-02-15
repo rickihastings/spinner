@@ -392,6 +392,164 @@ func TestRichFormatter_EmptyToolInput(t *testing.T) {
 	assert.NotContains(t, formatted, "()")
 }
 
+func TestRichFormatter_MarkdownPlainText(t *testing.T) {
+	f := NewRichFormatter()
+
+	event := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeText, Text: "This is plain text"},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&event)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "This is plain text")
+}
+
+func TestRichFormatter_MarkdownBold(t *testing.T) {
+	f := NewRichFormatter()
+
+	event := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeText, Text: "This is **bold** text"},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&event)
+	require.True(t, ok)
+	// The word "bold" should appear (glamour renders bold with ANSI, then translated to tview tags)
+	assert.Contains(t, formatted, "bold")
+	assert.Contains(t, formatted, "text")
+}
+
+func TestRichFormatter_MarkdownBulletPoints(t *testing.T) {
+	f := NewRichFormatter()
+
+	event := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeText, Text: "Items:\n- First item\n- Second item\n- Third item"},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&event)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "First item")
+	assert.Contains(t, formatted, "Second item")
+	assert.Contains(t, formatted, "Third item")
+}
+
+func TestRichFormatter_MarkdownCodeBlock(t *testing.T) {
+	f := NewRichFormatter()
+
+	event := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeText, Text: "Example:\n```go\nfunc main() {}\n```"},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&event)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "func main")
+}
+
+func TestRichFormatter_MarkdownHeading(t *testing.T) {
+	f := NewRichFormatter()
+
+	event := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeText, Text: "# My Heading\nSome content"},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&event)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "My Heading")
+	assert.Contains(t, formatted, "Some content")
+}
+
+func TestRichFormatter_MixedTextAndToolUseSeparation(t *testing.T) {
+	f := NewRichFormatter()
+
+	event := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeText, Text: "I'll read the file and edit it."},
+				{
+					Type:  contentBlockTypeToolUse,
+					ID:    "toolu_mixed1",
+					Name:  "Read",
+					Input: json.RawMessage(`{"file_path": "/a.go"}`),
+				},
+				{
+					Type:  contentBlockTypeToolUse,
+					ID:    "toolu_mixed2",
+					Name:  "Edit",
+					Input: json.RawMessage(`{"file_path": "/b.go"}`),
+				},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&event)
+	require.True(t, ok)
+	// Text should appear
+	assert.Contains(t, formatted, "read the file and edit it")
+	// Tool calls should appear
+	assert.Contains(t, formatted, "Read")
+	assert.Contains(t, formatted, "/a.go")
+	assert.Contains(t, formatted, "Edit")
+	assert.Contains(t, formatted, "/b.go")
+
+	// Text should come before tool calls
+	textIdx := strings.Index(formatted, "read the file")
+	readIdx := strings.Index(formatted, "Read")
+	assert.True(t, textIdx < readIdx, "text should appear before tool calls")
+}
+
+func TestRichFormatter_NilRendererFallback(t *testing.T) {
+	// Test that renderMarkdown falls back to raw text when renderer is nil
+	f := &RichFormatter{
+		toolNames: make(map[string]string),
+		renderer:  nil,
+	}
+
+	event := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{Type: contentBlockTypeText, Text: "Plain text fallback"},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&event)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "Plain text fallback")
+}
+
 func TestExtractToolSummary(t *testing.T) {
 	tests := []struct {
 		name     string

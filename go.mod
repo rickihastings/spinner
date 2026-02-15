@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/compute v1.54.0
 	cloud.google.com/go/compute/metadata v0.9.0
 	cloud.google.com/go/storage v1.59.2
+	github.com/charmbracelet/glamour v0.10.0
 	github.com/containerd/errdefs v1.0.0
 	github.com/creativeprojects/go-selfupdate v1.4.1
 	github.com/docker/docker v28.5.2+incompatible
@@ -40,7 +41,6 @@ require (
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
-	github.com/charmbracelet/glamour v0.10.0 // indirect
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834 // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect

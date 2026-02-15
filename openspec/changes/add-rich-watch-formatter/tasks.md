@@ -9,12 +9,12 @@
 - [x] 1.5 Add unit tests for tool call formatting: Bash command summary, Read file path, Edit file path, Glob pattern, Grep pattern, unknown tool fallback, long parameter truncation
 - [x] 1.6 Verify build and all tests pass
 
-## 2.0 Markdown Rendering for Agent Text
+## 2.0 Markdown Rendering for Agent Text ✓
 
-- [ ] 2.1 Implement glamour markdown rendering for assistant_message text blocks: render through glamour, convert ANSI to tview tags via `tview.TranslateANSI()`
-- [ ] 2.2 Handle mixed content (text + tool_use blocks in same message): render text first, then tool calls
-- [ ] 2.3 Add unit tests for markdown rendering: plain text, bold, bullet points, code blocks, headings, mixed text+tool messages
-- [ ] 2.4 Verify build and all tests pass
+- [x] 2.1 Implement glamour markdown rendering for assistant_message text blocks: render through glamour, convert ANSI to tview tags via `tview.TranslateANSI()`
+- [x] 2.2 Handle mixed content (text + tool_use blocks in same message): render text first, then tool calls
+- [x] 2.3 Add unit tests for markdown rendering: plain text, bold, bullet points, code blocks, headings, mixed text+tool messages
+- [x] 2.4 Verify build and all tests pass
 
 ## 3.0 Tool Result Rendering and Wiring
 
