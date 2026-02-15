@@ -95,23 +95,20 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		SetBorderColor(tcell.ColorGray).
 		SetBorderPadding(0, 0, 1, 1)
 
-	// Create log view with auto-scrolling
+	// Create log view with auto-scrolling (borderless for clean Claude-Code-like appearance)
 	logView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(true)
-	logView.SetBorder(true).
-		SetTitle(" Logs ").
-		SetBorderColor(tcell.ColorGray).
-		SetBorderPadding(0, 0, 1, 1)
 
 	// Note: SetChangedFunc for auto-scroll is set up after the WatchUI struct is created
 	// so the closure can reference ui.userScrolled directly.
 
-	// Create footer for help text
+	// Create footer as vim/tmux-style status bar
 	footer := tview.NewTextView().
 		SetDynamicColors(true).
-		SetTextAlign(tview.AlignRight)
-	footer.SetText("[darkgray]↑↓ scroll · h header · ? help · q quit[-]")
+		SetTextAlign(tview.AlignLeft)
+	footer.SetBackgroundColor(tcell.ColorDarkSlateGray)
+	footer.SetText(" [white]q[darkgray]: quit  [-][white]↑↓[darkgray]: scroll  [-][white]h[darkgray]: header  [-][white]?[darkgray]: help[-]")
 
 	// Determine initial header visibility
 	headerVisible := wctx.HeaderVisible
@@ -308,10 +305,11 @@ func (ui *WatchUI) setUserScrolled(scrolled bool) {
 
 // updateFooter refreshes the footer text based on current state
 func (ui *WatchUI) updateFooter() {
+	base := " [white]q[darkgray]: quit  [-][white]↑↓[darkgray]: scroll  [-][white]h[darkgray]: header  [-][white]?[darkgray]: help[-]"
 	if ui.userScrolled {
-		ui.footer.SetText("[yellow]SCROLLED[-] [darkgray]· ↑↓ scroll · h header · ? help · q quit[-]")
+		ui.footer.SetText(" [yellow]SCROLLED[-]" + base)
 	} else {
-		ui.footer.SetText("[darkgray]↑↓ scroll · h header · ? help · q quit[-]")
+		ui.footer.SetText(base)
 	}
 }
 
@@ -488,7 +486,8 @@ func (ui *WatchUI) updateMetrics(m provider.ContainerMetrics) {
 	})
 }
 
-// renderHeader renders the header with container metadata and metrics
+// renderHeader renders the header with container metadata and metrics,
+// selecting a layout based on terminal width.
 func (ui *WatchUI) renderHeader() {
 	ui.mu.Lock()
 	m := ui.lastMetrics
@@ -496,8 +495,19 @@ func (ui *WatchUI) renderHeader() {
 
 	ui.header.Clear()
 
-	// Get terminal width and calculate column width
 	_, _, width, _ := ui.header.GetInnerRect()
+
+	if width < 40 {
+		ui.renderHeaderMinimal(m)
+	} else if width < 80 {
+		ui.renderHeaderCompact(m, width)
+	} else {
+		ui.renderHeaderWide(m, width)
+	}
+}
+
+// renderHeaderWide renders the full 3-column header layout for terminals ≥80 columns.
+func (ui *WatchUI) renderHeaderWide(m provider.ContainerMetrics, width int) {
 	// Account for separators: " │ " (3 chars each, 2 separators = 6 chars)
 	// Border padding (left/right = 2 chars) and borders (2 chars) = 4 chars
 	availableWidth := width - 10
@@ -527,6 +537,107 @@ func (ui *WatchUI) renderHeader() {
 	content := fmt.Sprintf("%s\n%s\n%s", row1, row2, row3)
 
 	_, _ = fmt.Fprint(ui.header, content)
+}
+
+// renderHeaderCompact renders a condensed single-line header for terminals <80 columns.
+// Shows: status │ iter X/Y │ branch │ CPU% │ MEM
+func (ui *WatchUI) renderHeaderCompact(m provider.ContainerMetrics, width int) {
+	status := ui.compactStatus(m)
+	iter := ui.compactIterations()
+	branch := ui.compactBranch(width)
+	cpu := ui.compactCPU(m)
+	mem := ui.compactMemory(m)
+
+	line := fmt.Sprintf("%s │ %s │ %s │ %s │ %s", status, iter, branch, cpu, mem)
+	_, _ = fmt.Fprint(ui.header, line)
+}
+
+// renderHeaderMinimal renders a minimal single-line header for terminals <40 columns.
+// Shows: status iter CPU% MEM
+func (ui *WatchUI) renderHeaderMinimal(m provider.ContainerMetrics) {
+	status := ui.compactStatus(m)
+	iter := ui.compactIterations()
+	cpu := ui.compactCPU(m)
+	mem := ui.compactMemory(m)
+
+	line := fmt.Sprintf("%s %s %s %s", status, iter, cpu, mem)
+	_, _ = fmt.Fprint(ui.header, line)
+}
+
+// compactStatus returns a short colored status string.
+func (ui *WatchUI) compactStatus(m provider.ContainerMetrics) string {
+	stateText := string(m.State)
+	var color string
+
+	switch m.State {
+	case provider.StateStopped:
+		color = "yellow"
+	case provider.StateExited:
+		color = "red"
+	case provider.StateRunning:
+		color = "green"
+	default:
+		color = "gray"
+		if stateText == "" {
+			stateText = "unknown"
+		}
+	}
+
+	return fmt.Sprintf("[%s]%s[-]", color, stateText)
+}
+
+// compactIterations returns a short iteration string like "5/100".
+func (ui *WatchUI) compactIterations() string {
+	if ui.maxIterations == 0 {
+		return "[cyan]-[-]"
+	}
+
+	return fmt.Sprintf("[cyan]%d/%d[-]", ui.currentIter, ui.maxIterations)
+}
+
+// compactBranch returns a truncated branch name for compact display.
+func (ui *WatchUI) compactBranch(width int) string {
+	branch := ui.branch
+	if branch == "" {
+		branch = "-"
+	}
+
+	// Truncate branch to fit: allow roughly 1/3 of width for the branch field
+	maxLen := width / 3
+	if maxLen < 8 {
+		maxLen = 8
+	}
+	if len(branch) > maxLen {
+		branch = branch[:maxLen-3] + "..."
+	}
+
+	return fmt.Sprintf("[cyan]%s[-]", branch)
+}
+
+// compactCPU returns a short CPU string.
+func (ui *WatchUI) compactCPU(m provider.ContainerMetrics) string {
+	if m.Error != nil {
+		return "[red]ERR[-]"
+	}
+
+	return fmt.Sprintf("[cyan]%.1f%%[-]", m.CPUPercent)
+}
+
+// compactMemory returns a short memory string.
+func (ui *WatchUI) compactMemory(m provider.ContainerMetrics) string {
+	if m.Error != nil {
+		return "[red]ERR[-]"
+	}
+
+	if m.MemoryUsed > 0 {
+		return formatMemoryValue(m.MemoryUsed)
+	}
+
+	if m.MemoryPercent > 0 {
+		return fmt.Sprintf("[cyan]%.1f%%[-]", m.MemoryPercent)
+	}
+
+	return "[darkgray]N/A[-]"
 }
 
 // padString pads a string to the specified width, accounting for tview color tags

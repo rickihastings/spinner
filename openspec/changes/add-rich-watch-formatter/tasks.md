@@ -23,13 +23,13 @@
 - [x] 3.3 Add unit tests for tool result formatting: success with line count, error result, unknown tool_use_id fallback, map cleanup after result
 - [x] 3.4 Verify build and all tests pass
 
-## 4.0 TUI Simplification — Borderless Logs, Responsive Header, Status Bar
+## 4.0 TUI Simplification — Borderless Logs, Responsive Header, Status Bar ✓
 
-- [ ] 4.1 Remove border, title, and padding from `logView` in `internal/tui/watch.go`
-- [ ] 4.2 Extract current `renderHeader` into `renderHeaderWide` for ≥80 column terminals
-- [ ] 4.3 Implement `renderHeaderCompact` for <80 column terminals: single-line format showing status, iteration, branch, CPU, memory
-- [ ] 4.4 Implement `renderHeaderMinimal` for <40 column terminals: minimal single-line status
-- [ ] 4.5 Add width-based dispatch in `renderHeader` to select wide/compact/minimal mode
-- [ ] 4.6 Replace footer with solid vim/tmux-style status bar: inverted background, left-aligned keyboard shortcuts
-- [ ] 4.7 Add unit tests for responsive header rendering at different widths and status bar content
-- [ ] 4.8 Verify build and all tests pass
+- [x] 4.1 Remove border, title, and padding from `logView` in `internal/tui/watch.go`
+- [x] 4.2 Extract current `renderHeader` into `renderHeaderWide` for ≥80 column terminals
+- [x] 4.3 Implement `renderHeaderCompact` for <80 column terminals: single-line format showing status, iteration, branch, CPU, memory
+- [x] 4.4 Implement `renderHeaderMinimal` for <40 column terminals: minimal single-line status
+- [x] 4.5 Add width-based dispatch in `renderHeader` to select wide/compact/minimal mode
+- [x] 4.6 Replace footer with solid vim/tmux-style status bar: inverted background, left-aligned keyboard shortcuts
+- [x] 4.7 Add unit tests for responsive header rendering at different widths and status bar content
+- [x] 4.8 Verify build and all tests pass

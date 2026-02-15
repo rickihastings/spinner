@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rickihastings/spinner/internal/agent"
@@ -204,6 +205,212 @@ func TestWatchUI_PagesStructure(t *testing.T) {
 
 	// Help overlay should exist
 	assert.NotNil(t, ui.helpOverlay, "helpOverlay should not be nil")
+}
+
+func TestWatchUI_RenderHeaderWide(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{
+		Branch:        "main",
+		Agent:         "opus-4",
+		Environment:   "production",
+		ContainerID:   "abc123",
+		ImageID:       "def456",
+		MaxIterations: 100,
+		HeaderVisible: true,
+	})
+
+	// Simulate metrics
+	ui.mu.Lock()
+	ui.lastMetrics = provider.ContainerMetrics{
+		State:      provider.StateRunning,
+		CPUPercent: 12.3,
+		MemoryUsed: 1024 * 1024 * 512, // 512 MB
+	}
+	ui.currentIter = 5
+	ui.mu.Unlock()
+
+	// Render wide header directly
+	ui.header.Clear()
+	ui.renderHeaderWide(ui.lastMetrics, 120)
+	text := ui.header.GetText(false)
+
+	assert.Contains(t, text, "Branch:")
+	assert.Contains(t, text, "main")
+	assert.Contains(t, text, "Status:")
+	assert.Contains(t, text, "running")
+	assert.Contains(t, text, "Iterations:")
+	assert.Contains(t, text, "5/100")
+	assert.Contains(t, text, "Env:")
+	assert.Contains(t, text, "Agent:")
+	assert.Contains(t, text, "CPU:")
+	assert.Contains(t, text, "Memory:")
+}
+
+func TestWatchUI_RenderHeaderCompact(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{
+		Branch:        "main",
+		MaxIterations: 100,
+		HeaderVisible: true,
+	})
+
+	ui.mu.Lock()
+	ui.lastMetrics = provider.ContainerMetrics{
+		State:      provider.StateRunning,
+		CPUPercent: 12.3,
+		MemoryUsed: 1024 * 1024 * 512,
+	}
+	ui.currentIter = 5
+	ui.mu.Unlock()
+
+	ui.header.Clear()
+	ui.renderHeaderCompact(ui.lastMetrics, 60)
+	text := ui.header.GetText(false)
+
+	// Compact mode should contain essential fields
+	assert.Contains(t, text, "running")
+	assert.Contains(t, text, "5/100")
+	assert.Contains(t, text, "main")
+	assert.Contains(t, text, "12.3%")
+	assert.Contains(t, text, "512.00 MB")
+
+	// Compact mode should NOT contain full labels
+	assert.NotContains(t, text, "Branch:")
+	assert.NotContains(t, text, "Status:")
+	assert.NotContains(t, text, "Env:")
+	assert.NotContains(t, text, "Agent:")
+}
+
+func TestWatchUI_RenderHeaderMinimal(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{
+		Branch:        "main",
+		MaxIterations: 100,
+		HeaderVisible: true,
+	})
+
+	ui.mu.Lock()
+	ui.lastMetrics = provider.ContainerMetrics{
+		State:      provider.StateRunning,
+		CPUPercent: 5.0,
+		MemoryUsed: 1024 * 1024 * 256,
+	}
+	ui.currentIter = 3
+	ui.mu.Unlock()
+
+	ui.header.Clear()
+	ui.renderHeaderMinimal(ui.lastMetrics)
+	text := ui.header.GetText(false)
+
+	// Minimal mode should show essential status
+	assert.Contains(t, text, "running")
+	assert.Contains(t, text, "3/100")
+	assert.Contains(t, text, "5.0%")
+	assert.Contains(t, text, "256.00 MB")
+
+	// Minimal mode should NOT have separators
+	assert.NotContains(t, text, "│")
+}
+
+func TestWatchUI_RenderHeaderDispatch(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{
+		Branch:        "main",
+		MaxIterations: 50,
+		HeaderVisible: true,
+	})
+
+	ui.mu.Lock()
+	ui.lastMetrics = provider.ContainerMetrics{
+		State:      provider.StateRunning,
+		CPUPercent: 8.0,
+		MemoryUsed: 1024 * 1024 * 128,
+	}
+	ui.currentIter = 10
+	ui.mu.Unlock()
+
+	// We can't directly test the dispatch since GetInnerRect returns (0,0,0,0) in test,
+	// but we can verify the method doesn't panic
+	ui.renderHeader()
+}
+
+func TestWatchUI_StatusBarStyle(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
+
+	// Footer should have dark background (status bar style)
+	bg := ui.footer.GetBackgroundColor()
+	assert.NotEqual(t, int32(0), int32(bg), "footer should have a non-default background color")
+
+	// Footer text should be left-aligned and contain keyboard shortcuts
+	footerText := ui.footer.GetText(false)
+	assert.Contains(t, footerText, "quit")
+	assert.Contains(t, footerText, "scroll")
+	assert.Contains(t, footerText, "header")
+	assert.Contains(t, footerText, "help")
+}
+
+func TestWatchUI_CompactBranchTruncation(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{
+		Branch: "very-long-feature-branch-name-that-should-be-truncated",
+	})
+
+	result := ui.compactBranch(40)
+	// Should be truncated with "..." since 40/3 ≈ 13 chars max
+	assert.Contains(t, result, "...")
+	assert.Contains(t, result, "very-long")
+}
+
+func TestWatchUI_CompactStatusColors(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
+
+	tests := []struct {
+		state         provider.ContainerState
+		expectedColor string
+		expectedText  string
+	}{
+		{provider.StateRunning, "green", "running"},
+		{provider.StateStopped, "yellow", "stopped"},
+		{provider.StateExited, "red", "exited"},
+		{provider.StateUnknown, "gray", "unknown"},
+		{"", "gray", "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.state), func(t *testing.T) {
+			m := provider.ContainerMetrics{State: tt.state}
+			result := ui.compactStatus(m)
+			assert.Contains(t, result, tt.expectedColor)
+			assert.Contains(t, result, tt.expectedText)
+		})
+	}
+}
+
+func TestWatchUI_CompactMemoryFormats(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
+
+	// Error case
+	m := provider.ContainerMetrics{Error: fmt.Errorf("fail")}
+	assert.Contains(t, ui.compactMemory(m), "ERR")
+
+	// Memory used
+	m = provider.ContainerMetrics{MemoryUsed: 1024 * 1024 * 512}
+	assert.Contains(t, ui.compactMemory(m), "512.00 MB")
+
+	// Memory percent
+	m = provider.ContainerMetrics{MemoryPercent: 45.2}
+	assert.Contains(t, ui.compactMemory(m), "45.2%")
+
+	// N/A case
+	m = provider.ContainerMetrics{}
+	assert.Contains(t, ui.compactMemory(m), "N/A")
+}
+
+func TestWatchUI_CompactCPU(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
+
+	// Error case
+	m := provider.ContainerMetrics{Error: fmt.Errorf("fail")}
+	assert.Contains(t, ui.compactCPU(m), "ERR")
+
+	// Normal case
+	m = provider.ContainerMetrics{CPUPercent: 25.5}
+	assert.Contains(t, ui.compactCPU(m), "25.5%")
 }
 
 // mockFormatter is a simple formatter for testing
