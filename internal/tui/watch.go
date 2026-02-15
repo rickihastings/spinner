@@ -122,6 +122,7 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 	if headerVisible {
 		layout.AddItem(header, 5, 0, false)
 	}
+
 	layout.AddItem(logView, 0, 1, true).
 		AddItem(footer, 1, 0, false)
 
@@ -243,10 +244,12 @@ func (ui *WatchUI) setupKeyboardHandlers() {
 		case tcell.KeyHome:
 			ui.logView.ScrollToBeginning()
 			ui.setUserScrolled(true)
+
 			return nil
 		case tcell.KeyEnd:
 			ui.logView.ScrollToEnd()
 			ui.setUserScrolled(false)
+
 			return nil
 		}
 
@@ -260,16 +263,19 @@ func (ui *WatchUI) pageHeight() int {
 	if height < 1 {
 		height = 1
 	}
+
 	return height
 }
 
 // scrollUp scrolls the log view up by n lines and pauses auto-scroll
 func (ui *WatchUI) scrollUp(n int) {
 	row, _ := ui.logView.GetScrollOffset()
+
 	newRow := row - n
 	if newRow < 0 {
 		newRow = 0
 	}
+
 	ui.logView.ScrollTo(newRow, 0)
 	ui.setUserScrolled(true)
 }
@@ -290,6 +296,7 @@ func (ui *WatchUI) isAtBottom() bool {
 	row, _ := ui.logView.GetScrollOffset()
 	_, _, _, height := ui.logView.GetInnerRect()
 	totalLines := strings.Count(ui.logView.GetText(true), "\n")
+
 	return row+height >= totalLines
 }
 
@@ -324,9 +331,11 @@ func (ui *WatchUI) hideHelp() {
 func (ui *WatchUI) toggleHeader() {
 	ui.headerVisible = !ui.headerVisible
 	ui.layout.Clear()
+
 	if ui.headerVisible {
 		ui.layout.AddItem(ui.header, 5, 0, false)
 	}
+
 	ui.layout.AddItem(ui.logView, 0, 1, true)
 	ui.layout.AddItem(ui.footer, 1, 0, false)
 }
