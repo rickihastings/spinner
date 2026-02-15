@@ -14,6 +14,8 @@ import (
 const (
 	// maxToolSummaryLen is the maximum length of a tool parameter summary before truncation.
 	maxToolSummaryLen = 80
+	// maxToolResultLines is the maximum number of lines to show from a tool result.
+	maxToolResultLines = 50
 )
 
 // RichFormatter implements agent.EventFormatter with rich tool call display.
@@ -54,8 +56,7 @@ func (f *RichFormatter) FormatEvent(event *agent.Event) (string, bool) {
 	case eventTypeAssistantMessage:
 		return f.formatAssistantRich(timestamp, event)
 	case eventTypeUserMessage:
-		// Tool results — handled in slice 3.0; skip for now
-		return "", false
+		return f.formatToolResult(timestamp, event)
 	case eventTypeResult:
 		return formatResultEvent(timestamp, event), true
 	case eventTypeError:
@@ -103,6 +104,102 @@ func (f *RichFormatter) formatAssistantRich(timestamp string, event *agent.Event
 	parts = append(parts, toolParts...)
 
 	return fmt.Sprintf("[darkgray]%s[-] %s", timestamp, strings.Join(parts, "\n")), true
+}
+
+// formatToolResult renders user_message events containing tool_result blocks.
+// Each tool_result is correlated with its tool invocation via tool_use_id.
+func (f *RichFormatter) formatToolResult(timestamp string, event *agent.Event) (string, bool) {
+	data, ok := event.Data.(userMessageData)
+	if !ok {
+		return "", false
+	}
+
+	var parts []string
+
+	for _, block := range data.Content {
+		if block.Type != "tool_result" {
+			continue
+		}
+
+		// Look up the tool name from the recorded mapping
+		toolName := "Tool"
+		if block.ToolUseID != "" {
+			if name, exists := f.toolNames[block.ToolUseID]; exists {
+				toolName = name
+				delete(f.toolNames, block.ToolUseID)
+			}
+		}
+
+		// Build the header line: "⏺ ToolName ⎯⎯⎯⎯⎯⎯"
+		separator := strings.Repeat("⎯", 30)
+		header := fmt.Sprintf("  [lightblue]⏺[-] [cyan]%s[-] [darkgray]%s[-]", toolName, separator)
+
+		// Extract text content and build summary line
+		text := extractToolResultText(block)
+		if block.IsError {
+			summary := fmt.Sprintf("    [red]Error[-]")
+			if text != "" {
+				lines := strings.Split(text, "\n")
+				// Show first line of error
+				errLine := lines[0]
+				if len(errLine) > 100 {
+					errLine = errLine[:97] + "..."
+				}
+				summary = fmt.Sprintf("    [red]Error[-] %s", errLine)
+			}
+			parts = append(parts, header+"\n"+summary)
+		} else {
+			lines := strings.Split(text, "\n")
+			lineCount := len(lines)
+			if text == "" {
+				lineCount = 0
+			}
+
+			if lineCount > maxToolResultLines {
+				summary := fmt.Sprintf("    +%d lines [darkgray](%d more lines)[-]", lineCount, lineCount-maxToolResultLines)
+				parts = append(parts, header+"\n"+summary)
+			} else if lineCount > 0 {
+				summary := fmt.Sprintf("    +%d lines", lineCount)
+				parts = append(parts, header+"\n"+summary)
+			} else {
+				parts = append(parts, header+"\n    [darkgray](empty)[-]")
+			}
+		}
+	}
+
+	if len(parts) == 0 {
+		return "", false
+	}
+
+	return fmt.Sprintf("[darkgray]%s[-] %s", timestamp, strings.Join(parts, "\n")), true
+}
+
+// extractToolResultText extracts text from a tool_result content block.
+// The Content field can be a string or a list of content blocks.
+func extractToolResultText(block contentBlock) string {
+	if block.Content == nil {
+		return ""
+	}
+
+	// Try as string first
+	if s, ok := block.Content.(string); ok {
+		return s
+	}
+
+	// Try as array of content blocks ([]interface{})
+	if arr, ok := block.Content.([]interface{}); ok {
+		var texts []string
+		for _, item := range arr {
+			if m, ok := item.(map[string]interface{}); ok {
+				if t, ok := m["text"].(string); ok {
+					texts = append(texts, t)
+				}
+			}
+		}
+		return strings.Join(texts, "\n")
+	}
+
+	return ""
 }
 
 // renderMarkdown renders text through glamour and converts ANSI to tview tags.

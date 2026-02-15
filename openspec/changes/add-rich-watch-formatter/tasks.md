@@ -16,12 +16,12 @@
 - [x] 2.3 Add unit tests for markdown rendering: plain text, bold, bullet points, code blocks, headings, mixed text+tool messages
 - [x] 2.4 Verify build and all tests pass
 
-## 3.0 Tool Result Rendering and Wiring
+## 3.0 Tool Result Rendering and Wiring ✓
 
-- [ ] 3.1 Implement `FormatEvent` for `user_message` tool_result blocks: correlate with tool_use_id, show tool name header, line count, error indicator, and clean up map entry
-- [ ] 3.2 Modify `cmd/watch.go` line 109 to use `NewRichFormatter()` instead of `NewFormatter()`
-- [ ] 3.3 Add unit tests for tool result formatting: success with line count, error result, unknown tool_use_id fallback, map cleanup after result
-- [ ] 3.4 Verify build and all tests pass
+- [x] 3.1 Implement `FormatEvent` for `user_message` tool_result blocks: correlate with tool_use_id, show tool name header, line count, error indicator, and clean up map entry
+- [x] 3.2 Modify `cmd/watch.go` line 109 to use `NewRichFormatter()` instead of `NewFormatter()`
+- [x] 3.3 Add unit tests for tool result formatting: success with line count, error result, unknown tool_use_id fallback, map cleanup after result
+- [x] 3.4 Verify build and all tests pass
 
 ## 4.0 TUI Simplification — Borderless Logs, Responsive Header, Status Bar
 

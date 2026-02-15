@@ -350,19 +350,258 @@ func TestRichFormatter_MixedTextAndToolUse(t *testing.T) {
 	assert.Contains(t, formatted, "/path/to/file.go")
 }
 
-func TestRichFormatter_UserMessageSkipped(t *testing.T) {
+func TestRichFormatter_ToolResultSuccess(t *testing.T) {
 	f := NewRichFormatter()
 
+	// First, register a tool call so we can correlate
+	toolEvent := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{
+					Type:  contentBlockTypeToolUse,
+					ID:    "toolu_result1",
+					Name:  "Bash",
+					Input: json.RawMessage(`{"command": "ls -la"}`),
+				},
+			},
+		},
+	}
+	f.FormatEvent(&toolEvent)
+
+	// Now send the tool result
+	resultEvent := agent.Event{
+		Type:      eventTypeUserMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: userMessageData{
+			Role: "user",
+			Content: []contentBlock{
+				{
+					Type:      "tool_result",
+					ToolUseID: "toolu_result1",
+					Content:   "file1.go\nfile2.go\nfile3.go",
+				},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&resultEvent)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "Bash")
+	assert.Contains(t, formatted, "⏺")
+	assert.Contains(t, formatted, "+3 lines")
+}
+
+func TestRichFormatter_ToolResultError(t *testing.T) {
+	f := NewRichFormatter()
+
+	// Register a tool call
+	toolEvent := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{
+					Type:  contentBlockTypeToolUse,
+					ID:    "toolu_err1",
+					Name:  "Bash",
+					Input: json.RawMessage(`{"command": "false"}`),
+				},
+			},
+		},
+	}
+	f.FormatEvent(&toolEvent)
+
+	resultEvent := agent.Event{
+		Type:      eventTypeUserMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: userMessageData{
+			Role: "user",
+			Content: []contentBlock{
+				{
+					Type:      "tool_result",
+					ToolUseID: "toolu_err1",
+					Content:   "exit code 1",
+					IsError:   true,
+				},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&resultEvent)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "Bash")
+	assert.Contains(t, formatted, "Error")
+	assert.Contains(t, formatted, "exit code 1")
+}
+
+func TestRichFormatter_ToolResultUnknownID(t *testing.T) {
+	f := NewRichFormatter()
+
+	// Send a tool result without a prior tool call
+	resultEvent := agent.Event{
+		Type:      eventTypeUserMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: userMessageData{
+			Role: "user",
+			Content: []contentBlock{
+				{
+					Type:      "tool_result",
+					ToolUseID: "toolu_unknown",
+					Content:   "some output",
+				},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&resultEvent)
+	require.True(t, ok)
+	// Falls back to "Tool" when ID is not found
+	assert.Contains(t, formatted, "Tool")
+	assert.Contains(t, formatted, "+1 lines")
+}
+
+func TestRichFormatter_ToolResultMapCleanup(t *testing.T) {
+	f := NewRichFormatter()
+
+	// Register a tool call
+	toolEvent := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{
+					Type:  contentBlockTypeToolUse,
+					ID:    "toolu_cleanup1",
+					Name:  "Read",
+					Input: json.RawMessage(`{"file_path": "/tmp/test.go"}`),
+				},
+			},
+		},
+	}
+	f.FormatEvent(&toolEvent)
+	require.Equal(t, "Read", f.toolNames["toolu_cleanup1"])
+
+	// Send the tool result
+	resultEvent := agent.Event{
+		Type:      eventTypeUserMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: userMessageData{
+			Role: "user",
+			Content: []contentBlock{
+				{
+					Type:      "tool_result",
+					ToolUseID: "toolu_cleanup1",
+					Content:   "file contents here",
+				},
+			},
+		},
+	}
+
+	_, ok := f.FormatEvent(&resultEvent)
+	require.True(t, ok)
+
+	// Verify the map entry was cleaned up
+	_, exists := f.toolNames["toolu_cleanup1"]
+	assert.False(t, exists, "tool_use_id should be removed from map after result is received")
+}
+
+func TestRichFormatter_ToolResultEmptyContent(t *testing.T) {
+	f := NewRichFormatter()
+
+	// Register a tool call
+	toolEvent := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{
+					Type:  contentBlockTypeToolUse,
+					ID:    "toolu_empty_result",
+					Name:  "Bash",
+					Input: json.RawMessage(`{"command": "true"}`),
+				},
+			},
+		},
+	}
+	f.FormatEvent(&toolEvent)
+
+	resultEvent := agent.Event{
+		Type:      eventTypeUserMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: userMessageData{
+			Role: "user",
+			Content: []contentBlock{
+				{
+					Type:      "tool_result",
+					ToolUseID: "toolu_empty_result",
+				},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&resultEvent)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "Bash")
+	assert.Contains(t, formatted, "(empty)")
+}
+
+func TestRichFormatter_ToolResultArrayContent(t *testing.T) {
+	f := NewRichFormatter()
+
+	// Register a tool call
+	toolEvent := agent.Event{
+		Type:      eventTypeAssistantMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: assistantMessageData{
+			Content: []contentBlock{
+				{
+					Type:  contentBlockTypeToolUse,
+					ID:    "toolu_arr1",
+					Name:  "Read",
+					Input: json.RawMessage(`{"file_path": "/tmp/test.go"}`),
+				},
+			},
+		},
+	}
+	f.FormatEvent(&toolEvent)
+
+	// Content as array of content blocks (as parsed from JSON by Go's json.Unmarshal)
+	resultEvent := agent.Event{
+		Type:      eventTypeUserMessage,
+		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
+		Data: userMessageData{
+			Role: "user",
+			Content: []contentBlock{
+				{
+					Type:      "tool_result",
+					ToolUseID: "toolu_arr1",
+					Content:   []interface{}{map[string]interface{}{"type": "text", "text": "line1\nline2\nline3"}},
+				},
+			},
+		},
+	}
+
+	formatted, ok := f.FormatEvent(&resultEvent)
+	require.True(t, ok)
+	assert.Contains(t, formatted, "Read")
+	assert.Contains(t, formatted, "+3 lines")
+}
+
+func TestRichFormatter_UserMessageNoToolResults(t *testing.T) {
+	f := NewRichFormatter()
+
+	// User message without tool_result blocks should be skipped
 	event := agent.Event{
 		Type:      eventTypeUserMessage,
 		Timestamp: time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC),
 		Data: userMessageData{
 			Role:    "user",
-			Content: []contentBlock{{Type: "tool_result", Content: "file contents"}},
+			Content: []contentBlock{{Type: "text", Text: "some user text"}},
 		},
 	}
 
-	// In slice 1.0, user messages are still skipped (handled in slice 3.0)
 	formatted, ok := f.FormatEvent(&event)
 	assert.False(t, ok)
 	assert.Empty(t, formatted)
