@@ -13,7 +13,7 @@ all container operations except build, list, streaming logs, and metrics use CLI
 - [x] 1.5 Replace `RemoveContainer` — use `docker rm -f`
 - [x] 1.6 Replace `LogsContainer` — use `docker logs`
 - [x] 1.7 Replace `VerifyContainerStatus` — use `docker inspect` + `docker logs --tail 100`
-- [x] 1.8 ~~Remove `getSDKClient` method and `sdk` field from `RealDockerClient`~~ Deferred to 5.0 — `BuildImage`, `StreamContainerLogs`, and `ListContainers` still use the SDK client
+- [x] 1.8 ~~Remove `getSDKClient` method and `sdk` field from `RealDockerClient`~~ Deferred to 5.0 — `StreamContainerLogs` and `ListContainers` still use the SDK client
 - [x] 1.9 Update unit tests for changed methods
 - [x] 1.10 Verify build passes and existing tests pass
 
@@ -22,13 +22,13 @@ all container operations except build, list, streaming logs, and metrics use CLI
 Replace SDK-based image building with `docker build` CLI. This removes the tar-streaming build,
 JSON message parsing, and `moby/term` terminal detection.
 
-- [ ] 2.1 Replace `buildImageWithOptions` with `docker build` CLI invocation
-- [ ] 2.2 Replace `buildUserDockerfile` with `docker build` CLI invocation
-- [ ] 2.3 Update `BuildImage` to use CLI build methods
-- [ ] 2.4 Remove `processBuildOutput` (SDK JSON message stream parser)
-- [ ] 2.5 Remove `createBuildContextTar` if no longer needed, or keep if context dir is sufficient
-- [ ] 2.6 Update tests for build changes
-- [ ] 2.7 Verify build passes and existing tests pass
+- [x] 2.1 Replace `buildImageWithOptions` with `docker build` CLI invocation
+- [x] 2.2 Replace `buildUserDockerfile` with `docker build` CLI invocation
+- [x] 2.3 Update `BuildImage` to use CLI build methods
+- [x] 2.4 Remove `processBuildOutput` (SDK JSON message stream parser)
+- [x] 2.5 Remove `createBuildContextTar` — CLI handles context directory and `.dockerignore` natively
+- [x] 2.6 Update tests for build changes
+- [x] 2.7 Verify build passes and existing tests pass
 
 ## 3.0 Log Streaming and Container Listing Migration
 

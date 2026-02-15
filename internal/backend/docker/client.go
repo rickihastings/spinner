@@ -11,12 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/moby/term"
 
 	"github.com/rickihastings/spinner/internal/util"
 )
@@ -83,13 +80,8 @@ func (c *RealDockerClient) getSDKClient(ctx context.Context) (*client.Client, er
 	return c.sdk.getClient(ctx)
 }
 
-// BuildImage builds a Docker image with the given configuration using the Docker SDK.
+// BuildImage builds a Docker image with the given configuration using the Docker CLI.
 func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) error {
-	cli, err := c.getSDKClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get Docker client: %w", err)
-	}
-
 	buildContextDir := filepath.Join(os.TempDir(), fmt.Sprintf("spinner-%d", time.Now().UnixNano()))
 	if err := os.MkdirAll(buildContextDir, 0755); err != nil {
 		return fmt.Errorf("failed to create build context: %w", err)
@@ -103,10 +95,10 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 		baseImage = "ubuntu:22.04"
 	}
 
-	// If user provided a Dockerfile, build it first using SDK
+	// If user provided a Dockerfile, build it first using CLI
 	if config.Dockerfile != "" {
 		userBaseImageTag := fmt.Sprintf("spinner-base:%s", config.Name)
-		if err := c.buildUserDockerfile(ctx, cli, config.Dockerfile, userBaseImageTag); err != nil {
+		if err := c.buildUserDockerfile(ctx, config.Dockerfile, userBaseImageTag); err != nil {
 			return fmt.Errorf("failed to build user Dockerfile: %w", err)
 		}
 
@@ -173,64 +165,49 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 		}
 	}
 
-	// Build the final image using SDK
+	// Build the final image using CLI
 	imageName := fmt.Sprintf("spinner:%s", config.Name)
-	if err := c.buildImageFromContext(ctx, cli, buildContextDir, imageName, baseImage); err != nil {
+	if err := c.buildWithCLI(ctx, buildContextDir, "Dockerfile", imageName, baseImage); err != nil {
 		return fmt.Errorf("failed to build Docker image: %w", err)
 	}
 
 	return nil
 }
 
-// buildUserDockerfile builds a user-provided Dockerfile using the Docker SDK.
-func (c *RealDockerClient) buildUserDockerfile(ctx context.Context, cli *client.Client, dockerfilePath, tag string) error {
+// buildUserDockerfile builds a user-provided Dockerfile using the Docker CLI.
+func (c *RealDockerClient) buildUserDockerfile(ctx context.Context, dockerfilePath, tag string) error {
 	contextDir := filepath.Dir(dockerfilePath)
 	dockerfileName := filepath.Base(dockerfilePath)
 
 	// User dockerfiles don't need baseImage since they define their own FROM
-	return c.buildImageWithOptions(ctx, cli, contextDir, dockerfileName, tag, "")
+	return c.buildWithCLI(ctx, contextDir, dockerfileName, tag, "")
 }
 
-// buildImageFromContext builds a Docker image from a build context directory using the SDK.
-func (c *RealDockerClient) buildImageFromContext(ctx context.Context, cli *client.Client, contextDir, tag, baseImage string) error {
-	return c.buildImageWithOptions(ctx, cli, contextDir, "Dockerfile", tag, baseImage)
-}
+// buildWithCLI builds a Docker image using the docker build CLI command.
+func (c *RealDockerClient) buildWithCLI(ctx context.Context, contextDir, dockerfileName, tag, baseImage string) error {
+	args := []string{"build", "-t", tag, "-f", filepath.Join(contextDir, dockerfileName)}
 
-// buildImageWithOptions is the shared implementation for building Docker images.
-func (c *RealDockerClient) buildImageWithOptions(ctx context.Context, cli *client.Client, contextDir, dockerfileName, tag, baseImage string) error {
-	tarReader, err := createBuildContextTar(contextDir)
-	if err != nil {
-		return fmt.Errorf("failed to create build context tar: %w", err)
+	// Add build args
+	localBuild := os.Getenv("LOCAL_BUILD")
+	if localBuild != "" {
+		args = append(args, "--build-arg", fmt.Sprintf("LOCAL_BUILD=%s", localBuild))
 	}
 
-	buildOptions := build.ImageBuildOptions{
-		Tags:       []string{tag},
-		Dockerfile: dockerfileName,
-		Remove:     true,
-		BuildArgs: map[string]*string{
-			"LOCAL_BUILD": getEnvPtr("LOCAL_BUILD"),
-			"BASE_IMAGE":  &baseImage,
-		},
+	if baseImage != "" {
+		args = append(args, "--build-arg", fmt.Sprintf("BASE_IMAGE=%s", baseImage))
 	}
 
-	response, err := cli.ImageBuild(ctx, tarReader, buildOptions)
-	if err != nil {
-		return err
+	args = append(args, contextDir)
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker build failed: %w", err)
 	}
 
-	defer func() { _ = response.Body.Close() }()
-
-	return c.processBuildOutput(response.Body)
-}
-
-// processBuildOutput reads and processes Docker build output, streaming to stdout.
-// It uses Docker's own jsonmessage package which handles both legacy builder and
-// BuildKit output formats, including terminal-aware progress bars.
-func (c *RealDockerClient) processBuildOutput(reader io.Reader) error {
-	fd := os.Stdout.Fd()
-	isTerminal := term.IsTerminal(fd)
-
-	return jsonmessage.DisplayJSONMessagesStream(reader, os.Stdout, fd, isTerminal, nil)
+	return nil
 }
 
 // RunContainer creates and starts a container with the given arguments.
@@ -566,14 +543,4 @@ func (c *RealDockerClient) ListContainers(ctx context.Context, filterLabels map[
 // ContainerEnvVars reads environment variables from a container using docker inspect.
 func (c *RealDockerClient) ContainerEnvVars(ctx context.Context, name string) (map[string]string, error) {
 	return getContainerEnvVars(ctx, name)
-}
-
-// getEnvPtr returns a pointer to an environment variable value, or nil if not set
-func getEnvPtr(key string) *string {
-	val := os.Getenv(key)
-	if val == "" {
-		return nil
-	}
-
-	return &val
 }
