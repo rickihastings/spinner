@@ -99,6 +99,9 @@ func init() {
 		_ = viper.ReadInConfig() // Ignore error if config can't be read
 	}
 
+	// Watch mode defaults
+	viper.SetDefault("watch-header", true)
+
 	// Secondary: .env file (not committed, local overrides)
 	// Viper only reads one config file, so load .env separately via MergeInConfig.
 	viper.SetConfigName(".env")

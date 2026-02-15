@@ -23,6 +23,8 @@ type WatchUI struct {
 	logView     *tview.TextView
 	footer      *tview.TextView
 	layout      *tview.Flex
+	pages       *tview.Pages
+	helpOverlay *tview.TextView
 	ctx         context.Context
 	cancel      context.CancelFunc
 	mu          sync.Mutex
@@ -39,6 +41,15 @@ type WatchUI struct {
 	maxIterations int
 	currentIter   int
 
+	// Scroll state
+	userScrolled bool
+
+	// Header toggle state
+	headerVisible bool
+
+	// Help overlay state
+	helpVisible bool
+
 	// Test mode flag - when true, skip TUI startup
 	testMode bool
 }
@@ -51,6 +62,7 @@ type WatchContext struct {
 	ContainerID   string
 	ImageID       string
 	MaxIterations int
+	HeaderVisible bool
 }
 
 // isTestEnvironment detects if we're running in a test environment or without a terminal
@@ -92,25 +104,59 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		SetBorderColor(tcell.ColorGray).
 		SetBorderPadding(0, 0, 1, 1)
 
-	// Set up auto-scroll after logView is created
-	logView.SetChangedFunc(func() {
-		app.QueueUpdateDraw(func() {
-			logView.ScrollToEnd()
-		})
-	})
+	// Note: SetChangedFunc for auto-scroll is set up after the WatchUI struct is created
+	// so the closure can reference ui.userScrolled directly.
 
 	// Create footer for help text
 	footer := tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignRight)
-	footer.SetText("[darkgray]Press q to quit[-]")
+	footer.SetText("[darkgray]↑↓ scroll · h header · ? help · q quit[-]")
+
+	// Determine initial header visibility
+	headerVisible := wctx.HeaderVisible
 
 	// Create split-pane layout
 	layout := tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(header, 5, 0, false).
-		AddItem(logView, 0, 1, true).
+		SetDirection(tview.FlexRow)
+	if headerVisible {
+		layout.AddItem(header, 5, 0, false)
+	}
+
+	layout.AddItem(logView, 0, 1, true).
 		AddItem(footer, 1, 0, false)
+
+	// Create help overlay
+	helpOverlay := tview.NewTextView().
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignLeft)
+	helpOverlay.SetBorder(true).
+		SetTitle(" Keyboard Shortcuts ").
+		SetBorderColor(tcell.ColorGray)
+	helpOverlay.SetText(
+		"\n" +
+			" ↑/↓         Scroll line\n" +
+			" PgUp/PgDn   Scroll page\n" +
+			" Home/End     Top/Bottom\n" +
+			" h            Toggle header\n" +
+			" ?            This help\n" +
+			" q            Quit\n")
+
+	// Center the help overlay using nested Flex spacers
+	helpModal := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(nil, 0, 1, false).
+		AddItem(
+			tview.NewFlex().SetDirection(tview.FlexColumn).
+				AddItem(nil, 0, 1, false).
+				AddItem(helpOverlay, 32, 0, true).
+				AddItem(nil, 0, 1, false),
+			11, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	// Wrap main layout and help overlay in Pages
+	pages := tview.NewPages().
+		AddPage("main", layout, true, true).
+		AddPage("help", helpModal, true, false)
 
 	ui := &WatchUI{
 		app:           app,
@@ -118,6 +164,8 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		logView:       logView,
 		footer:        footer,
 		layout:        layout,
+		pages:         pages,
+		helpOverlay:   helpOverlay,
 		ctx:           ctx,
 		cancel:        cancel,
 		formatter:     formatter,
@@ -129,8 +177,18 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		imageID:       wctx.ImageID,
 		maxIterations: wctx.MaxIterations,
 		currentIter:   0,
+		headerVisible: headerVisible,
 		testMode:      isTestEnvironment(), // Auto-detect test mode
 	}
+
+	// Set up auto-scroll: only scroll to end when user hasn't scrolled away
+	ui.logView.SetChangedFunc(func() {
+		ui.app.QueueUpdateDraw(func() {
+			if !ui.userScrolled {
+				ui.logView.ScrollToEnd()
+			}
+		})
+	})
 
 	// Set up keyboard handlers
 	ui.setupKeyboardHandlers()
@@ -141,6 +199,12 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 // setupKeyboardHandlers configures keyboard input handling
 func (ui *WatchUI) setupKeyboardHandlers() {
 	ui.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// When help overlay is visible, any keypress dismisses it
+		if ui.helpVisible {
+			ui.hideHelp()
+			return nil
+		}
+
 		// Handle 'q' key to quit
 		if event.Rune() == 'q' || event.Rune() == 'Q' {
 			ui.Stop()
@@ -152,8 +216,128 @@ func (ui *WatchUI) setupKeyboardHandlers() {
 			return nil
 		}
 
+		// Handle '?' key to show help overlay
+		if event.Rune() == '?' {
+			ui.showHelp()
+			return nil
+		}
+
+		// Handle 'h' key to toggle header
+		if event.Rune() == 'h' {
+			ui.toggleHeader()
+			return nil
+		}
+
+		switch event.Key() {
+		case tcell.KeyUp:
+			ui.scrollUp(1)
+			return nil
+		case tcell.KeyDown:
+			ui.scrollDown(1)
+			return nil
+		case tcell.KeyPgUp:
+			ui.scrollUp(ui.pageHeight())
+			return nil
+		case tcell.KeyPgDn:
+			ui.scrollDown(ui.pageHeight())
+			return nil
+		case tcell.KeyHome:
+			ui.logView.ScrollToBeginning()
+			ui.setUserScrolled(true)
+
+			return nil
+		case tcell.KeyEnd:
+			ui.logView.ScrollToEnd()
+			ui.setUserScrolled(false)
+
+			return nil
+		}
+
 		return event
 	})
+}
+
+// pageHeight returns the visible height of the log view for page scrolling
+func (ui *WatchUI) pageHeight() int {
+	_, _, _, height := ui.logView.GetInnerRect()
+	if height < 1 {
+		height = 1
+	}
+
+	return height
+}
+
+// scrollUp scrolls the log view up by n lines and pauses auto-scroll
+func (ui *WatchUI) scrollUp(n int) {
+	row, _ := ui.logView.GetScrollOffset()
+
+	newRow := row - n
+	if newRow < 0 {
+		newRow = 0
+	}
+
+	ui.logView.ScrollTo(newRow, 0)
+	ui.setUserScrolled(true)
+}
+
+// scrollDown scrolls the log view down by n lines, resuming auto-scroll if at bottom
+func (ui *WatchUI) scrollDown(n int) {
+	row, _ := ui.logView.GetScrollOffset()
+	ui.logView.ScrollTo(row+n, 0)
+
+	// Check if we've reached the bottom
+	if ui.isAtBottom() {
+		ui.setUserScrolled(false)
+	}
+}
+
+// isAtBottom returns true if the log view is scrolled to the bottom
+func (ui *WatchUI) isAtBottom() bool {
+	row, _ := ui.logView.GetScrollOffset()
+	_, _, _, height := ui.logView.GetInnerRect()
+	totalLines := strings.Count(ui.logView.GetText(true), "\n")
+
+	return row+height >= totalLines
+}
+
+// setUserScrolled updates the scroll state and refreshes the footer
+func (ui *WatchUI) setUserScrolled(scrolled bool) {
+	ui.userScrolled = scrolled
+	ui.updateFooter()
+}
+
+// updateFooter refreshes the footer text based on current state
+func (ui *WatchUI) updateFooter() {
+	if ui.userScrolled {
+		ui.footer.SetText("[yellow]SCROLLED[-] [darkgray]· ↑↓ scroll · h header · ? help · q quit[-]")
+	} else {
+		ui.footer.SetText("[darkgray]↑↓ scroll · h header · ? help · q quit[-]")
+	}
+}
+
+// showHelp shows the help overlay
+func (ui *WatchUI) showHelp() {
+	ui.helpVisible = true
+	ui.pages.ShowPage("help")
+}
+
+// hideHelp hides the help overlay
+func (ui *WatchUI) hideHelp() {
+	ui.helpVisible = false
+	ui.pages.HidePage("help")
+}
+
+// toggleHeader toggles the header panel visibility and rebuilds the layout
+func (ui *WatchUI) toggleHeader() {
+	ui.headerVisible = !ui.headerVisible
+	ui.layout.Clear()
+
+	if ui.headerVisible {
+		ui.layout.AddItem(ui.header, 5, 0, false)
+	}
+
+	ui.layout.AddItem(ui.logView, 0, 1, true)
+	ui.layout.AddItem(ui.footer, 1, 0, false)
 }
 
 // Run starts the TUI and begins consuming from log and metrics channels
@@ -185,7 +369,7 @@ func (ui *WatchUI) Run(logCh <-chan agent.Event, metricsCh <-chan provider.Conta
 	}()
 
 	// Start the application
-	ui.app.SetRoot(ui.layout, true)
+	ui.app.SetRoot(ui.pages, true)
 
 	// Run in goroutine to allow cleanup
 	errCh := make(chan error, 1)
