@@ -66,6 +66,14 @@ if [ -f "/state/max-iterations.txt" ]; then
   fi
 fi
 
+if [ -f "/state/model.txt" ]; then
+  OVERRIDE_MODEL=$(cat /state/model.txt)
+  if [ -n "$OVERRIDE_MODEL" ]; then
+    ANTHROPIC_MODEL="$OVERRIDE_MODEL"
+    export ANTHROPIC_MODEL
+  fi
+fi
+
 # If PROMPT is set, run Ralph loop
 if [ -n "$PROMPT" ]; then
   echo ""

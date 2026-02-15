@@ -564,3 +564,77 @@ func TestDockerProvider_List_StateEnrichment(t *testing.T) {
 	assert.Equal(t, lastUpdated, *info.LastUpdated)
 	client.AssertExpectations(t)
 }
+
+func TestWriteConfigOverrides_WritesModelFile(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	containerName := "test-container"
+	config := provider.CreateConfig{
+		Prompt:        "Fix the bug",
+		MaxIterations: "50",
+		Model:         "claude-sonnet-4-5-20250929",
+	}
+
+	err := writeConfigOverrides(containerName, config)
+	assert.NoError(t, err)
+
+	stateDir := filepath.Join(tmpHome, ".spinner", containerName, "state")
+
+	// Verify prompt.txt
+	promptData, err := os.ReadFile(filepath.Join(stateDir, "prompt.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "Fix the bug", string(promptData))
+
+	// Verify max-iterations.txt
+	maxIterData, err := os.ReadFile(filepath.Join(stateDir, "max-iterations.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "50", string(maxIterData))
+
+	// Verify model.txt
+	modelData, err := os.ReadFile(filepath.Join(stateDir, "model.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "claude-sonnet-4-5-20250929", string(modelData))
+}
+
+func TestWriteConfigOverrides_EmptyModel(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	containerName := "test-container"
+	config := provider.CreateConfig{
+		Prompt: "Fix the bug",
+		Model:  "",
+	}
+
+	err := writeConfigOverrides(containerName, config)
+	assert.NoError(t, err)
+
+	stateDir := filepath.Join(tmpHome, ".spinner", containerName, "state")
+
+	// model.txt should exist but be empty (startup.sh skips empty values)
+	modelData, err := os.ReadFile(filepath.Join(stateDir, "model.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(modelData))
+}
+
+func TestWriteConfigOverrides_DefaultMaxIterations(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	containerName := "test-container"
+	config := provider.CreateConfig{
+		Prompt:        "Fix the bug",
+		MaxIterations: "",
+	}
+
+	err := writeConfigOverrides(containerName, config)
+	assert.NoError(t, err)
+
+	stateDir := filepath.Join(tmpHome, ".spinner", containerName, "state")
+
+	// When MaxIterations is empty, should use defaultMaxIterations
+	maxIterData, err := os.ReadFile(filepath.Join(stateDir, "max-iterations.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, defaultMaxIterations, string(maxIterData))
+}

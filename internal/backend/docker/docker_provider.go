@@ -144,7 +144,7 @@ func (p *Provider) Start(ctx context.Context, name string, config provider.Creat
 	return &provider.Instance{Name: name, Status: provider.InstanceStatusRunning}, nil
 }
 
-// writeConfigOverrides writes prompt and max-iterations to the host-mounted
+// writeConfigOverrides writes prompt, max-iterations, and model to the host-mounted
 // state directory so the container picks up updated values on restart.
 func writeConfigOverrides(containerName string, config provider.CreateConfig) error {
 	homeDir, err := os.UserHomeDir()
@@ -172,6 +172,12 @@ func writeConfigOverrides(containerName string, config provider.CreateConfig) er
 	maxIterFile := filepath.Join(stateDir, "max-iterations.txt")
 	if err := os.WriteFile(maxIterFile, []byte(maxIterations), 0644); err != nil {
 		return fmt.Errorf("failed to write max-iterations override: %w", err)
+	}
+
+	// Write model override
+	modelFile := filepath.Join(stateDir, "model.txt")
+	if err := os.WriteFile(modelFile, []byte(config.Model), 0644); err != nil {
+		return fmt.Errorf("failed to write model override: %w", err)
 	}
 
 	return nil

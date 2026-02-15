@@ -14,10 +14,10 @@
 
 ## 2.0 Docker restart override and startup.sh
 
-- [ ] 2.1 Write `model.txt` in `writeConfigOverrides()` in `internal/backend/docker/docker_provider.go`
-- [ ] 2.2 Read `model.txt` and export `ANTHROPIC_MODEL` in `internal/util/templates/scripts/startup.sh`
-- [ ] 2.3 Add unit tests for model override file writing
-- [ ] 2.4 Verify build succeeds and all tests pass
+- [x] 2.1 Write `model.txt` in `writeConfigOverrides()` in `internal/backend/docker/docker_provider.go`
+- [x] 2.2 Read `model.txt` and export `ANTHROPIC_MODEL` in `internal/util/templates/scripts/startup.sh`
+- [x] 2.3 Add unit tests for model override file writing
+- [x] 2.4 Verify build succeeds and all tests pass
 
 ## 3.0 GCP metadata and runtime script
 
