@@ -582,6 +582,96 @@ WORKDIR /workspace
 	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running")
 }
 
+// TestSpin_EnvFilePassedToContainer tests that --env-file passes env vars into the container
+// and copies the file to the workspace
+func TestSpin_EnvFilePassedToContainer(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	_, imageName := testutil.SetupTestImage(t)
+
+	// Create a temporary env file
+	tmpDir := t.TempDir()
+	envFilePath := tmpDir + "/.env"
+	err := testutil.WriteFile(t, envFilePath, "NPM_TOKEN=abc123\nAPI_KEY=secret456\n")
+	require.NoError(t, err, "should create env file")
+
+	args := []string{"spin", "--image", imageName, "--repo", testRepo, "--env-file", envFilePath}
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Verify env vars from the file are set in the container
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	envVars := string(output)
+	assert.Contains(t, envVars, "NPM_TOKEN=abc123", "env var from file should be set")
+	assert.Contains(t, envVars, "API_KEY=secret456", "env var from file should be set")
+
+	// Wait for startup to copy the file
+	time.Sleep(2 * time.Second)
+
+	// Verify the .env file was copied into the workspace
+	cmd = exec.Command("docker", "exec", containerName, "test", "-f", workspacePath+"/.env")
+	err = cmd.Run()
+	assert.NoError(t, err, ".env file should exist in workspace")
+
+	// Verify file contents match
+	cmd = exec.Command("docker", "exec", containerName, "cat", workspacePath+"/.env")
+	fileContent, err := cmd.Output()
+	require.NoError(t, err, "should read .env file from workspace")
+	assert.Contains(t, string(fileContent), "NPM_TOKEN=abc123", "workspace .env should contain env vars")
+	assert.Contains(t, string(fileContent), "API_KEY=secret456", "workspace .env should contain env vars")
+}
+
+// TestSpin_EnvFileNotFoundError tests that --env-file with a non-existent file produces an error
+func TestSpin_EnvFileNotFoundError(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	args := []string{"spin", "--image", "spinner:fake", "--repo", testRepo, "--env-file", "/nonexistent/path/.env"}
+	stdout, stderr, exitCode := testutil.RunCommandExpectError(t, args...)
+	output := stdout + stderr
+
+	assert.NotEqual(t, 0, exitCode, "should fail with non-existent env file")
+	assert.Contains(t, output, "--env-file: file does not exist", "should mention file not found")
+}
+
+// TestSpin_EnvFileWithEnvVarsCombined tests that --env-file and --env flags work together
+func TestSpin_EnvFileWithEnvVarsCombined(t *testing.T) {
+	testutil.SkipIfDockerNotAvailable(t)
+
+	_, imageName := testutil.SetupTestImage(t)
+
+	// Create a temporary env file
+	tmpDir := t.TempDir()
+	envFilePath := tmpDir + "/.env"
+	err := testutil.WriteFile(t, envFilePath, "FILE_VAR=from_file\n")
+	require.NoError(t, err, "should create env file")
+
+	args := []string{
+		"spin", "--image", imageName, "--repo", testRepo,
+		"--env-file", envFilePath,
+		"--env", "CLI_VAR=from_cli",
+	}
+	containerName, _, _ := testutil.RunSpinCommand(t, args...)
+
+	t.Cleanup(func() {
+		testutil.RemoveDockerContainer(t, containerName)
+	})
+
+	// Verify both sources of env vars are set
+	cmd := exec.Command("docker", "inspect", containerName, "-f", "{{range .Config.Env}}{{println .}}{{end}}")
+	output, err := cmd.Output()
+	require.NoError(t, err, "should get container environment")
+
+	envVars := string(output)
+	assert.Contains(t, envVars, "FILE_VAR=from_file", "env var from file should be set")
+	assert.Contains(t, envVars, "CLI_VAR=from_cli", "env var from --env flag should be set")
+}
+
 // TestSpin_EnvVarsSingleVar tests that --env KEY=VALUE sets the env var in the container
 func TestSpin_EnvVarsSingleVar(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)

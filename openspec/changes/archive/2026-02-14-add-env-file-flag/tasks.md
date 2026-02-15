@@ -21,3 +21,10 @@
 - [x] 3.2 Update `templates/scripts/gcp_runtime.sh`: read `SPINNER_ENV_FILE` metadata, base64-decode, write to
   workspace `.env`, source it
 - [x] 3.3 Verify build succeeds and all tests pass
+
+## 4.0 Integration tests
+
+- [x] 4.1 Docker: `TestSpin_EnvFilePassedToContainer` — verify env vars set in container and .env copied to workspace
+- [x] 4.2 Docker: `TestSpin_EnvFileNotFoundError` — verify error on non-existent file
+- [x] 4.3 Docker: `TestSpin_EnvFileWithEnvVarsCombined` — verify --env-file and --env work together
+- [x] 4.4 GCP: `TestGCPSpin_EnvFileInMetadata` — verify base64-encoded content in SPINNER_ENV_FILE metadata
