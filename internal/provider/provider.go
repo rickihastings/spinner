@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"io"
+	"time"
 )
 
 // InstanceStatus represents the lifecycle state of an instance.
@@ -106,6 +107,23 @@ type InstanceMetadata struct {
 	Branch string
 }
 
+// InstanceInfo carries everything the list command needs about an instance.
+// A single struct avoids N+1 per-instance queries.
+type InstanceInfo struct {
+	Name          string
+	Status        InstanceStatus
+	Backend       string     // "docker" or "gcp"
+	Image         string     // environment/image name
+	Repo          string     // repository (from labels/metadata)
+	Branch        string     // git branch (from state or metadata)
+	Agent         string     // AI model (if available)
+	Iteration     int        // current iteration from state file
+	MaxIterations int        // max iterations configured
+	AgentStatus   string     // from state: running/completed/rate_limited/error
+	StartedAt     *time.Time // when execution started
+	LastUpdated   *time.Time // last state file update
+}
+
 // Provider is the backend-agnostic interface for managing isolated execution
 // environments. Each backend (Docker, VMs, cloud instances) implements this
 // interface independently. The rest of the system depends only on Provider.
@@ -159,4 +177,8 @@ type Provider interface {
 	// Used by the watch UI to display instance information.
 	// Returns nil metadata if the instance doesn't exist or metadata cannot be retrieved.
 	GetInstanceMetadata(ctx context.Context, name string) (*InstanceMetadata, error)
+
+	// List discovers all instances managed by this backend and returns their info.
+	// Returns an empty slice if no instances are found.
+	List(ctx context.Context) ([]InstanceInfo, error)
 }

@@ -448,6 +448,12 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 	return metadata, nil
 }
 
+// List discovers all spinner-managed GCP instances.
+// Full implementation is in slice 2.0; this stub satisfies the Provider interface.
+func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
+	return nil, fmt.Errorf("GCP list not yet implemented")
+}
+
 // isNotFoundError checks whether a GCP API error indicates a resource was not found.
 func isNotFoundError(err error) bool {
 	if err == nil {

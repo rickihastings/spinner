@@ -268,11 +268,12 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 			hasNpmrc:      false,
 			expectedArgs: []string{
 				"run", "-d", "--name", "spinner-test-repo",
+				"--label", "spinner-managed=true",
 				"--env-file",
 				"spinner:test",
 			},
 			unexpectedArgs: []string{"-e GITHUB_TOKEN=", "-e CLAUDE_CODE_OAUTH_TOKEN="},
-			description:    "should create basic run command with --env-file",
+			description:    "should create basic run command with --env-file and label",
 		},
 		{
 			name: "run with prompt",

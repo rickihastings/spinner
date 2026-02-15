@@ -103,3 +103,13 @@ func (m *MockProvider) GetInstanceMetadata(ctx context.Context, name string) (*I
 
 	return args.Get(0).(*InstanceMetadata), args.Error(1)
 }
+
+// List mocks the List method.
+func (m *MockProvider) List(ctx context.Context) ([]InstanceInfo, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).([]InstanceInfo), args.Error(1)
+}

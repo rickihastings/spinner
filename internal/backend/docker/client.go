@@ -14,6 +14,7 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/moby/term"
@@ -57,6 +58,10 @@ type Client interface {
 	// or an error occurs. Check LogEvent.Error for any streaming errors.
 	// Options can be used to configure the stream (follow, timestamps, tail, etc.)
 	StreamContainerLogs(ctx context.Context, name string, opts LogStreamOptions) (<-chan LogEvent, error)
+
+	// ListContainers lists containers matching the given label filters.
+	// The filters map keys are filter names (e.g. "label") and values are filter values.
+	ListContainers(ctx context.Context, filterLabels map[string]string) ([]container.Summary, error)
 }
 
 // RealDockerClient implements Client using the Docker SDK.
@@ -590,6 +595,29 @@ func (c *RealDockerClient) streamLogs(ctx context.Context, reader io.Reader, eve
 			Message:   string(payload),
 		}
 	}
+}
+
+// ListContainers lists containers matching the given label filters using the Docker SDK.
+func (c *RealDockerClient) ListContainers(ctx context.Context, filterLabels map[string]string) ([]container.Summary, error) {
+	cli, err := c.getSDKClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Docker client: %w", err)
+	}
+
+	filterArgs := filters.NewArgs()
+	for key, value := range filterLabels {
+		filterArgs.Add("label", fmt.Sprintf("%s=%s", key, value))
+	}
+
+	containers, err := cli.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: filterArgs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	return containers, nil
 }
 
 // getEnvPtr returns a pointer to an environment variable value, or nil if not set

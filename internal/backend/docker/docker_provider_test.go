@@ -2,8 +2,13 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -428,5 +433,131 @@ func TestDockerProvider_Create_WithNilEnvVars(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "spinner-test-repo", instance.Name)
 	assert.Equal(t, provider.InstanceStatusRunning, instance.Status)
+	client.AssertExpectations(t)
+}
+
+func TestDockerProvider_List_ContainersWithLabels(t *testing.T) {
+	client := new(MockDockerClient)
+	p := NewDockerProvider(client)
+	ctx := context.Background()
+
+	client.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(
+		[]container.Summary{
+			{
+				Names:  []string{"/spinner-test-repo"},
+				Image:  "spinner:test",
+				State:  "running",
+				Labels: map[string]string{"spinner-managed": "true"},
+			},
+			{
+				Names:  []string{"/spinner-test-other"},
+				Image:  "spinner:test",
+				State:  "exited",
+				Labels: map[string]string{"spinner-managed": "true"},
+			},
+		}, nil,
+	)
+
+	instances, err := p.List(ctx)
+
+	assert.NoError(t, err)
+	assert.Len(t, instances, 2)
+
+	assert.Equal(t, "spinner-test-repo", instances[0].Name)
+	assert.Equal(t, provider.InstanceStatusRunning, instances[0].Status)
+	assert.Equal(t, "docker", instances[0].Backend)
+	assert.Equal(t, "spinner:test", instances[0].Image)
+
+	assert.Equal(t, "spinner-test-other", instances[1].Name)
+	assert.Equal(t, provider.InstanceStatusStopped, instances[1].Status)
+	client.AssertExpectations(t)
+}
+
+func TestDockerProvider_List_NoContainers(t *testing.T) {
+	client := new(MockDockerClient)
+	p := NewDockerProvider(client)
+	ctx := context.Background()
+
+	client.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(
+		[]container.Summary{}, nil,
+	)
+
+	instances, err := p.List(ctx)
+
+	assert.NoError(t, err)
+	assert.Empty(t, instances)
+	client.AssertExpectations(t)
+}
+
+func TestDockerProvider_List_DockerUnavailable(t *testing.T) {
+	client := new(MockDockerClient)
+	p := NewDockerProvider(client)
+	ctx := context.Background()
+
+	client.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(
+		nil, assert.AnError,
+	)
+
+	instances, err := p.List(ctx)
+
+	assert.Error(t, err)
+	assert.Nil(t, instances)
+	assert.Contains(t, err.Error(), "failed to list containers")
+	client.AssertExpectations(t)
+}
+
+func TestDockerProvider_List_StateEnrichment(t *testing.T) {
+	client := new(MockDockerClient)
+	p := NewDockerProvider(client)
+	ctx := context.Background()
+
+	// Create a temp state directory that mimics ~/.spinner/<name>/state/
+	homeDir, err := os.UserHomeDir()
+	assert.NoError(t, err)
+
+	containerName := "spinner-test-stateful"
+	stateDir := filepath.Join(homeDir, ".spinner", containerName, "state")
+	assert.NoError(t, os.MkdirAll(stateDir, 0755))
+
+	defer func() { _ = os.RemoveAll(filepath.Join(homeDir, ".spinner", containerName)) }()
+
+	startedAt := time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC)
+	lastUpdated := time.Date(2026, 1, 15, 12, 30, 0, 0, time.UTC)
+
+	stateData, _ := json.Marshal(map[string]interface{}{
+		"iteration":    42,
+		"status":       "running",
+		"branch":       "feature-branch",
+		"started_at":   startedAt,
+		"last_updated": lastUpdated,
+	})
+
+	assert.NoError(t, os.WriteFile(filepath.Join(stateDir, "state.json"), stateData, 0644))
+
+	client.On("ListContainers", ctx, map[string]string{"spinner-managed": "true"}).Return(
+		[]container.Summary{
+			{
+				Names:  []string{"/" + containerName},
+				Image:  "spinner:test",
+				State:  "running",
+				Labels: map[string]string{"spinner-managed": "true"},
+			},
+		}, nil,
+	)
+
+	instances, err := p.List(ctx)
+
+	assert.NoError(t, err)
+	assert.Len(t, instances, 1)
+
+	info := instances[0]
+	assert.Equal(t, containerName, info.Name)
+	assert.Equal(t, 42, info.Iteration)
+	assert.Equal(t, "running", info.AgentStatus)
+	assert.Equal(t, "feature-branch", info.Branch)
+	assert.NotNil(t, info.StartedAt)
+	assert.Equal(t, startedAt, *info.StartedAt)
+	assert.NotNil(t, info.LastUpdated)
+	assert.Equal(t, lastUpdated, *info.LastUpdated)
 	client.AssertExpectations(t)
 }

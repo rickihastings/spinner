@@ -2,17 +2,17 @@
 
 ## 1.0 Provider interface extension and Docker list with labels
 
-- [ ] 1.1 Add `InstanceInfo` struct and `List(ctx) ([]InstanceInfo, error)` to `Provider` interface in
+- [x] 1.1 Add `InstanceInfo` struct and `List(ctx) ([]InstanceInfo, error)` to `Provider` interface in
   `internal/provider/provider.go`
-- [ ] 1.2 Add `--label spinner-managed=true` to Docker container creation in `internal/backend/docker/run.go`
-- [ ] 1.3 Add `ListContainers` method to Docker `Client` interface and implement using Docker SDK `ContainerList`
+- [x] 1.2 Add `--label spinner-managed=true` to Docker container creation in `internal/backend/docker/run.go`
+- [x] 1.3 Add `ListContainers` method to Docker `Client` interface and implement using Docker SDK `ContainerList`
   in `internal/backend/docker/client.go`
-- [ ] 1.4 Implement `List()` on `DockerProvider` with label filter + state file reading
+- [x] 1.4 Implement `List()` on `DockerProvider` with label filter + state file reading
   in `internal/backend/docker/docker_provider.go`
-- [ ] 1.5 Update mock provider and Docker mock client with `List`/`ListContainers` stubs
-- [ ] 1.6 Add unit tests for Docker `List()`: containers with labels, state enrichment, no containers found,
+- [x] 1.5 Update mock provider and Docker mock client with `List`/`ListContainers` stubs
+- [x] 1.6 Add unit tests for Docker `List()`: containers with labels, state enrichment, no containers found,
   Docker unavailable
-- [ ] 1.7 Verify build succeeds and all tests pass
+- [x] 1.7 Verify build succeeds and all tests pass
 
 ## 2.0 GCP instance listing
 

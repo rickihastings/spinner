@@ -3,6 +3,7 @@ package docker
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -321,6 +322,99 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 	}
 
 	return metadata, nil
+}
+
+// List discovers all spinner-managed Docker containers and returns their info.
+func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
+	containers, err := p.client.ListContainers(ctx, map[string]string{
+		"spinner-managed": "true",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	var instances []provider.InstanceInfo
+
+	for _, c := range containers {
+		name := strings.TrimPrefix(c.Names[0], "/")
+
+		status := provider.InstanceStatusStopped
+		if c.State == "running" {
+			status = provider.InstanceStatusRunning
+		}
+
+		info := provider.InstanceInfo{
+			Name:    name,
+			Status:  status,
+			Backend: "docker",
+			Image:   c.Image,
+		}
+
+		// Read env vars for repo, branch, agent, max-iterations
+		envVars := getContainerEnvVars(name)
+		if repo, ok := envVars["REPO_URL"]; ok {
+			info.Repo = repo
+		}
+		if branch, ok := envVars["BRANCH"]; ok {
+			info.Branch = branch
+		}
+		if model, ok := envVars["ANTHROPIC_MODEL"]; ok {
+			info.Agent = model
+		}
+		if maxIter, ok := envVars["MAX_ITERATIONS"]; ok {
+			fmt.Sscanf(maxIter, "%d", &info.MaxIterations)
+		}
+
+		// Read state file from host for execution state
+		p.enrichFromStateFile(&info, name)
+
+		instances = append(instances, info)
+	}
+
+	return instances, nil
+}
+
+// enrichFromStateFile reads the state.json from the host-mounted state directory
+// and populates execution state fields on the InstanceInfo.
+func (p *Provider) enrichFromStateFile(info *provider.InstanceInfo, containerName string) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+
+	statePath := filepath.Join(homeDir, ".spinner", containerName, "state", "state.json")
+
+	data, err := os.ReadFile(statePath)
+	if err != nil {
+		return
+	}
+
+	var state struct {
+		Iteration   int       `json:"iteration"`
+		Status      string    `json:"status"`
+		Branch      string    `json:"branch"`
+		StartedAt   time.Time `json:"started_at"`
+		LastUpdated time.Time `json:"last_updated"`
+	}
+
+	if err := json.Unmarshal(data, &state); err != nil {
+		return
+	}
+
+	info.Iteration = state.Iteration
+	info.AgentStatus = state.Status
+
+	if !state.StartedAt.IsZero() {
+		info.StartedAt = &state.StartedAt
+	}
+	if !state.LastUpdated.IsZero() {
+		info.LastUpdated = &state.LastUpdated
+	}
+
+	// State file branch overrides env var branch (more up-to-date)
+	if state.Branch != "" {
+		info.Branch = state.Branch
+	}
 }
 
 // getDockerContainerID gets the container ID for a given container name using docker inspect.

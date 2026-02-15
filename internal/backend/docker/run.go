@@ -156,6 +156,8 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		"-d",
 		"--name",
 		containerName,
+		"--label",
+		"spinner-managed=true",
 		"--env-file",
 		tmpFilePath,
 		"-v",
