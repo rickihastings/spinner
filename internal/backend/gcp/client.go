@@ -30,6 +30,9 @@ type Client interface {
 	GetImage(ctx context.Context, project, name string) (*computepb.Image, error)
 	DeleteImage(ctx context.Context, project, name string) error
 
+	// ListInstances lists VM instances matching a label filter.
+	ListInstances(ctx context.Context, project, zone string, filter string) ([]*computepb.Instance, error)
+
 	// Serial port (for boot/bake diagnostics)
 	GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*serialPortOutput, error)
 
@@ -299,6 +302,38 @@ func (c *RealGCPClient) DeleteInstance(ctx context.Context, project, zone, name 
 	}
 
 	return nil
+}
+
+// ListInstances lists VM instances matching a label filter expression.
+// The filter uses GCP's filter syntax (e.g., "labels.spinner-managed=true").
+func (c *RealGCPClient) ListInstances(ctx context.Context, project, zone string, filter string) ([]*computepb.Instance, error) {
+	req := &computepb.ListInstancesRequest{
+		Project: project,
+		Zone:    zone,
+	}
+
+	if filter != "" {
+		req.Filter = &filter
+	}
+
+	var instances []*computepb.Instance
+
+	it := c.instances.List(ctx, req)
+
+	for {
+		instance, err := it.Next()
+		if err != nil {
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+
+			return nil, fmt.Errorf("failed to list instances: %w", err)
+		}
+
+		instances = append(instances, instance)
+	}
+
+	return instances, nil
 }
 
 // CreateImage creates a Compute Engine image from a source disk and waits for

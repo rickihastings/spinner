@@ -58,6 +58,16 @@ func (m *MockGCPClient) DeleteInstance(ctx context.Context, project, zone, name 
 	return args.Error(0)
 }
 
+// ListInstances mocks the ListInstances method.
+func (m *MockGCPClient) ListInstances(ctx context.Context, project, zone string, filter string) ([]*computepb.Instance, error) {
+	args := m.Called(ctx, project, zone, filter)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).([]*computepb.Instance), args.Error(1)
+}
+
 // CreateImage mocks the CreateImage method.
 func (m *MockGCPClient) CreateImage(ctx context.Context, project string, config imageConfig) error {
 	args := m.Called(ctx, project, config)

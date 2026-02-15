@@ -686,6 +686,147 @@ func TestProviderCreateWithEnvFile(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestProviderListWithInstances(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	running := "RUNNING"
+	terminated := "TERMINATED"
+
+	mockClient.On("ListInstances", mock.Anything, "test-project", "us-central1-a", "labels.spinner-managed=true").
+		Return([]*computepb.Instance{
+			{
+				Name:   strPtr("spinner-default-my-repo"),
+				Status: &running,
+				Labels: map[string]string{
+					"spinner-managed": "true",
+					"spinner-image":   "default",
+					"spinner-repo":    "my-repo",
+				},
+				Metadata: &computepb.Metadata{
+					Items: []*computepb.Items{
+						{Key: strPtr("ANTHROPIC_MODEL"), Value: strPtr("claude-sonnet-4-5-20250929")},
+						{Key: strPtr("MAX_ITERATIONS"), Value: strPtr("100")},
+						{Key: strPtr("BRANCH"), Value: strPtr("main")},
+					},
+				},
+			},
+			{
+				Name:   strPtr("spinner-default-other-repo"),
+				Status: &terminated,
+				Labels: map[string]string{
+					"spinner-managed": "true",
+					"spinner-image":   "default",
+					"spinner-repo":    "other-repo",
+				},
+			},
+		}, nil)
+
+	// State enrichment for first instance
+	mockClient.On("ObjectExists", mock.Anything, "test-bucket", "spinner-default-my-repo/state.json").
+		Return(true, nil)
+	mockClient.On("ReadObject", mock.Anything, "test-bucket", "spinner-default-my-repo/state.json").
+		Return([]byte(`{"iteration":5,"status":"running","branch":"feature","started_at":"2026-02-15T10:00:00Z","last_updated":"2026-02-15T11:00:00Z"}`), nil)
+
+	// State enrichment for second instance - no state file
+	mockClient.On("ObjectExists", mock.Anything, "test-bucket", "spinner-default-other-repo/state.json").
+		Return(false, nil)
+
+	instances, err := p.List(context.Background())
+	assert.NoError(t, err)
+	assert.Len(t, instances, 2)
+
+	// First instance: running with full state
+	assert.Equal(t, "spinner-default-my-repo", instances[0].Name)
+	assert.Equal(t, provider.InstanceStatusRunning, instances[0].Status)
+	assert.Equal(t, "gcp", instances[0].Backend)
+	assert.Equal(t, "default", instances[0].Image)
+	assert.Equal(t, "my-repo", instances[0].Repo)
+	assert.Equal(t, "claude-sonnet-4-5-20250929", instances[0].Agent)
+	assert.Equal(t, 100, instances[0].MaxIterations)
+	assert.Equal(t, 5, instances[0].Iteration)
+	assert.Equal(t, "running", instances[0].AgentStatus)
+	// State file branch overrides metadata branch
+	assert.Equal(t, "feature", instances[0].Branch)
+	assert.NotNil(t, instances[0].StartedAt)
+	assert.NotNil(t, instances[0].LastUpdated)
+
+	// Second instance: stopped without state
+	assert.Equal(t, "spinner-default-other-repo", instances[1].Name)
+	assert.Equal(t, provider.InstanceStatusStopped, instances[1].Status)
+	assert.Equal(t, "gcp", instances[1].Backend)
+	assert.Equal(t, "default", instances[1].Image)
+	assert.Equal(t, "other-repo", instances[1].Repo)
+	assert.Equal(t, 0, instances[1].Iteration)
+	assert.Empty(t, instances[1].AgentStatus)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderListNoInstances(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	mockClient.On("ListInstances", mock.Anything, "test-project", "us-central1-a", "labels.spinner-managed=true").
+		Return([]*computepb.Instance{}, nil)
+
+	instances, err := p.List(context.Background())
+	assert.NoError(t, err)
+	assert.Empty(t, instances)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderListAPIError(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	mockClient.On("ListInstances", mock.Anything, "test-project", "us-central1-a", "labels.spinner-managed=true").
+		Return(nil, fmt.Errorf("permission denied"))
+
+	instances, err := p.List(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to list instances")
+	assert.Nil(t, instances)
+	mockClient.AssertExpectations(t)
+}
+
+func TestProviderListNoBucket(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	// Provider with no bucket configured
+	p := NewGCPProvider(mockClient, "test-project", "us-central1-a", "")
+
+	running := "RUNNING"
+	mockClient.On("ListInstances", mock.Anything, "test-project", "us-central1-a", "labels.spinner-managed=true").
+		Return([]*computepb.Instance{
+			{
+				Name:   strPtr("spinner-default-repo"),
+				Status: &running,
+				Labels: map[string]string{
+					"spinner-managed": "true",
+					"spinner-image":   "default",
+				},
+				Metadata: &computepb.Metadata{
+					Items: []*computepb.Items{
+						{Key: strPtr("MAX_ITERATIONS"), Value: strPtr("50")},
+					},
+				},
+			},
+		}, nil)
+
+	instances, err := p.List(context.Background())
+	assert.NoError(t, err)
+	assert.Len(t, instances, 1)
+
+	// Instance visible but without execution state
+	assert.Equal(t, "spinner-default-repo", instances[0].Name)
+	assert.Equal(t, provider.InstanceStatusRunning, instances[0].Status)
+	assert.Equal(t, 50, instances[0].MaxIterations)
+	assert.Equal(t, 0, instances[0].Iteration)
+	assert.Empty(t, instances[0].AgentStatus)
+
+	mockClient.AssertExpectations(t)
+}
+
 func TestProviderCreateWithEnvFileNotFound(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)

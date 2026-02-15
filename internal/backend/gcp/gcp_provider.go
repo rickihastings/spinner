@@ -3,12 +3,14 @@ package gcp
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/rickihastings/spinner/internal/provider"
@@ -448,10 +450,105 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 	return metadata, nil
 }
 
-// List discovers all spinner-managed GCP instances.
-// Full implementation is in slice 2.0; this stub satisfies the Provider interface.
+// List discovers all spinner-managed GCP instances using label-based filtering.
+// Enriches each instance with metadata from VM labels/metadata items and GCS state.
 func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
-	return nil, fmt.Errorf("GCP list not yet implemented")
+	instances, err := p.client.ListInstances(ctx, p.project, p.zone, "labels.spinner-managed=true")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list instances: %w", err)
+	}
+
+	var result []provider.InstanceInfo
+
+	for _, inst := range instances {
+		name := inst.GetName()
+		status := mapVMStatus(inst.GetStatus())
+
+		info := provider.InstanceInfo{
+			Name:    name,
+			Status:  status,
+			Backend: "gcp",
+		}
+
+		// Extract info from VM labels
+		if labels := inst.GetLabels(); labels != nil {
+			if image, ok := labels["spinner-image"]; ok {
+				info.Image = image
+			}
+			if repo, ok := labels["spinner-repo"]; ok {
+				info.Repo = repo
+			}
+		}
+
+		// Extract info from VM metadata items
+		if inst.Metadata != nil {
+			for _, item := range inst.Metadata.Items {
+				if item == nil {
+					continue
+				}
+
+				key := item.GetKey()
+				value := item.GetValue()
+
+				switch key {
+				case "ANTHROPIC_MODEL":
+					info.Agent = value
+				case "MAX_ITERATIONS":
+					fmt.Sscanf(value, "%d", &info.MaxIterations)
+				case "BRANCH":
+					info.Branch = value
+				}
+			}
+		}
+
+		// Enrich from GCS state file if bucket is configured
+		p.enrichFromGCSState(ctx, &info, name)
+
+		result = append(result, info)
+	}
+
+	return result, nil
+}
+
+// enrichFromGCSState reads the state.json from GCS and populates execution state
+// fields on the InstanceInfo. Silently skips if no bucket is configured or state
+// cannot be read.
+func (p *Provider) enrichFromGCSState(ctx context.Context, info *provider.InstanceInfo, instanceName string) {
+	if p.bucket == "" {
+		return
+	}
+
+	data, err := readState(ctx, p.client, p.bucket, instanceName)
+	if err != nil || data == nil {
+		return
+	}
+
+	var state struct {
+		Iteration   int       `json:"iteration"`
+		Status      string    `json:"status"`
+		Branch      string    `json:"branch"`
+		StartedAt   time.Time `json:"started_at"`
+		LastUpdated time.Time `json:"last_updated"`
+	}
+
+	if err := json.Unmarshal(data, &state); err != nil {
+		return
+	}
+
+	info.Iteration = state.Iteration
+	info.AgentStatus = state.Status
+
+	if !state.StartedAt.IsZero() {
+		info.StartedAt = &state.StartedAt
+	}
+	if !state.LastUpdated.IsZero() {
+		info.LastUpdated = &state.LastUpdated
+	}
+
+	// State file branch overrides metadata branch (more up-to-date)
+	if state.Branch != "" {
+		info.Branch = state.Branch
+	}
 }
 
 // isNotFoundError checks whether a GCP API error indicates a resource was not found.

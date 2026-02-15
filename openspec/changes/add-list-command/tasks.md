@@ -16,14 +16,14 @@
 
 ## 2.0 GCP instance listing
 
-- [ ] 2.1 Add `ListInstances` method to GCP `Client` interface and implement using Compute Engine `List` API
+- [x] 2.1 Add `ListInstances` method to GCP `Client` interface and implement using Compute Engine `List` API
   in `internal/backend/gcp/client.go`
-- [ ] 2.2 Implement `List()` on `GCPProvider` with label filter + metadata/label extraction + GCS state reading
+- [x] 2.2 Implement `List()` on `GCPProvider` with label filter + metadata/label extraction + GCS state reading
   in `internal/backend/gcp/gcp_provider.go`
-- [ ] 2.3 Update GCP mock client with `ListInstances` stub
-- [ ] 2.4 Add unit tests for GCP `List()`: VMs with labels, metadata extraction, state enrichment from GCS,
+- [x] 2.3 Update GCP mock client with `ListInstances` stub
+- [x] 2.4 Add unit tests for GCP `List()`: VMs with labels, metadata extraction, state enrichment from GCS,
   no state bucket, no instances found
-- [ ] 2.5 Verify build succeeds and all tests pass
+- [x] 2.5 Verify build succeeds and all tests pass
 
 ## 3.0 CLI list command with multi-backend orchestration
 
