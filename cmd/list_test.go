@@ -19,28 +19,28 @@ func TestListCommand_MultiBackendListing(t *testing.T) {
 	dockerMock := new(provider.MockProvider)
 	dockerMock.On("List", mock.Anything).Return([]provider.InstanceInfo{
 		{
-			Name:        "spinner-default-repo1",
-			Status:      provider.InstanceStatusRunning,
-			Backend:     "docker",
-			Iteration:   5,
+			Name:          "spinner-default-repo1",
+			Status:        provider.InstanceStatusRunning,
+			Backend:       "docker",
+			Iteration:     5,
 			MaxIterations: 100,
-			AgentStatus: "running",
-			StartedAt:   &started,
-			LastUpdated: &updated,
+			AgentStatus:   "running",
+			StartedAt:     &started,
+			LastUpdated:   &updated,
 		},
 	}, nil)
 
 	gcpMock := new(provider.MockProvider)
 	gcpMock.On("List", mock.Anything).Return([]provider.InstanceInfo{
 		{
-			Name:        "spinner-prod-refactor",
-			Status:      provider.InstanceStatusRunning,
-			Backend:     "gcp",
-			Iteration:   12,
+			Name:          "spinner-prod-refactor",
+			Status:        provider.InstanceStatusRunning,
+			Backend:       "gcp",
+			Iteration:     12,
 			MaxIterations: 100,
-			AgentStatus: "rate_limited",
-			StartedAt:   &started,
-			LastUpdated: &updated,
+			AgentStatus:   "rate_limited",
+			StartedAt:     &started,
+			LastUpdated:   &updated,
 		},
 	}, nil)
 
@@ -127,14 +127,14 @@ func TestListCommand_StaleWarning(t *testing.T) {
 	dockerMock := new(provider.MockProvider)
 	dockerMock.On("List", mock.Anything).Return([]provider.InstanceInfo{
 		{
-			Name:        "spinner-stale-instance",
-			Status:      provider.InstanceStatusRunning,
-			Backend:     "docker",
-			Iteration:   88,
+			Name:          "spinner-stale-instance",
+			Status:        provider.InstanceStatusRunning,
+			Backend:       "docker",
+			Iteration:     88,
 			MaxIterations: 100,
-			AgentStatus: "running",
-			StartedAt:   &started,
-			LastUpdated: &staleUpdate,
+			AgentStatus:   "running",
+			StartedAt:     &started,
+			LastUpdated:   &staleUpdate,
 		},
 	}, nil)
 
@@ -160,14 +160,14 @@ func TestListCommand_StoppedInstanceNoStaleWarning(t *testing.T) {
 	dockerMock := new(provider.MockProvider)
 	dockerMock.On("List", mock.Anything).Return([]provider.InstanceInfo{
 		{
-			Name:        "spinner-stopped-old",
-			Status:      provider.InstanceStatusStopped,
-			Backend:     "docker",
-			Iteration:   42,
+			Name:          "spinner-stopped-old",
+			Status:        provider.InstanceStatusStopped,
+			Backend:       "docker",
+			Iteration:     42,
 			MaxIterations: 50,
-			AgentStatus: "completed",
-			StartedAt:   &started,
-			LastUpdated: &oldUpdate,
+			AgentStatus:   "completed",
+			StartedAt:     &started,
+			LastUpdated:   &oldUpdate,
 		},
 	}, nil)
 
@@ -198,14 +198,14 @@ func TestListCommand_SortOrder(t *testing.T) {
 			Backend: "docker",
 		},
 		{
-			Name:        "a-running",
-			Status:      provider.InstanceStatusRunning,
-			Backend:     "docker",
-			Iteration:   1,
+			Name:          "a-running",
+			Status:        provider.InstanceStatusRunning,
+			Backend:       "docker",
+			Iteration:     1,
 			MaxIterations: 10,
-			AgentStatus: "running",
-			StartedAt:   &started,
-			LastUpdated: &updated,
+			AgentStatus:   "running",
+			StartedAt:     &started,
+			LastUpdated:   &updated,
 		},
 	}, nil)
 

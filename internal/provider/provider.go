@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"time"
 )
@@ -122,6 +123,37 @@ type InstanceInfo struct {
 	AgentStatus   string     // from state: running/completed/rate_limited/error
 	StartedAt     *time.Time // when execution started
 	LastUpdated   *time.Time // last state file update
+}
+
+// EnrichFromStateData parses raw state JSON and populates execution state
+// fields on the InstanceInfo. Both Docker and GCP backends use this after
+// obtaining the raw bytes from their respective storage.
+func EnrichFromStateData(info *InstanceInfo, data []byte) {
+	var state struct {
+		Iteration   int       `json:"iteration"`
+		Status      string    `json:"status"`
+		Branch      string    `json:"branch"`
+		StartedAt   time.Time `json:"started_at"`
+		LastUpdated time.Time `json:"last_updated"`
+	}
+
+	if err := json.Unmarshal(data, &state); err != nil {
+		return
+	}
+
+	info.Iteration = state.Iteration
+	info.AgentStatus = state.Status
+
+	if !state.StartedAt.IsZero() {
+		info.StartedAt = &state.StartedAt
+	}
+	if !state.LastUpdated.IsZero() {
+		info.LastUpdated = &state.LastUpdated
+	}
+
+	if state.Branch != "" {
+		info.Branch = state.Branch
+	}
 }
 
 // Provider is the backend-agnostic interface for managing isolated execution

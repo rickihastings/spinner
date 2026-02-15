@@ -89,3 +89,13 @@ func (m *MockDockerClient) ListContainers(ctx context.Context, filterLabels map[
 
 	return args.Get(0).([]container.Summary), args.Error(1)
 }
+
+// ContainerEnvVars mocks the ContainerEnvVars method.
+func (m *MockDockerClient) ContainerEnvVars(ctx context.Context, name string) (map[string]string, error) {
+	args := m.Called(ctx, name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(map[string]string), args.Error(1)
+}

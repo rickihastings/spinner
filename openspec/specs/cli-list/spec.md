@@ -1,0 +1,61 @@
+# cli-list Specification
+
+## Purpose
+TBD - created by archiving change add-list-command. Update Purpose after archive.
+## Requirements
+### Requirement: List Command
+
+The CLI SHALL provide a `spinner list` command that discovers and displays all spinner-managed instances across
+configured backends.
+
+#### Scenario: List all instances
+
+- **WHEN** user runs `spinner list`
+- **THEN** the CLI SHALL query all registered backends for spinner-managed instances
+- **AND** display a table with columns: BACKEND, NAME, STATUS, STATE, ITER, AGE, LAST UPDATE
+- **AND** sort results by backend, then status (running first), then name
+
+#### Scenario: No instances found
+
+- **WHEN** user runs `spinner list` and no instances exist
+- **THEN** the CLI SHALL print "No instances found"
+
+#### Scenario: Backend unavailable
+
+- **WHEN** a backend fails to initialize (e.g., Docker not running, GCP not configured)
+- **THEN** the CLI SHALL print a warning for that backend
+- **AND** continue listing instances from other available backends
+
+#### Scenario: GCP backend auto-detection
+
+- **WHEN** GCP project/zone configuration exists (from `--project`/`--zone` flags, `.spinner.json`, or env vars)
+- **THEN** the CLI SHALL include GCP instances in the listing
+- **AND** if `--state-bucket` is configured, include execution state from GCS
+
+#### Scenario: GCP not configured
+
+- **WHEN** no GCP project/zone configuration is available
+- **THEN** the CLI SHALL silently skip the GCP backend (no warning)
+
+### Requirement: Rich State Display
+
+The list output SHALL include execution state from state files alongside instance lifecycle status.
+
+#### Scenario: Running instance with state
+
+- **WHEN** an instance is running and has a state file
+- **THEN** the output SHALL show the agent status (running/completed/rate_limited/error)
+- **AND** the current iteration count and max iterations
+- **AND** the time since the instance started (age)
+- **AND** the time since the state was last updated
+
+#### Scenario: Stale instance warning
+
+- **WHEN** a running instance has not updated its state in more than 2 hours
+- **THEN** the output SHALL display a stale warning indicator
+
+#### Scenario: Instance without state
+
+- **WHEN** an instance exists but has no state file (e.g., never ran or state was cleaned up)
+- **THEN** the state-related columns SHALL show dashes or be empty
+

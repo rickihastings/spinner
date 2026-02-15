@@ -20,6 +20,7 @@ func TestGCPSpin_NonExistentImage(t *testing.T) {
 		"--image", "nonexistent-image-12345",
 		"--repo", testRepo,
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 	}
@@ -43,6 +44,7 @@ func TestGCPSpin_EnvVarsInMetadata(t *testing.T) {
 		"--repo", testRepo,
 		"--branch", "test-env-vars",
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 		"--env", "MY_CUSTOM_VAR=hello_world",
@@ -88,6 +90,7 @@ func TestGCPSpin_EnvFileInMetadata(t *testing.T) {
 		"--repo", testRepo,
 		"--branch", "test-env-file",
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 		"--env-file", envFilePath,

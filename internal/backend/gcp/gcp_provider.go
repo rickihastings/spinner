@@ -3,14 +3,12 @@ package gcp
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/rickihastings/spinner/internal/provider"
@@ -115,14 +113,15 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 	configHash := os.Getenv("SPINNER_CONFIG_HASH")
 
 	return bakeImage(ctx, p.client, bakeConfig{
-		ImageName:     config.Name,
-		Project:       project,
-		Zone:          zone,
-		MachineType:   machineType,
-		DiskSizeGB:    diskSizeGB,
-		StartupScript: bakeScript,
-		StateBucket:   stateBucket,
-		ConfigHash:    configHash,
+		ImageName:      config.Name,
+		Project:        project,
+		Zone:           zone,
+		MachineType:    machineType,
+		DiskSizeGB:     diskSizeGB,
+		StartupScript:  bakeScript,
+		StateBucket:    stateBucket,
+		ConfigHash:     configHash,
+		ServiceAccount: config.Options["service-account"],
 		ExtraMetadata: map[string]string{
 			"startup-script-runtime": startupScript,
 			"spinner-install-script": installScript,
@@ -523,32 +522,7 @@ func (p *Provider) enrichFromGCSState(ctx context.Context, info *provider.Instan
 		return
 	}
 
-	var state struct {
-		Iteration   int       `json:"iteration"`
-		Status      string    `json:"status"`
-		Branch      string    `json:"branch"`
-		StartedAt   time.Time `json:"started_at"`
-		LastUpdated time.Time `json:"last_updated"`
-	}
-
-	if err := json.Unmarshal(data, &state); err != nil {
-		return
-	}
-
-	info.Iteration = state.Iteration
-	info.AgentStatus = state.Status
-
-	if !state.StartedAt.IsZero() {
-		info.StartedAt = &state.StartedAt
-	}
-	if !state.LastUpdated.IsZero() {
-		info.LastUpdated = &state.LastUpdated
-	}
-
-	// State file branch overrides metadata branch (more up-to-date)
-	if state.Branch != "" {
-		info.Branch = state.Branch
-	}
+	provider.EnrichFromStateData(info, data)
 }
 
 // isNotFoundError checks whether a GCP API error indicates a resource was not found.

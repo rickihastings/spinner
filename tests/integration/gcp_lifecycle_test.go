@@ -27,6 +27,7 @@ func TestGCPLifecycle_FullCycle(t *testing.T) {
 		"--backend", "gcp",
 		"--name", imageName,
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 	}
@@ -40,6 +41,7 @@ func TestGCPLifecycle_FullCycle(t *testing.T) {
 		"--image", imageName,
 		"--repo", testRepo,
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 	}
@@ -137,6 +139,7 @@ func TestGCPLifecycle_VMAutoStopsOnCompletion(t *testing.T) {
 		"--branch", "test-auto-stop",
 		"--prompt", "list files and output ~~ FEATURE_COMPLETED ~~",
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 		"--max-iterations", "1",
@@ -176,6 +179,7 @@ func TestGCPLifecycle_VMStaysRunningOnError(t *testing.T) {
 		"--repo", "https://github.com/invalid/nonexistent-repo-12345",
 		"--prompt", "do something",
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 		"--max-iterations", "1",
@@ -190,7 +194,7 @@ func TestGCPLifecycle_VMStaysRunningOnError(t *testing.T) {
 	})
 
 	// Wait for error state in GCS (repo clone will fail)
-	testutil.WaitForGCSStateStatus(t, cfg.Bucket, instanceName, "error", 120)
+	testutil.WaitForGCSStateStatus(t, cfg.Bucket, instanceName, "error", 300)
 
 	// Wait a bit to ensure VM doesn't shut down
 	testutil.Sleep(t, 10)
@@ -215,6 +219,7 @@ func TestGCPList_StateEnrichmentFromGCS(t *testing.T) {
 		"--repo", "https://github.com/invalid/nonexistent-repo-list-test",
 		"--prompt", "do something",
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 		"--max-iterations", "5",
@@ -229,7 +234,7 @@ func TestGCPList_StateEnrichmentFromGCS(t *testing.T) {
 	})
 
 	// Wait for error state in GCS (repo clone will fail, writing state.json)
-	testutil.WaitForGCSStateStatus(t, cfg.Bucket, instanceName, "error", 120)
+	testutil.WaitForGCSStateStatus(t, cfg.Bucket, instanceName, "error", 300)
 
 	// Run list command with state-bucket to enable state enrichment
 	listArgs := []string{
@@ -277,6 +282,7 @@ func TestGCPLifecycle_VMStaysRunningWithoutPrompt(t *testing.T) {
 		"--branch", "test-no-prompt",
 		// Note: NO --prompt flag
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 	}

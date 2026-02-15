@@ -3,7 +3,6 @@ package docker
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -305,7 +304,7 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 	}
 
 	// Read environment variables from the container (not the host process)
-	envVars := getContainerEnvVars(name)
+	envVars, _ := p.client.ContainerEnvVars(ctx, name)
 
 	if model, ok := envVars["ANTHROPIC_MODEL"]; ok && model != "" {
 		metadata.Agent = model
@@ -351,7 +350,7 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 		}
 
 		// Read env vars for repo, branch, agent, max-iterations
-		envVars := getContainerEnvVars(name)
+		envVars, _ := p.client.ContainerEnvVars(ctx, name)
 		if repo, ok := envVars["REPO_URL"]; ok {
 			info.Repo = repo
 		}
@@ -389,32 +388,7 @@ func (p *Provider) enrichFromStateFile(info *provider.InstanceInfo, containerNam
 		return
 	}
 
-	var state struct {
-		Iteration   int       `json:"iteration"`
-		Status      string    `json:"status"`
-		Branch      string    `json:"branch"`
-		StartedAt   time.Time `json:"started_at"`
-		LastUpdated time.Time `json:"last_updated"`
-	}
-
-	if err := json.Unmarshal(data, &state); err != nil {
-		return
-	}
-
-	info.Iteration = state.Iteration
-	info.AgentStatus = state.Status
-
-	if !state.StartedAt.IsZero() {
-		info.StartedAt = &state.StartedAt
-	}
-	if !state.LastUpdated.IsZero() {
-		info.LastUpdated = &state.LastUpdated
-	}
-
-	// State file branch overrides env var branch (more up-to-date)
-	if state.Branch != "" {
-		info.Branch = state.Branch
-	}
+	provider.EnrichFromStateData(info, data)
 }
 
 // getDockerContainerID gets the container ID for a given container name using docker inspect.
@@ -448,15 +422,15 @@ func getDockerImageID(containerName string) string {
 }
 
 // getContainerEnvVars reads environment variables from a Docker container using docker inspect.
-func getContainerEnvVars(containerName string) map[string]string {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func getContainerEnvVars(ctx context.Context, containerName string) (map[string]string, error) {
+	inspectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	cmd := fmt.Sprintf("docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' %s", containerName)
 
-	result, err := execCommand(ctx, cmd)
+	result, err := execCommand(inspectCtx, cmd)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	envMap := make(map[string]string)
@@ -472,7 +446,7 @@ func getContainerEnvVars(containerName string) map[string]string {
 		}
 	}
 
-	return envMap
+	return envMap, nil
 }
 
 // execCommand executes a shell command and returns the output.

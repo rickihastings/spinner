@@ -457,6 +457,8 @@ func TestDockerProvider_List_ContainersWithLabels(t *testing.T) {
 			},
 		}, nil,
 	)
+	client.On("ContainerEnvVars", ctx, "spinner-test-repo").Return(map[string]string{}, nil)
+	client.On("ContainerEnvVars", ctx, "spinner-test-other").Return(map[string]string{}, nil)
 
 	instances, err := p.List(ctx)
 
@@ -544,6 +546,7 @@ func TestDockerProvider_List_StateEnrichment(t *testing.T) {
 			},
 		}, nil,
 	)
+	client.On("ContainerEnvVars", ctx, containerName).Return(map[string]string{}, nil)
 
 	instances, err := p.List(ctx)
 

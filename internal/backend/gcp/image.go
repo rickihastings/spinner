@@ -37,6 +37,9 @@ type bakeConfig struct {
 	// ExtraMetadata holds additional metadata key-value pairs for the bake VM
 	// (e.g., startup-script-runtime containing the startup.sh content).
 	ExtraMetadata map[string]string
+
+	// ServiceAccount is the service account email for the bake VM (optional, uses default).
+	ServiceAccount string
 }
 
 const (
@@ -85,16 +88,17 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 	}
 
 	err := client.CreateInstance(ctx, instanceConfig{
-		Name:         bakeVMName,
-		Project:      config.Project,
-		Zone:         config.Zone,
-		MachineType:  config.MachineType,
-		ImageProject: bakeBaseImageProject,
-		ImageName:    bakeBaseImage,
-		DiskSizeGB:   config.DiskSizeGB,
-		Network:      "default",
-		ExternalIP:   true,
-		Metadata:     metadata,
+		Name:           bakeVMName,
+		Project:        config.Project,
+		Zone:           config.Zone,
+		MachineType:    config.MachineType,
+		ImageProject:   bakeBaseImageProject,
+		ImageName:      bakeBaseImage,
+		DiskSizeGB:     config.DiskSizeGB,
+		Network:        "default",
+		ExternalIP:     true,
+		Metadata:       metadata,
+		ServiceAccount: config.ServiceAccount,
 		Labels: map[string]string{
 			"spinner-managed": "true",
 			"spinner-purpose": "bake",

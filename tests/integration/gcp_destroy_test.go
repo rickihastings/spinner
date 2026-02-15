@@ -26,6 +26,7 @@ func TestGCPDestroy(t *testing.T) {
 		"--repo", testRepo,
 		"--branch", "test-destroy",
 		"--project", cfg.Project,
+		"--service-account", cfg.ServiceAccount,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
 	}

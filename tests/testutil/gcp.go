@@ -19,14 +19,16 @@ import (
 //   - SPINNER_TEST_GCP_PROJECT: GCP project ID
 //   - SPINNER_TEST_GCP_ZONE: GCP zone (default: us-central1-a)
 //   - SPINNER_TEST_GCP_BUCKET: GCS bucket for state persistence
+//   - SPINNER_TEST_SERVICE_ACCOUNT: GCP service account email (optional)
 //
-// All three must be set for GCP integration tests to run.
+// The first three must be set for GCP integration tests to run.
 
 // GCPTestConfig holds the resolved configuration for GCP integration tests.
 type GCPTestConfig struct {
-	Project string
-	Zone    string
-	Bucket  string
+	Project        string
+	Zone           string
+	Bucket         string
+	ServiceAccount string
 }
 
 // GCPTestConfigFromEnv reads GCP test configuration from environment variables.
@@ -35,6 +37,7 @@ func GCPTestConfigFromEnv() *GCPTestConfig {
 	project := os.Getenv("SPINNER_TEST_GCP_PROJECT")
 	zone := os.Getenv("SPINNER_TEST_GCP_ZONE")
 	bucket := os.Getenv("SPINNER_TEST_GCP_BUCKET")
+	serviceAccount := os.Getenv("SPINNER_TEST_SERVICE_ACCOUNT")
 
 	if project == "" || bucket == "" {
 		return nil
@@ -45,9 +48,10 @@ func GCPTestConfigFromEnv() *GCPTestConfig {
 	}
 
 	return &GCPTestConfig{
-		Project: project,
-		Zone:    zone,
-		Bucket:  bucket,
+		Project:        project,
+		Zone:           zone,
+		Bucket:         bucket,
+		ServiceAccount: serviceAccount,
 	}
 }
 

@@ -206,4 +206,3 @@ func formatDuration(t *time.Time, now time.Time) string {
 		return fmt.Sprintf("%dd ago", days)
 	}
 }
-

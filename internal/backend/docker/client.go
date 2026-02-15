@@ -62,6 +62,9 @@ type Client interface {
 	// ListContainers lists containers matching the given label filters.
 	// The filters map keys are filter names (e.g. "label") and values are filter values.
 	ListContainers(ctx context.Context, filterLabels map[string]string) ([]container.Summary, error)
+
+	// ContainerEnvVars reads environment variables from a container.
+	ContainerEnvVars(ctx context.Context, name string) (map[string]string, error)
 }
 
 // RealDockerClient implements Client using the Docker SDK.
@@ -618,6 +621,11 @@ func (c *RealDockerClient) ListContainers(ctx context.Context, filterLabels map[
 	}
 
 	return containers, nil
+}
+
+// ContainerEnvVars reads environment variables from a container using docker inspect.
+func (c *RealDockerClient) ContainerEnvVars(ctx context.Context, name string) (map[string]string, error) {
+	return getContainerEnvVars(ctx, name)
 }
 
 // getEnvPtr returns a pointer to an environment variable value, or nil if not set
