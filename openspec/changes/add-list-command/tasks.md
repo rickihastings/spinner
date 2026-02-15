@@ -27,13 +27,13 @@
 
 ## 3.0 CLI list command with multi-backend orchestration
 
-- [ ] 3.1 Create `cmd/list.go` with `NewListCommand(f *provider.Factory)`: iterate backends, collect InstanceInfo,
+- [x] 3.1 Create `cmd/list.go` with `NewListCommand(f *provider.Factory)`: iterate backends, collect InstanceInfo,
   render table output with BACKEND/NAME/STATUS/STATE/ITER/AGE/LAST UPDATE columns, stale warning indicator
-- [ ] 3.2 Add GCP config flags (project/zone/state-bucket)
-- [ ] 3.3 Register command in `cmd/root.go`
-- [ ] 3.4 Create `cmd/list_test.go` with unit tests: multi-backend listing, backend unavailable warning,
+- [x] 3.2 Add GCP config flags (project/zone/state-bucket)
+- [x] 3.3 Register command in `cmd/root.go`
+- [x] 3.4 Create `cmd/list_test.go` with unit tests: multi-backend listing, backend unavailable warning,
   no instances, stale warning
-- [ ] 3.5 Verify build succeeds and all tests pass
+- [x] 3.5 Verify build succeeds and all tests pass
 
 ## 4.0 Docker integration tests
 
