@@ -42,6 +42,9 @@ type WatchUI struct {
 	// Scroll state
 	userScrolled bool
 
+	// Header toggle state
+	headerVisible bool
+
 	// Test mode flag - when true, skip TUI startup
 	testMode bool
 }
@@ -54,6 +57,7 @@ type WatchContext struct {
 	ContainerID   string
 	ImageID       string
 	MaxIterations int
+	HeaderVisible bool
 }
 
 // isTestEnvironment detects if we're running in a test environment or without a terminal
@@ -104,11 +108,16 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		SetTextAlign(tview.AlignRight)
 	footer.SetText("[darkgray]↑↓ scroll · h header · ? help · q quit[-]")
 
+	// Determine initial header visibility
+	headerVisible := wctx.HeaderVisible
+
 	// Create split-pane layout
 	layout := tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(header, 5, 0, false).
-		AddItem(logView, 0, 1, true).
+		SetDirection(tview.FlexRow)
+	if headerVisible {
+		layout.AddItem(header, 5, 0, false)
+	}
+	layout.AddItem(logView, 0, 1, true).
 		AddItem(footer, 1, 0, false)
 
 	ui := &WatchUI{
@@ -128,6 +137,7 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		imageID:       wctx.ImageID,
 		maxIterations: wctx.MaxIterations,
 		currentIter:   0,
+		headerVisible: headerVisible,
 		testMode:      isTestEnvironment(), // Auto-detect test mode
 	}
 
@@ -157,6 +167,12 @@ func (ui *WatchUI) setupKeyboardHandlers() {
 		// Handle Ctrl+C to quit
 		if event.Key() == tcell.KeyCtrlC {
 			ui.Stop()
+			return nil
+		}
+
+		// Handle 'h' key to toggle header
+		if event.Rune() == 'h' {
+			ui.toggleHeader()
 			return nil
 		}
 
@@ -239,6 +255,17 @@ func (ui *WatchUI) updateFooter() {
 	} else {
 		ui.footer.SetText("[darkgray]↑↓ scroll · h header · ? help · q quit[-]")
 	}
+}
+
+// toggleHeader toggles the header panel visibility and rebuilds the layout
+func (ui *WatchUI) toggleHeader() {
+	ui.headerVisible = !ui.headerVisible
+	ui.layout.Clear()
+	if ui.headerVisible {
+		ui.layout.AddItem(ui.header, 5, 0, false)
+	}
+	ui.layout.AddItem(ui.logView, 0, 1, true)
+	ui.layout.AddItem(ui.footer, 1, 0, false)
 }
 
 // Run starts the TUI and begins consuming from log and metrics channels

@@ -130,6 +130,30 @@ func TestWatchUI_PageHeight(t *testing.T) {
 	assert.GreaterOrEqual(t, height, 1, "pageHeight should be at least 1")
 }
 
+func TestWatchUI_HeaderToggle(t *testing.T) {
+	// Default: header visible
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{HeaderVisible: true})
+	assert.True(t, ui.headerVisible, "header should be visible initially when HeaderVisible=true")
+
+	// Toggle header off
+	ui.toggleHeader()
+	assert.False(t, ui.headerVisible, "header should be hidden after toggle")
+
+	// Toggle header back on
+	ui.toggleHeader()
+	assert.True(t, ui.headerVisible, "header should be visible after second toggle")
+}
+
+func TestWatchUI_HeaderStartHidden(t *testing.T) {
+	// Start with header hidden via config
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{HeaderVisible: false})
+	assert.False(t, ui.headerVisible, "header should be hidden when HeaderVisible=false")
+
+	// Toggle header on
+	ui.toggleHeader()
+	assert.True(t, ui.headerVisible, "header should be visible after toggle")
+}
+
 // mockFormatter is a simple formatter for testing
 type mockFormatter struct{}
 

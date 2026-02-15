@@ -10,6 +10,7 @@ import (
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/tui"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // watchCmd is the production watch command using the default provider factory.
@@ -110,6 +111,7 @@ func performWatch(ctx context.Context, p provider.Provider, containerName string
 
 	// Gather context information for the watch UI
 	uiContext := gatherWatchContext(ctx, p, containerName)
+	uiContext.HeaderVisible = viper.GetBool("watch-header")
 
 	// Create channels for logs and metrics
 	logCh := make(chan agent.Event, 100)

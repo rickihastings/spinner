@@ -18,14 +18,14 @@ Add keyboard-driven log scrolling and smart auto-scroll pause/resume.
 
 Add `h` key to toggle the header panel visibility, with the initial state driven by configuration.
 
-- [ ] 2.1 Register `viper.SetDefault("watch-header", true)` in `cmd/root.go`
-- [ ] 2.2 Read `viper.GetBool("watch-header")` in `cmd/watch.go` and pass to `NewWatchUI`
-- [ ] 2.3 Add `headerVisible bool` field to `WatchUI` struct, initialized from the config value
-- [ ] 2.4 Add `h` key handler to `setupKeyboardHandlers()` that calls a `toggleHeader()` method
-- [ ] 2.5 Implement `toggleHeader()`: clear flex layout, rebuild with or without header, re-set app root
-- [ ] 2.6 Add unit tests for header toggle state transitions (including starting hidden)
-- [ ] 2.7 Add `.env.example` entry for `SPINNER_WATCH_HEADER`
-- [ ] 2.8 Verify build passes and all tests pass
+- [x] 2.1 Register `viper.SetDefault("watch-header", true)` in `cmd/root.go`
+- [x] 2.2 Read `viper.GetBool("watch-header")` in `cmd/watch.go` and pass to `NewWatchUI`
+- [x] 2.3 Add `headerVisible bool` field to `WatchUI` struct, initialized from the config value
+- [x] 2.4 Add `h` key handler to `setupKeyboardHandlers()` that calls a `toggleHeader()` method
+- [x] 2.5 Implement `toggleHeader()`: clear flex layout, rebuild with or without header, re-set app root
+- [x] 2.6 Add unit tests for header toggle state transitions (including starting hidden)
+- [x] 2.7 Add `.env.example` entry for `SPINNER_WATCH_HEADER`
+- [x] 2.8 Verify build passes and all tests pass
 
 ## 3.0 Help Overlay
 
