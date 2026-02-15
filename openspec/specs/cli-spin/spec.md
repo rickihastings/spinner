@@ -789,7 +789,8 @@ runtime environment.
 #### Scenario: Reserved variable name rejected
 
 - **WHEN** user provides `--env GITHUB_TOKEN=fake` (or any other reserved name: CLAUDE_CODE_OAUTH_TOKEN, REPO_URL,
-  PROMPT, BRANCH, MAX_ITERATIONS, LOG_DIR, STATE_DIR, SPINNER_LOG_BUCKET, SPINNER_STATE_BUCKET, SPINNER_INSTANCE_NAME)
+  PROMPT, BRANCH, MAX_ITERATIONS, LOG_DIR, STATE_DIR, SPINNER_LOG_BUCKET, SPINNER_STATE_BUCKET,
+  SPINNER_INSTANCE_NAME, ANTHROPIC_MODEL)
 - **THEN** the CLI SHALL print an error indicating the variable is reserved and exit with non-zero status
 
 #### Scenario: Invalid format rejected
@@ -1012,4 +1013,57 @@ container for workspace placement.
 - **WHEN** `--env-file` is not provided
 - **THEN** the Docker backend SHALL not add a second `--env-file` or mount
 - **AND** `startup.sh` SHALL skip the copy step
+
+### Requirement: Model Flag
+
+The spin command SHALL accept an optional `--model <model-name>` flag that selects which Claude model the agent uses
+inside the container/VM. The model name is passed as the `ANTHROPIC_MODEL` environment variable.
+
+#### Scenario: Model flag provided
+
+- **WHEN** user runs `spinner spin --image <image> --repo <repo> --model claude-sonnet-4-5-20250929`
+- **THEN** the runtime environment SHALL have `ANTHROPIC_MODEL=claude-sonnet-4-5-20250929` set
+- **AND** the Claude CLI inside the container SHALL use that model
+
+#### Scenario: Model flag not provided
+
+- **WHEN** user runs `spinner spin --image <image> --repo <repo>` without `--model`
+- **THEN** the `ANTHROPIC_MODEL` environment variable SHALL NOT be set
+- **AND** the Claude CLI SHALL use its default model
+
+#### Scenario: Model from config file
+
+- **WHEN** `.spinner.json` contains `{"model": "claude-sonnet-4-5-20250929"}`
+- **AND** user runs `spinner spin --image <image> --repo <repo>` without `--model`
+- **THEN** the runtime environment SHALL have `ANTHROPIC_MODEL=claude-sonnet-4-5-20250929` set
+
+#### Scenario: CLI flag overrides config file
+
+- **WHEN** `.spinner.json` contains `{"model": "claude-sonnet-4-5-20250929"}`
+- **AND** user runs `spinner spin --image <image> --repo <repo> --model claude-opus-4-6`
+- **THEN** the runtime environment SHALL have `ANTHROPIC_MODEL=claude-opus-4-6` set
+
+#### Scenario: No model validation
+
+- **WHEN** user provides any string as the model name (e.g., `--model my-custom-model`)
+- **THEN** the CLI SHALL pass it through without validation
+
+### Requirement: Model Override on Restart
+
+When a stopped instance is restarted, the model SHALL be updatable. The new `--model` value takes effect on restart,
+overriding the original value.
+
+#### Scenario: Docker model override on restart
+
+- **WHEN** a Docker instance was created with `--model claude-sonnet-4-5-20250929`
+- **AND** user stops the instance and runs `spinner spin` with `--model claude-opus-4-6`
+- **THEN** the CLI SHALL write the new model to the state directory override file
+- **AND** the startup script SHALL read the override and export `ANTHROPIC_MODEL=claude-opus-4-6`
+
+#### Scenario: GCP model override on restart
+
+- **WHEN** a GCP instance was created with `--model claude-sonnet-4-5-20250929`
+- **AND** user stops the instance and runs `spinner spin` with `--model claude-opus-4-6`
+- **THEN** the CLI SHALL update the `ANTHROPIC_MODEL` instance metadata to `claude-opus-4-6`
+- **AND** the runtime script SHALL read the updated metadata on boot
 
