@@ -36,6 +36,6 @@
 
 ## 5.0 GCP integration tests
 
-- [ ] 5.1 Add integration test: spin with `--model` on GCP, verify `ANTHROPIC_MODEL` in instance metadata
-- [ ] 5.2 Add integration test: restart with different `--model`, verify metadata updated
-- [ ] 5.3 Verify build succeeds and all integration tests pass
+- [x] 5.1 Add integration test: spin with `--model` on GCP, verify `ANTHROPIC_MODEL` in instance metadata
+- [x] 5.2 Add integration test: restart with different `--model`, verify metadata updated
+- [x] 5.3 Verify build succeeds and all integration tests pass

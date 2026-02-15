@@ -69,6 +69,95 @@ func TestGCPSpin_EnvVarsInMetadata(t *testing.T) {
 	assert.Equal(t, "secret123", val, "API_KEY should have correct value")
 }
 
+// TestGCPSpin_ModelFlagSetsMetadata tests that --model sets ANTHROPIC_MODEL in GCP instance metadata.
+func TestGCPSpin_ModelFlagSetsMetadata(t *testing.T) {
+	cfg := testutil.SkipIfGCPNotAvailable(t)
+
+	imageName := testutil.GetSharedGCPImage(t)
+
+	spinArgs := []string{
+		"spin",
+		"--backend", "gcp",
+		"--image", imageName,
+		"--repo", testRepo,
+		"--branch", "test-model-flag",
+		"--project", cfg.Project,
+		"--zone", cfg.Zone,
+		"--state-bucket", cfg.Bucket,
+		"--model", "claude-sonnet-4-5-20250929",
+	}
+
+	instanceName, _, _ := testutil.RunGCPSpinCommand(t, spinArgs...)
+	require.NotEmpty(t, instanceName, "should get instance name")
+
+	t.Cleanup(func() {
+		testutil.RemoveGCPInstance(t, cfg.Project, cfg.Zone, instanceName)
+		testutil.CleanupGCSPrefix(t, cfg.Bucket, instanceName+"/")
+	})
+
+	// Verify ANTHROPIC_MODEL is set in instance metadata
+	val, found := testutil.GCPInstanceMetadata(t, cfg.Project, cfg.Zone, instanceName, "ANTHROPIC_MODEL")
+	assert.True(t, found, "ANTHROPIC_MODEL metadata should exist")
+	assert.Equal(t, "claude-sonnet-4-5-20250929", val, "ANTHROPIC_MODEL should match the --model flag value")
+}
+
+// TestGCPSpin_ModelFlagUpdatedOnRestart tests that restarting with a different --model updates the metadata.
+func TestGCPSpin_ModelFlagUpdatedOnRestart(t *testing.T) {
+	cfg := testutil.SkipIfGCPNotAvailable(t)
+
+	imageName := testutil.GetSharedGCPImage(t)
+
+	// 1. Spin with initial model
+	spinArgs := []string{
+		"spin",
+		"--backend", "gcp",
+		"--image", imageName,
+		"--repo", testRepo,
+		"--branch", "test-model-restart",
+		"--project", cfg.Project,
+		"--zone", cfg.Zone,
+		"--state-bucket", cfg.Bucket,
+		"--model", "claude-sonnet-4-5-20250929",
+	}
+
+	instanceName, _, _ := testutil.RunGCPSpinCommand(t, spinArgs...)
+	require.NotEmpty(t, instanceName, "should get instance name")
+
+	t.Cleanup(func() {
+		testutil.RemoveGCPInstance(t, cfg.Project, cfg.Zone, instanceName)
+		testutil.CleanupGCSPrefix(t, cfg.Bucket, instanceName+"/")
+	})
+
+	// Verify initial model
+	val, found := testutil.GCPInstanceMetadata(t, cfg.Project, cfg.Zone, instanceName, "ANTHROPIC_MODEL")
+	assert.True(t, found, "ANTHROPIC_MODEL metadata should exist after initial spin")
+	assert.Equal(t, "claude-sonnet-4-5-20250929", val, "initial model should be sonnet")
+
+	// 2. Stop the instance
+	testutil.StopGCPInstance(t, cfg.Project, cfg.Zone, instanceName)
+	testutil.WaitForGCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName, "TERMINATED", 120)
+
+	// 3. Spin again with a different model (triggers restart with metadata update)
+	restartArgs := []string{
+		"spin",
+		"--backend", "gcp",
+		"--image", imageName,
+		"--repo", testRepo,
+		"--branch", "test-model-restart",
+		"--project", cfg.Project,
+		"--zone", cfg.Zone,
+		"--state-bucket", cfg.Bucket,
+		"--model", "claude-opus-4-6",
+	}
+
+	testutil.RunCommandExpectSuccess(t, restartArgs...)
+
+	// 4. Verify model metadata was updated
+	val, found = testutil.GCPInstanceMetadata(t, cfg.Project, cfg.Zone, instanceName, "ANTHROPIC_MODEL")
+	assert.True(t, found, "ANTHROPIC_MODEL metadata should exist after restart")
+	assert.Equal(t, "claude-opus-4-6", val, "model should be updated to opus after restart")
+}
+
 // TestGCPSpin_EnvFileInMetadata tests that --env-file content is base64-encoded
 // and stored as SPINNER_ENV_FILE metadata on the GCP instance.
 func TestGCPSpin_EnvFileInMetadata(t *testing.T) {
