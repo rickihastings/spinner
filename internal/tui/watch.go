@@ -39,6 +39,9 @@ type WatchUI struct {
 	maxIterations int
 	currentIter   int
 
+	// Scroll state
+	userScrolled bool
+
 	// Test mode flag - when true, skip TUI startup
 	testMode bool
 }
@@ -92,18 +95,14 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		SetBorderColor(tcell.ColorGray).
 		SetBorderPadding(0, 0, 1, 1)
 
-	// Set up auto-scroll after logView is created
-	logView.SetChangedFunc(func() {
-		app.QueueUpdateDraw(func() {
-			logView.ScrollToEnd()
-		})
-	})
+	// Note: SetChangedFunc for auto-scroll is set up after the WatchUI struct is created
+	// so the closure can reference ui.userScrolled directly.
 
 	// Create footer for help text
 	footer := tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignRight)
-	footer.SetText("[darkgray]Press q to quit[-]")
+	footer.SetText("[darkgray]↑↓ scroll · h header · ? help · q quit[-]")
 
 	// Create split-pane layout
 	layout := tview.NewFlex().
@@ -132,6 +131,15 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		testMode:      isTestEnvironment(), // Auto-detect test mode
 	}
 
+	// Set up auto-scroll: only scroll to end when user hasn't scrolled away
+	ui.logView.SetChangedFunc(func() {
+		ui.app.QueueUpdateDraw(func() {
+			if !ui.userScrolled {
+				ui.logView.ScrollToEnd()
+			}
+		})
+	})
+
 	// Set up keyboard handlers
 	ui.setupKeyboardHandlers()
 
@@ -152,8 +160,85 @@ func (ui *WatchUI) setupKeyboardHandlers() {
 			return nil
 		}
 
+		switch event.Key() {
+		case tcell.KeyUp:
+			ui.scrollUp(1)
+			return nil
+		case tcell.KeyDown:
+			ui.scrollDown(1)
+			return nil
+		case tcell.KeyPgUp:
+			ui.scrollUp(ui.pageHeight())
+			return nil
+		case tcell.KeyPgDn:
+			ui.scrollDown(ui.pageHeight())
+			return nil
+		case tcell.KeyHome:
+			ui.logView.ScrollToBeginning()
+			ui.setUserScrolled(true)
+			return nil
+		case tcell.KeyEnd:
+			ui.logView.ScrollToEnd()
+			ui.setUserScrolled(false)
+			return nil
+		}
+
 		return event
 	})
+}
+
+// pageHeight returns the visible height of the log view for page scrolling
+func (ui *WatchUI) pageHeight() int {
+	_, _, _, height := ui.logView.GetInnerRect()
+	if height < 1 {
+		height = 1
+	}
+	return height
+}
+
+// scrollUp scrolls the log view up by n lines and pauses auto-scroll
+func (ui *WatchUI) scrollUp(n int) {
+	row, _ := ui.logView.GetScrollOffset()
+	newRow := row - n
+	if newRow < 0 {
+		newRow = 0
+	}
+	ui.logView.ScrollTo(newRow, 0)
+	ui.setUserScrolled(true)
+}
+
+// scrollDown scrolls the log view down by n lines, resuming auto-scroll if at bottom
+func (ui *WatchUI) scrollDown(n int) {
+	row, _ := ui.logView.GetScrollOffset()
+	ui.logView.ScrollTo(row+n, 0)
+
+	// Check if we've reached the bottom
+	if ui.isAtBottom() {
+		ui.setUserScrolled(false)
+	}
+}
+
+// isAtBottom returns true if the log view is scrolled to the bottom
+func (ui *WatchUI) isAtBottom() bool {
+	row, _ := ui.logView.GetScrollOffset()
+	_, _, _, height := ui.logView.GetInnerRect()
+	totalLines := strings.Count(ui.logView.GetText(true), "\n")
+	return row+height >= totalLines
+}
+
+// setUserScrolled updates the scroll state and refreshes the footer
+func (ui *WatchUI) setUserScrolled(scrolled bool) {
+	ui.userScrolled = scrolled
+	ui.updateFooter()
+}
+
+// updateFooter refreshes the footer text based on current state
+func (ui *WatchUI) updateFooter() {
+	if ui.userScrolled {
+		ui.footer.SetText("[yellow]SCROLLED[-] [darkgray]· ↑↓ scroll · h header · ? help · q quit[-]")
+	} else {
+		ui.footer.SetText("[darkgray]↑↓ scroll · h header · ? help · q quit[-]")
+	}
 }
 
 // Run starts the TUI and begins consuming from log and metrics channels

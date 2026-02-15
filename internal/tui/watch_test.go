@@ -77,6 +77,59 @@ func TestWatchUI_TestMode(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestWatchUI_ScrollStateTransitions(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
+
+	// Initially auto-scroll is active (userScrolled = false)
+	assert.False(t, ui.userScrolled, "userScrolled should be false initially")
+
+	// Scrolling up should pause auto-scroll
+	ui.setUserScrolled(true)
+	assert.True(t, ui.userScrolled, "scrolling up should set userScrolled to true")
+
+	// Pressing End should resume auto-scroll
+	ui.setUserScrolled(false)
+	assert.False(t, ui.userScrolled, "End key should clear userScrolled")
+
+	// Scroll up again, then simulate reaching bottom
+	ui.setUserScrolled(true)
+	assert.True(t, ui.userScrolled)
+	// Reaching bottom clears userScrolled
+	ui.setUserScrolled(false)
+	assert.False(t, ui.userScrolled, "reaching bottom should clear userScrolled")
+}
+
+func TestWatchUI_FooterTextContent(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
+
+	// Default footer (not scrolled)
+	ui.updateFooter()
+	footerText := ui.footer.GetText(false)
+	assert.Contains(t, footerText, "scroll")
+	assert.Contains(t, footerText, "quit")
+	assert.NotContains(t, footerText, "SCROLLED")
+
+	// When user has scrolled, footer should show SCROLLED indicator
+	ui.setUserScrolled(true)
+	footerText = ui.footer.GetText(false)
+	assert.Contains(t, footerText, "SCROLLED")
+	assert.Contains(t, footerText, "scroll")
+	assert.Contains(t, footerText, "quit")
+
+	// When user returns to bottom, SCROLLED indicator disappears
+	ui.setUserScrolled(false)
+	footerText = ui.footer.GetText(false)
+	assert.NotContains(t, footerText, "SCROLLED")
+}
+
+func TestWatchUI_PageHeight(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
+
+	// pageHeight should return at least 1 even when logView has no dimensions
+	height := ui.pageHeight()
+	assert.GreaterOrEqual(t, height, 1, "pageHeight should be at least 1")
+}
+
 // mockFormatter is a simple formatter for testing
 type mockFormatter struct{}
 

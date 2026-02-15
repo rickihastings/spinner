@@ -4,15 +4,15 @@
 
 Add keyboard-driven log scrolling and smart auto-scroll pause/resume.
 
-- [ ] 1.1 Add `userScrolled bool` field to `WatchUI` struct
-- [ ] 1.2 Modify `SetChangedFunc` callback to check `userScrolled` before calling `ScrollToEnd()`
-- [ ] 1.3 Add scroll key handlers (Up, Down, PgUp, PgDn, Home, End) to `setupKeyboardHandlers()`
-- [ ] 1.4 Implement page-height calculation using `logView.GetInnerRect()` for PgUp/PgDn
-- [ ] 1.5 Implement bottom-detection logic: after Down/PgDn, check scroll offset to determine if at bottom and clear `userScrolled`
-- [ ] 1.6 Update footer text to show `SCROLLED` indicator when `userScrolled` is true
-- [ ] 1.7 Add unit tests for scroll state transitions (up pauses, bottom resumes, End resumes)
-- [ ] 1.8 Add unit tests for footer text content based on scroll state
-- [ ] 1.9 Verify build passes and all tests pass
+- [x] 1.1 Add `userScrolled bool` field to `WatchUI` struct
+- [x] 1.2 Modify `SetChangedFunc` callback to check `userScrolled` before calling `ScrollToEnd()`
+- [x] 1.3 Add scroll key handlers (Up, Down, PgUp, PgDn, Home, End) to `setupKeyboardHandlers()`
+- [x] 1.4 Implement page-height calculation using `logView.GetInnerRect()` for PgUp/PgDn
+- [x] 1.5 Implement bottom-detection logic: after Down/PgDn, check scroll offset to determine if at bottom and clear `userScrolled`
+- [x] 1.6 Update footer text to show `SCROLLED` indicator when `userScrolled` is true
+- [x] 1.7 Add unit tests for scroll state transitions (up pauses, bottom resumes, End resumes)
+- [x] 1.8 Add unit tests for footer text content based on scroll state
+- [x] 1.9 Verify build passes and all tests pass
 
 ## 2.0 Header Toggle with Configurable Default
 
