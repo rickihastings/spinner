@@ -2,12 +2,12 @@
 
 ## 1.0 Core RichFormatter with Tool Call Display
 
-- [ ] 1.1 Add `charmbracelet/glamour` dependency to `go.mod`
-- [ ] 1.2 Create `internal/agent/claude/rich_formatter.go` with `RichFormatter` struct, constructor, tool_use_id tracking map, and glamour renderer initialization
-- [ ] 1.3 Implement `FormatEvent` for `system_init`, `result`, and `error` events (same logic as current formatter)
-- [ ] 1.4 Implement `FormatEvent` for `assistant_message` tool_use blocks: render as `⏺ ToolName(param_summary)` with parameter extraction per tool type
-- [ ] 1.5 Add unit tests for tool call formatting: Bash command summary, Read file path, Edit file path, Glob pattern, Grep pattern, unknown tool fallback, long parameter truncation
-- [ ] 1.6 Verify build and all tests pass
+- [x] 1.1 Add `charmbracelet/glamour` dependency to `go.mod`
+- [x] 1.2 Create `internal/agent/claude/rich_formatter.go` with `RichFormatter` struct, constructor, tool_use_id tracking map, and glamour renderer initialization
+- [x] 1.3 Implement `FormatEvent` for `system_init`, `result`, and `error` events (same logic as current formatter)
+- [x] 1.4 Implement `FormatEvent` for `assistant_message` tool_use blocks: render as `⏺ ToolName(param_summary)` with parameter extraction per tool type
+- [x] 1.5 Add unit tests for tool call formatting: Bash command summary, Read file path, Edit file path, Glob pattern, Grep pattern, unknown tool fallback, long parameter truncation
+- [x] 1.6 Verify build and all tests pass
 
 ## 2.0 Markdown Rendering for Agent Text
 
