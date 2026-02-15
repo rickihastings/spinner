@@ -52,7 +52,8 @@ func RunCommand(t *testing.T, args ...string) (stdout string, stderr string, exi
 func RunCommandWithEnv(t *testing.T, env map[string]string, args ...string) (stdout string, stderr string, exitCode int) {
 	t.Helper()
 
-	binaryPath, err := filepath.Abs(BinaryPath)
+	binaryPath := GetBinaryPath()
+	binaryPath, err := filepath.Abs(binaryPath)
 	require.NoError(t, err, "failed to resolve binary path")
 
 	cmd := exec.Command(binaryPath, args...)
