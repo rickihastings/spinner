@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -282,68 +281,44 @@ func (c *RealDockerClient) RunContainer(ctx context.Context, args []string, cont
 	}, nil
 }
 
-// ImageExists checks if a Docker image exists using the Docker SDK.
+// ImageExists checks if a Docker image exists using the Docker CLI.
 func (c *RealDockerClient) ImageExists(ctx context.Context, imageName string) (bool, error) {
-	cli, err := c.getSDKClient(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to get Docker client: %w", err)
-	}
-
-	_, err = cli.ImageInspect(ctx, imageName)
-	if err != nil {
-		if cerrdefs.IsNotFound(err) {
-			return false, nil
-		}
-
-		return false, fmt.Errorf("failed to inspect image: %w", err)
+	cmd := exec.CommandContext(ctx, "docker", "image", "inspect", imageName)
+	if err := cmd.Run(); err != nil {
+		// Exit code != 0 means image doesn't exist (or docker error)
+		return false, nil
 	}
 
 	return true, nil
 }
 
-// ContainerExists checks if a container exists and returns its status using the Docker SDK.
+// ContainerExists checks if a container exists and returns its status using the Docker CLI.
 func (c *RealDockerClient) ContainerExists(ctx context.Context, name string) (ContainerStatus, error) {
-	cli, err := c.getSDKClient(ctx)
+	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Running}}", name)
+
+	output, err := cmd.Output()
 	if err != nil {
-		return StatusNone, fmt.Errorf("failed to get Docker client: %w", err)
+		// Container doesn't exist
+		return StatusNone, nil
 	}
 
-	info, err := cli.ContainerInspect(ctx, name)
-	if err != nil {
-		if cerrdefs.IsNotFound(err) {
-			return StatusNone, nil
-		}
-
-		return StatusNone, fmt.Errorf("failed to inspect container: %w", err)
-	}
-
-	if info.State.Running {
+	if strings.TrimSpace(string(output)) == "true" {
 		return StatusRunning, nil
 	}
 
 	return StatusStopped, nil
 }
 
-// RemoveContainer removes a container, forcing removal if it's running using the Docker SDK.
+// RemoveContainer removes a container, forcing removal if it's running using the Docker CLI.
 func (c *RealDockerClient) RemoveContainer(ctx context.Context, name string) (ContainerResult, error) {
-	cli, err := c.getSDKClient(ctx)
-	if err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: name,
-			Error:         fmt.Sprintf("failed to get Docker client: %v", err),
-		}, err
-	}
+	cmd := exec.CommandContext(ctx, "docker", "rm", "-f", name)
 
-	err = cli.ContainerRemove(ctx, name, container.RemoveOptions{
-		Force:         true,
-		RemoveVolumes: false,
-	})
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return ContainerResult{
 			Success:       false,
 			ContainerName: name,
-			Error:         err.Error(),
+			Error:         strings.TrimSpace(string(output)),
 		}, err
 	}
 
@@ -353,23 +328,16 @@ func (c *RealDockerClient) RemoveContainer(ctx context.Context, name string) (Co
 	}, nil
 }
 
-// StartContainer starts a stopped container using the Docker SDK.
+// StartContainer starts a stopped container using the Docker CLI.
 func (c *RealDockerClient) StartContainer(ctx context.Context, name string) (ContainerResult, error) {
-	cli, err := c.getSDKClient(ctx)
-	if err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: name,
-			Error:         fmt.Sprintf("failed to get Docker client: %v", err),
-		}, err
-	}
+	cmd := exec.CommandContext(ctx, "docker", "start", name)
 
-	err = cli.ContainerStart(ctx, name, container.StartOptions{})
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return ContainerResult{
 			Success:       false,
 			ContainerName: name,
-			Error:         err.Error(),
+			Error:         strings.TrimSpace(string(output)),
 		}, err
 	}
 
@@ -379,51 +347,33 @@ func (c *RealDockerClient) StartContainer(ctx context.Context, name string) (Con
 	}, nil
 }
 
-// StopContainer stops a running container using the Docker SDK.
+// StopContainer stops a running container using the Docker CLI.
 func (c *RealDockerClient) StopContainer(ctx context.Context, name string) error {
-	cli, err := c.getSDKClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get Docker client: %w", err)
-	}
-
-	timeout := 10 // seconds
-
-	err = cli.ContainerStop(ctx, name, container.StopOptions{Timeout: &timeout})
-	if err != nil {
-		return fmt.Errorf("failed to stop container: %w", err)
+	cmd := exec.CommandContext(ctx, "docker", "stop", "-t", "10", name)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to stop container: %s", strings.TrimSpace(string(output)))
 	}
 
 	return nil
 }
 
-// LogsContainer returns the logs from a container using the Docker SDK.
+// LogsContainer returns the logs from a container using the Docker CLI.
 func (c *RealDockerClient) LogsContainer(ctx context.Context, name string) ([]byte, error) {
-	cli, err := c.getSDKClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Docker client: %w", err)
-	}
+	cmd := exec.CommandContext(ctx, "docker", "logs", name)
 
-	logsReader, err := cli.ContainerLogs(ctx, name, container.LogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-	})
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container logs: %w", err)
-	}
-
-	defer func() { _ = logsReader.Close() }()
-
-	output, err := io.ReadAll(logsReader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read container logs: %w", err)
+		return nil, fmt.Errorf("failed to get container logs: %s", strings.TrimSpace(string(output)))
 	}
 
 	return output, nil
 }
 
-// VerifyContainerStatus verifies that a container is running using the Docker SDK.
+// VerifyContainerStatus verifies that a container is running using the Docker CLI.
 func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name string) (ContainerResult, error) {
-	cli, err := c.getSDKClient(ctx)
+	cmd := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.State.Running}} {{.State.Status}}", name)
+
+	output, err := cmd.Output()
 	if err != nil {
 		return ContainerResult{
 			Success:       false,
@@ -432,24 +382,23 @@ func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name strin
 		}, err
 	}
 
-	info, err := cli.ContainerInspect(ctx, name)
-	if err != nil {
-		return ContainerResult{
-			Success:       false,
-			ContainerName: name,
-			Error:         "Failed to verify container status",
-		}, err
+	parts := strings.Fields(strings.TrimSpace(string(output)))
+	running := len(parts) > 0 && parts[0] == "true"
+
+	stateStatus := ""
+	if len(parts) > 1 {
+		stateStatus = parts[1]
 	}
 
-	if !info.State.Running {
+	if !running {
 		// Get logs to show what went wrong
-		logsOutput := c.getContainerLogs(ctx, cli, name)
+		logsOutput := c.getContainerLogsTail(ctx, name)
 
 		return ContainerResult{
 			Success:       false,
 			ContainerName: name,
 			Error:         fmt.Sprintf("Container exited. Logs: %s", logsOutput),
-		}, fmt.Errorf("container not running: %s", info.State.Status)
+		}, fmt.Errorf("container not running: %s", stateStatus)
 	}
 
 	return ContainerResult{
@@ -458,25 +407,16 @@ func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name strin
 	}, nil
 }
 
-// getContainerLogs retrieves container logs using the Docker SDK.
-func (c *RealDockerClient) getContainerLogs(ctx context.Context, cli *client.Client, name string) string {
-	logsReader, err := cli.ContainerLogs(ctx, name, container.LogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Tail:       "100",
-	})
+// getContainerLogsTail retrieves the last 100 lines of container logs using the Docker CLI.
+func (c *RealDockerClient) getContainerLogsTail(ctx context.Context, name string) string {
+	cmd := exec.CommandContext(ctx, "docker", "logs", "--tail", "100", name)
+
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return ""
 	}
 
-	defer func() { _ = logsReader.Close() }()
-
-	logsBytes, err := io.ReadAll(logsReader)
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(string(logsBytes))
+	return strings.TrimSpace(string(output))
 }
 
 // StreamContainerLogs streams container logs in real-time using the Docker SDK.

@@ -6,16 +6,16 @@ Migrate the core `RealDockerClient` methods from SDK to CLI. This covers contain
 lifecycle management (start/stop/remove), log retrieval, and status verification. After this slice,
 all container operations except build, list, streaming logs, and metrics use CLI.
 
-- [ ] 1.1 Replace `ImageExists` — use `docker image inspect` exit code
-- [ ] 1.2 Replace `ContainerExists` — use `docker inspect --format` for state
-- [ ] 1.3 Replace `StartContainer` — use `docker start`
-- [ ] 1.4 Replace `StopContainer` — use `docker stop -t 10`
-- [ ] 1.5 Replace `RemoveContainer` — use `docker rm -f`
-- [ ] 1.6 Replace `LogsContainer` — use `docker logs`
-- [ ] 1.7 Replace `VerifyContainerStatus` — use `docker inspect` + `docker logs --tail 100`
-- [ ] 1.8 Remove `getSDKClient` method and `sdk` field from `RealDockerClient`
-- [ ] 1.9 Update unit tests for changed methods
-- [ ] 1.10 Verify build passes and existing tests pass
+- [x] 1.1 Replace `ImageExists` — use `docker image inspect` exit code
+- [x] 1.2 Replace `ContainerExists` — use `docker inspect --format` for state
+- [x] 1.3 Replace `StartContainer` — use `docker start`
+- [x] 1.4 Replace `StopContainer` — use `docker stop -t 10`
+- [x] 1.5 Replace `RemoveContainer` — use `docker rm -f`
+- [x] 1.6 Replace `LogsContainer` — use `docker logs`
+- [x] 1.7 Replace `VerifyContainerStatus` — use `docker inspect` + `docker logs --tail 100`
+- [x] 1.8 ~~Remove `getSDKClient` method and `sdk` field from `RealDockerClient`~~ Deferred to 5.0 — `BuildImage`, `StreamContainerLogs`, and `ListContainers` still use the SDK client
+- [x] 1.9 Update unit tests for changed methods
+- [x] 1.10 Verify build passes and existing tests pass
 
 ## 2.0 Image Building Migration
 
