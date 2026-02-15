@@ -31,9 +31,9 @@ Add `h` key to toggle the header panel visibility, with the initial state driven
 
 Add `?` key to show a centered help overlay listing all shortcuts.
 
-- [ ] 3.1 Switch app root from `tview.Flex` to `tview.Pages` containing the main layout and a help page
-- [ ] 3.2 Create help overlay content as a bordered, centered `tview.TextView` listing all shortcuts
-- [ ] 3.3 Add `helpVisible bool` field and `?` key handler to toggle overlay page visibility
-- [ ] 3.4 Add dismiss-on-any-key logic: when `helpVisible` is true, any keypress hides the overlay
-- [ ] 3.5 Add unit tests for help overlay state transitions (show, dismiss)
-- [ ] 3.6 Verify build passes and all tests pass
+- [x] 3.1 Switch app root from `tview.Flex` to `tview.Pages` containing the main layout and a help page
+- [x] 3.2 Create help overlay content as a bordered, centered `tview.TextView` listing all shortcuts
+- [x] 3.3 Add `helpVisible bool` field and `?` key handler to toggle overlay page visibility
+- [x] 3.4 Add dismiss-on-any-key logic: when `helpVisible` is true, any keypress hides the overlay
+- [x] 3.5 Add unit tests for help overlay state transitions (show, dismiss)
+- [x] 3.6 Verify build passes and all tests pass

@@ -154,6 +154,58 @@ func TestWatchUI_HeaderStartHidden(t *testing.T) {
 	assert.True(t, ui.headerVisible, "header should be visible after toggle")
 }
 
+func TestWatchUI_HelpOverlay_ShowAndDismiss(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{HeaderVisible: true})
+
+	// Initially help is not visible
+	assert.False(t, ui.helpVisible, "helpVisible should be false initially")
+
+	// Show help
+	ui.showHelp()
+	assert.True(t, ui.helpVisible, "helpVisible should be true after showHelp")
+
+	// Dismiss help
+	ui.hideHelp()
+	assert.False(t, ui.helpVisible, "helpVisible should be false after hideHelp")
+}
+
+func TestWatchUI_HelpOverlay_ToggleCycle(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{HeaderVisible: true})
+
+	// Show → hide → show cycle
+	ui.showHelp()
+	assert.True(t, ui.helpVisible)
+
+	ui.hideHelp()
+	assert.False(t, ui.helpVisible)
+
+	ui.showHelp()
+	assert.True(t, ui.helpVisible)
+}
+
+func TestWatchUI_HelpOverlay_Content(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{})
+
+	// Help overlay should contain shortcut descriptions
+	helpText := ui.helpOverlay.GetText(false)
+	assert.Contains(t, helpText, "Scroll line")
+	assert.Contains(t, helpText, "Scroll page")
+	assert.Contains(t, helpText, "Top/Bottom")
+	assert.Contains(t, helpText, "Toggle header")
+	assert.Contains(t, helpText, "This help")
+	assert.Contains(t, helpText, "Quit")
+}
+
+func TestWatchUI_PagesStructure(t *testing.T) {
+	ui := NewWatchUI("test-container", &mockFormatter{}, WatchContext{HeaderVisible: true})
+
+	// Pages should exist
+	assert.NotNil(t, ui.pages, "pages should not be nil")
+
+	// Help overlay should exist
+	assert.NotNil(t, ui.helpOverlay, "helpOverlay should not be nil")
+}
+
 // mockFormatter is a simple formatter for testing
 type mockFormatter struct{}
 

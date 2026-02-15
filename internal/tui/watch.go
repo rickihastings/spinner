@@ -23,6 +23,8 @@ type WatchUI struct {
 	logView     *tview.TextView
 	footer      *tview.TextView
 	layout      *tview.Flex
+	pages       *tview.Pages
+	helpOverlay *tview.TextView
 	ctx         context.Context
 	cancel      context.CancelFunc
 	mu          sync.Mutex
@@ -44,6 +46,9 @@ type WatchUI struct {
 
 	// Header toggle state
 	headerVisible bool
+
+	// Help overlay state
+	helpVisible bool
 
 	// Test mode flag - when true, skip TUI startup
 	testMode bool
@@ -120,12 +125,46 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 	layout.AddItem(logView, 0, 1, true).
 		AddItem(footer, 1, 0, false)
 
+	// Create help overlay
+	helpOverlay := tview.NewTextView().
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignLeft)
+	helpOverlay.SetBorder(true).
+		SetTitle(" Keyboard Shortcuts ").
+		SetBorderColor(tcell.ColorGray)
+	helpOverlay.SetText(
+		"\n" +
+			" ↑/↓         Scroll line\n" +
+			" PgUp/PgDn   Scroll page\n" +
+			" Home/End     Top/Bottom\n" +
+			" h            Toggle header\n" +
+			" ?            This help\n" +
+			" q            Quit\n")
+
+	// Center the help overlay using nested Flex spacers
+	helpModal := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(nil, 0, 1, false).
+		AddItem(
+			tview.NewFlex().SetDirection(tview.FlexColumn).
+				AddItem(nil, 0, 1, false).
+				AddItem(helpOverlay, 32, 0, true).
+				AddItem(nil, 0, 1, false),
+			11, 0, true).
+		AddItem(nil, 0, 1, false)
+
+	// Wrap main layout and help overlay in Pages
+	pages := tview.NewPages().
+		AddPage("main", layout, true, true).
+		AddPage("help", helpModal, true, false)
+
 	ui := &WatchUI{
 		app:           app,
 		header:        header,
 		logView:       logView,
 		footer:        footer,
 		layout:        layout,
+		pages:         pages,
+		helpOverlay:   helpOverlay,
 		ctx:           ctx,
 		cancel:        cancel,
 		formatter:     formatter,
@@ -159,6 +198,12 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 // setupKeyboardHandlers configures keyboard input handling
 func (ui *WatchUI) setupKeyboardHandlers() {
 	ui.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// When help overlay is visible, any keypress dismisses it
+		if ui.helpVisible {
+			ui.hideHelp()
+			return nil
+		}
+
 		// Handle 'q' key to quit
 		if event.Rune() == 'q' || event.Rune() == 'Q' {
 			ui.Stop()
@@ -167,6 +212,12 @@ func (ui *WatchUI) setupKeyboardHandlers() {
 		// Handle Ctrl+C to quit
 		if event.Key() == tcell.KeyCtrlC {
 			ui.Stop()
+			return nil
+		}
+
+		// Handle '?' key to show help overlay
+		if event.Rune() == '?' {
+			ui.showHelp()
 			return nil
 		}
 
@@ -257,6 +308,18 @@ func (ui *WatchUI) updateFooter() {
 	}
 }
 
+// showHelp shows the help overlay
+func (ui *WatchUI) showHelp() {
+	ui.helpVisible = true
+	ui.pages.ShowPage("help")
+}
+
+// hideHelp hides the help overlay
+func (ui *WatchUI) hideHelp() {
+	ui.helpVisible = false
+	ui.pages.HidePage("help")
+}
+
 // toggleHeader toggles the header panel visibility and rebuilds the layout
 func (ui *WatchUI) toggleHeader() {
 	ui.headerVisible = !ui.headerVisible
@@ -297,7 +360,7 @@ func (ui *WatchUI) Run(logCh <-chan agent.Event, metricsCh <-chan provider.Conta
 	}()
 
 	// Start the application
-	ui.app.SetRoot(ui.layout, true)
+	ui.app.SetRoot(ui.pages, true)
 
 	// Run in goroutine to allow cleanup
 	errCh := make(chan error, 1)
