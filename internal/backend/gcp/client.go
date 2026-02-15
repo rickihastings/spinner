@@ -17,6 +17,7 @@ type Client interface {
 	// Instance operations
 	CreateInstance(ctx context.Context, config instanceConfig) error
 	GetInstance(ctx context.Context, project, zone, name string) (*computepb.Instance, error)
+	SetMetadata(ctx context.Context, project, zone, name string, metadata *computepb.Metadata) error
 	StartInstance(ctx context.Context, project, zone, name string) error
 	StopInstance(ctx context.Context, project, zone, name string) error
 	ResetInstance(ctx context.Context, project, zone, name string) error
@@ -203,6 +204,26 @@ func (c *RealGCPClient) GetInstance(ctx context.Context, project, zone, name str
 	}
 
 	return instance, nil
+}
+
+// SetMetadata replaces the metadata on a VM instance and waits for the operation to complete.
+// The metadata must include the current fingerprint to prevent concurrent modification conflicts.
+func (c *RealGCPClient) SetMetadata(ctx context.Context, project, zone, name string, metadata *computepb.Metadata) error {
+	op, err := c.instances.SetMetadata(ctx, &computepb.SetMetadataInstanceRequest{
+		Project:          project,
+		Zone:             zone,
+		Instance:         name,
+		MetadataResource: metadata,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
+
+	if err := op.Wait(ctx); err != nil {
+		return fmt.Errorf("set metadata failed: %w", err)
+	}
+
+	return nil
 }
 
 // StartInstance starts a stopped VM instance and waits for the operation to complete.

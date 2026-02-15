@@ -111,7 +111,16 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 }
 
 // Start starts a stopped container and verifies it is running.
-func (p *Provider) Start(ctx context.Context, name string) (*provider.Instance, error) {
+// Before starting, it writes configuration overrides (prompt, max-iterations)
+// to the host-mounted state directory so startup.sh picks up the latest values.
+func (p *Provider) Start(ctx context.Context, name string, config provider.CreateConfig) (*provider.Instance, error) {
+	// Write prompt override to the host-mounted state directory.
+	// Docker containers cannot have their env vars updated after creation,
+	// so we write to a file that startup.sh reads on boot.
+	if err := writeConfigOverrides(name, config); err != nil {
+		return nil, fmt.Errorf("failed to write config overrides: %w", err)
+	}
+
 	result, err := p.client.StartContainer(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start instance: %w", err)
@@ -133,13 +142,46 @@ func (p *Provider) Start(ctx context.Context, name string) (*provider.Instance, 
 	return &provider.Instance{Name: name, Status: provider.InstanceStatusRunning}, nil
 }
 
+// writeConfigOverrides writes prompt and max-iterations to the host-mounted
+// state directory so the container picks up updated values on restart.
+func writeConfigOverrides(containerName string, config provider.CreateConfig) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	stateDir := filepath.Join(homeDir, ".spinner", containerName, "state")
+	if err := os.MkdirAll(stateDir, 0755); err != nil {
+		return fmt.Errorf("failed to create state directory: %w", err)
+	}
+
+	// Write prompt override
+	promptFile := filepath.Join(stateDir, "prompt.txt")
+	if err := os.WriteFile(promptFile, []byte(config.Prompt), 0644); err != nil {
+		return fmt.Errorf("failed to write prompt override: %w", err)
+	}
+
+	// Write max-iterations override
+	maxIterations := config.MaxIterations
+	if maxIterations == "" {
+		maxIterations = defaultMaxIterations
+	}
+
+	maxIterFile := filepath.Join(stateDir, "max-iterations.txt")
+	if err := os.WriteFile(maxIterFile, []byte(maxIterations), 0644); err != nil {
+		return fmt.Errorf("failed to write max-iterations override: %w", err)
+	}
+
+	return nil
+}
+
 // Restart stops then starts a container.
 func (p *Provider) Restart(ctx context.Context, name string) (*provider.Instance, error) {
 	if err := p.Stop(ctx, name); err != nil {
 		return nil, err
 	}
 
-	return p.Start(ctx, name)
+	return p.Start(ctx, name, provider.CreateConfig{})
 }
 
 // Stop stops a running container.

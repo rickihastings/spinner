@@ -122,10 +122,24 @@ func TestProviderStartSuccess(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
+	fingerprint := "abc123"
+	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(&computepb.Instance{
+			Name: strPtr("test-vm"),
+			Metadata: &computepb.Metadata{
+				Fingerprint: &fingerprint,
+				Items: []*computepb.Items{
+					{Key: strPtr("PROMPT"), Value: strPtr("old prompt")},
+				},
+			},
+		}, nil)
+	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm", mock.Anything).
+		Return(nil)
 	mockClient.On("StartInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
 		Return(nil)
 
-	instance, err := p.Start(context.Background(), "test-vm")
+	config := provider.CreateConfig{Prompt: "new prompt"}
+	instance, err := p.Start(context.Background(), "test-vm", config)
 	assert.NoError(t, err)
 	assert.Equal(t, "test-vm", instance.Name)
 	assert.Equal(t, provider.InstanceStatusRunning, instance.Status)
@@ -136,10 +150,22 @@ func TestProviderStartError(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
+	fingerprint := "abc123"
+	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(&computepb.Instance{
+			Name: strPtr("test-vm"),
+			Metadata: &computepb.Metadata{
+				Fingerprint: &fingerprint,
+				Items:       []*computepb.Items{},
+			},
+		}, nil)
+	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm", mock.Anything).
+		Return(nil)
 	mockClient.On("StartInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
 		Return(fmt.Errorf("instance start failed"))
 
-	instance, err := p.Start(context.Background(), "test-vm")
+	config := provider.CreateConfig{Prompt: "Fix the bug"}
+	instance, err := p.Start(context.Background(), "test-vm", config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to start instance")
 	assert.Nil(t, instance)
@@ -174,7 +200,18 @@ func TestProviderRestartSuccess(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
+	fingerprint := "abc123"
 	mockClient.On("StopInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(nil)
+	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
+		Return(&computepb.Instance{
+			Name: strPtr("test-vm"),
+			Metadata: &computepb.Metadata{
+				Fingerprint: &fingerprint,
+				Items:       []*computepb.Items{},
+			},
+		}, nil)
+	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm", mock.Anything).
 		Return(nil)
 	mockClient.On("StartInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
 		Return(nil)

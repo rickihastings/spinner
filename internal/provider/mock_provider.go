@@ -29,8 +29,8 @@ func (m *MockProvider) Create(ctx context.Context, config CreateConfig) (*Instan
 }
 
 // Start mocks the Start method.
-func (m *MockProvider) Start(ctx context.Context, name string) (*Instance, error) {
-	args := m.Called(ctx, name)
+func (m *MockProvider) Start(ctx context.Context, name string, config CreateConfig) (*Instance, error) {
+	args := m.Called(ctx, name, config)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

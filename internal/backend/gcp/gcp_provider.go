@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/util"
 )
@@ -231,8 +232,15 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	}, nil
 }
 
-// Start starts a stopped VM instance.
-func (p *Provider) Start(ctx context.Context, name string) (*provider.Instance, error) {
+// Start starts a stopped VM instance, updating its metadata (e.g. prompt)
+// from the provided CreateConfig before starting.
+func (p *Provider) Start(ctx context.Context, name string, config provider.CreateConfig) (*provider.Instance, error) {
+	// Update instance metadata with the latest config before starting.
+	// This ensures the prompt and other settings are current when the VM boots.
+	if err := p.updateMetadata(ctx, name, config); err != nil {
+		return nil, fmt.Errorf("failed to update instance metadata: %w", err)
+	}
+
 	if err := p.client.StartInstance(ctx, p.project, p.zone, name); err != nil {
 		return nil, fmt.Errorf("failed to start instance: %w", err)
 	}
@@ -243,13 +251,61 @@ func (p *Provider) Start(ctx context.Context, name string) (*provider.Instance, 
 	}, nil
 }
 
+// updateMetadata fetches current instance metadata, updates config-driven fields,
+// and writes the updated metadata back using the fingerprint for consistency.
+func (p *Provider) updateMetadata(ctx context.Context, name string, config provider.CreateConfig) error {
+	instance, err := p.client.GetInstance(ctx, p.project, p.zone, name)
+	if err != nil {
+		return fmt.Errorf("failed to get instance: %w", err)
+	}
+
+	metadata := instance.GetMetadata()
+	if metadata == nil {
+		return nil
+	}
+
+	// Build a map of keys to update
+	updates := map[string]string{
+		"PROMPT":                  config.Prompt,
+		"GITHUB_TOKEN":            os.Getenv("GITHUB_TOKEN"),
+		"CLAUDE_CODE_OAUTH_TOKEN": os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"),
+	}
+
+	if config.MaxIterations != "" {
+		updates["MAX_ITERATIONS"] = config.MaxIterations
+	}
+
+	// Update existing metadata items in-place
+	for _, item := range metadata.Items {
+		if item == nil {
+			continue
+		}
+
+		key := item.GetKey()
+		if newVal, ok := updates[key]; ok {
+			item.Value = strPtr(newVal)
+			delete(updates, key)
+		}
+	}
+
+	// Append any new keys that didn't exist in the original metadata
+	for key, value := range updates {
+		metadata.Items = append(metadata.Items, &computepb.Items{
+			Key:   strPtr(key),
+			Value: strPtr(value),
+		})
+	}
+
+	return p.client.SetMetadata(ctx, p.project, p.zone, name, metadata)
+}
+
 // Restart stops then starts a VM instance.
 func (p *Provider) Restart(ctx context.Context, name string) (*provider.Instance, error) {
 	if err := p.Stop(ctx, name); err != nil {
 		return nil, err
 	}
 
-	return p.Start(ctx, name)
+	return p.Start(ctx, name, provider.CreateConfig{})
 }
 
 // Stop stops a running VM instance.

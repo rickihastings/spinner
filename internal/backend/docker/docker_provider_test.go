@@ -185,7 +185,8 @@ func TestDockerProvider_Start_Success(t *testing.T) {
 		ContainerResult{Success: true, ContainerName: "test-container"}, nil,
 	)
 
-	instance, err := p.Start(ctx, "test-container")
+	config := provider.CreateConfig{Prompt: "Fix the bug"}
+	instance, err := p.Start(ctx, "test-container", config)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "test-container", instance.Name)
@@ -202,7 +203,8 @@ func TestDockerProvider_Start_Fails(t *testing.T) {
 		ContainerResult{Success: false, ContainerName: "test-container", Error: "no such container"}, nil,
 	)
 
-	_, err := p.Start(ctx, "test-container")
+	config := provider.CreateConfig{Prompt: "Fix the bug"}
+	_, err := p.Start(ctx, "test-container", config)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no such container")

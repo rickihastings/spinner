@@ -86,8 +86,8 @@ echo "=== Installing Node.js 22.x LTS ==="
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 
-echo "=== Installing Claude Code CLI (global) ==="
-npm install -g @anthropic-ai/claude-code
+echo "=== Installing Claude Code CLI and OpenSpec (global) ==="
+npm install -g @anthropic-ai/claude-code @fission-ai/openspec
 
 echo "=== Installing golangci-lint ==="
 curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b /usr/local/bin

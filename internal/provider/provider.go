@@ -116,8 +116,9 @@ type Provider interface {
 	// has not been set up.
 	Create(ctx context.Context, config CreateConfig) (*Instance, error)
 
-	// Start starts a stopped instance.
-	Start(ctx context.Context, name string) (*Instance, error)
+	// Start starts a stopped instance, updating its configuration (e.g. prompt)
+	// from the provided CreateConfig before starting.
+	Start(ctx context.Context, name string, config CreateConfig) (*Instance, error)
 
 	// Restart restarts a running instance (stop then start).
 	Restart(ctx context.Context, name string) (*Instance, error)

@@ -214,7 +214,7 @@ EXAMPLES:
 				fmt.Println()
 				fmt.Println("Note: Reusing existing instance. Use --recreate flag to force recreation.")
 			case provider.InstanceStatusStopped:
-				instance, err = p.Start(ctx, name)
+				instance, err = p.Start(ctx, name, createConfig)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 					return err

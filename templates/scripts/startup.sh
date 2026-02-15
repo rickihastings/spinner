@@ -43,6 +43,23 @@ fi
 echo "Verifying repository..."
 git status
 
+# Check for config overrides from the state directory (written by spin on restart)
+if [ -f "/state/prompt.txt" ]; then
+  OVERRIDE_PROMPT=$(cat /state/prompt.txt)
+  if [ -n "$OVERRIDE_PROMPT" ]; then
+    PROMPT="$OVERRIDE_PROMPT"
+    export PROMPT
+  fi
+fi
+
+if [ -f "/state/max-iterations.txt" ]; then
+  OVERRIDE_MAX_ITER=$(cat /state/max-iterations.txt)
+  if [ -n "$OVERRIDE_MAX_ITER" ]; then
+    MAX_ITERATIONS="$OVERRIDE_MAX_ITER"
+    export MAX_ITERATIONS
+  fi
+fi
+
 # If PROMPT is set, run Ralph loop
 if [ -n "$PROMPT" ]; then
   echo ""

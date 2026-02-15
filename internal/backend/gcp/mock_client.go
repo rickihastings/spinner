@@ -28,6 +28,12 @@ func (m *MockGCPClient) GetInstance(ctx context.Context, project, zone, name str
 	return args.Get(0).(*computepb.Instance), args.Error(1)
 }
 
+// SetMetadata mocks the SetMetadata method.
+func (m *MockGCPClient) SetMetadata(ctx context.Context, project, zone, name string, metadata *computepb.Metadata) error {
+	args := m.Called(ctx, project, zone, name, metadata)
+	return args.Error(0)
+}
+
 // StartInstance mocks the StartInstance method.
 func (m *MockGCPClient) StartInstance(ctx context.Context, project, zone, name string) error {
 	args := m.Called(ctx, project, zone, name)
