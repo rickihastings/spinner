@@ -56,25 +56,28 @@ EXAMPLES:
 			}
 
 			ctx := context.Background()
+
 			var failures []string
 
 			for _, instanceName := range args {
 				// Check if instance exists
 				status, err := p.Status(ctx, instanceName)
 				if err != nil || status == provider.InstanceStatusNone {
-					fmt.Fprintf(cmd.ErrOrStderr(), "✗ Instance '%s' not found\n", instanceName)
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "✗ Instance '%s' not found\n", instanceName)
 					failures = append(failures, instanceName)
+
 					continue
 				}
 
 				// Remove the instance (providers handle state cleanup)
 				if err := p.Remove(ctx, instanceName); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "✗ Failed to destroy instance '%s': %s\n", instanceName, err.Error())
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "✗ Failed to destroy instance '%s': %s\n", instanceName, err.Error())
 					failures = append(failures, instanceName)
+
 					continue
 				}
 
-				fmt.Fprintf(cmd.OutOrStdout(), "✓ Instance '%s' destroyed\n", instanceName)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✓ Instance '%s' destroyed\n", instanceName)
 			}
 
 			// Return aggregate error if any instance failed

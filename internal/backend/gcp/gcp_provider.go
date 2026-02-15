@@ -286,6 +286,7 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 		key := item.GetKey()
 		if newVal, ok := updates[key]; ok {
 			item.Value = strPtr(newVal)
+
 			delete(updates, key)
 		}
 	}

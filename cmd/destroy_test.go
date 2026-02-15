@@ -150,9 +150,11 @@ func TestDestroyCommand_StateDirectoryCleanup(t *testing.T) {
 	// Create a temporary home directory
 	tmpHome := t.TempDir()
 	originalHome := os.Getenv("HOME")
+
 	t.Setenv("HOME", tmpHome)
+
 	defer func() {
-		os.Setenv("HOME", originalHome)
+		_ = os.Setenv("HOME", originalHome)
 	}()
 
 	// Create state directory

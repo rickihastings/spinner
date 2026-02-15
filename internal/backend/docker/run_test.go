@@ -854,6 +854,7 @@ func TestBuildDockerRunCommand_UserEnvFile(t *testing.T) {
 	// Create a temporary env file to test with
 	tmpEnvFile, err := os.CreateTemp("", "test-env-*.env")
 	assert.NoError(t, err)
+
 	defer func() { _ = os.Remove(tmpEnvFile.Name()) }()
 
 	_, _ = tmpEnvFile.WriteString("API_KEY=secret123\nDATABASE_URL=postgres://localhost\n")
@@ -886,11 +887,13 @@ func TestBuildDockerRunCommand_UserEnvFile(t *testing.T) {
 
 	// Should have two --env-file flags in total
 	count := 0
+
 	for _, arg := range args {
 		if arg == "--env-file" {
 			count++
 		}
 	}
+
 	assert.Equal(t, 2, count, "should have two --env-file flags")
 }
 
@@ -927,10 +930,12 @@ func TestBuildDockerRunCommand_NoUserEnvFile(t *testing.T) {
 
 	// Should have only one --env-file flag (for the system temp file)
 	count := 0
+
 	for _, arg := range args {
 		if arg == "--env-file" {
 			count++
 		}
 	}
+
 	assert.Equal(t, 1, count, "should have exactly one --env-file flag")
 }

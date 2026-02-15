@@ -119,6 +119,7 @@ EXAMPLES:
 					if os.IsNotExist(err) {
 						return fmt.Errorf("--env-file: file does not exist: %s", spinEnvFile)
 					}
+
 					return fmt.Errorf("--env-file: cannot read file: %w", err)
 				}
 			}
@@ -235,11 +236,13 @@ EXAMPLES:
 					retryStatus, statusErr := p.Status(ctx, name)
 					if statusErr == nil && retryStatus == provider.InstanceStatusNone {
 						fmt.Println("Instance was removed, creating fresh instance...")
+
 						instance, err = p.Create(ctx, createConfig)
 						if err != nil {
 							fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 							return err
 						}
+
 						fmt.Printf("✓ Instance created successfully: %s\n", instance.Name)
 					} else {
 						fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())

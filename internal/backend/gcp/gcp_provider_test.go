@@ -203,6 +203,7 @@ func TestProviderRestartSuccess(t *testing.T) {
 	p := newTestProvider(mockClient)
 
 	fingerprint := "abc123"
+
 	mockClient.On("StopInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
 		Return(nil)
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").

@@ -734,6 +734,7 @@ func TestSpinCommand_EnvFileFlagParsing(t *testing.T) {
 	// Create a temporary env file
 	tmpfile, err := os.CreateTemp("", "test-env-*.env")
 	assert.NoError(t, err)
+
 	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	_, _ = tmpfile.WriteString("NPM_TOKEN=abc123\nAPI_KEY=xyz\n")
@@ -815,6 +816,7 @@ func TestSpinCommand_EnvFileAndEnvFlagCombination(t *testing.T) {
 	// Create a temporary env file
 	tmpfile, err := os.CreateTemp("", "test-env-*.env")
 	assert.NoError(t, err)
+
 	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	_, _ = tmpfile.WriteString("NPM_TOKEN=abc123\n")

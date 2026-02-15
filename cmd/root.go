@@ -30,6 +30,7 @@ func findConfigFile(startDir, homeDir string) string {
 			// Reached filesystem root
 			break
 		}
+
 		current = parent
 	}
 
@@ -90,9 +91,11 @@ func init() {
 
 	// Primary config: .spinner.json (traverses from cwd up to root, then checks $HOME)
 	cwd, _ := os.Getwd()
+
 	home, _ := os.UserHomeDir()
 	if configPath := findConfigFile(cwd, home); configPath != "" {
 		viper.SetConfigFile(configPath)
+
 		_ = viper.ReadInConfig() // Ignore error if config can't be read
 	}
 

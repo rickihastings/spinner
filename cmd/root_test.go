@@ -23,6 +23,7 @@ func TestFindConfigFile(t *testing.T) {
 				tmpDir := t.TempDir()
 				configPath := filepath.Join(tmpDir, ".spinner.json")
 				require.NoError(t, os.WriteFile(configPath, []byte("{}"), 0644))
+
 				return tmpDir, ""
 			},
 			expectFound: true,
@@ -37,6 +38,7 @@ func TestFindConfigFile(t *testing.T) {
 
 				childDir := filepath.Join(tmpDir, "subdir")
 				require.NoError(t, os.Mkdir(childDir, 0755))
+
 				return childDir, ""
 			},
 			expectFound: true,
@@ -51,6 +53,7 @@ func TestFindConfigFile(t *testing.T) {
 
 				childDir := filepath.Join(tmpDir, "a", "b")
 				require.NoError(t, os.MkdirAll(childDir, 0755))
+
 				return childDir, ""
 			},
 			expectFound: true,
@@ -63,6 +66,7 @@ func TestFindConfigFile(t *testing.T) {
 				homeDir := t.TempDir()
 				configPath := filepath.Join(homeDir, ".spinner.json")
 				require.NoError(t, os.WriteFile(configPath, []byte("{}"), 0644))
+
 				return startDir, homeDir
 			},
 			expectFound: true,
@@ -73,6 +77,7 @@ func TestFindConfigFile(t *testing.T) {
 			setup: func(t *testing.T) (string, string) {
 				startDir := t.TempDir()
 				homeDir := t.TempDir()
+
 				return startDir, homeDir
 			},
 			expectFound: false,
@@ -94,6 +99,7 @@ func TestFindConfigFile(t *testing.T) {
 
 				childDir := filepath.Join(tmpDir, "subdir")
 				require.NoError(t, os.Mkdir(childDir, 0755))
+
 				return childDir, homeDir
 			},
 			expectFound: true,
@@ -143,8 +149,8 @@ func TestFindConfigFile(t *testing.T) {
 
 func TestConfigPrecedence(t *testing.T) {
 	tests := []struct {
-		name           string
-		setup          func(t *testing.T) (workDir string, cleanup func())
+		name            string
+		setup           func(t *testing.T) (workDir string, cleanup func())
 		expectedBackend string
 	}{
 		{
@@ -165,10 +171,12 @@ func TestConfigPrecedence(t *testing.T) {
 
 				// Save original HOME and set test HOME
 				origHome := os.Getenv("HOME")
-				os.Setenv("HOME", homeDir)
+
+				_ = os.Setenv("HOME", homeDir)
 
 				cleanup := func() {
-					os.Setenv("HOME", origHome)
+					_ = os.Setenv("HOME", origHome)
+
 					viper.Reset()
 				}
 
@@ -188,10 +196,12 @@ func TestConfigPrecedence(t *testing.T) {
 
 				// Save original HOME and set test HOME
 				origHome := os.Getenv("HOME")
-				os.Setenv("HOME", homeDir)
+
+				_ = os.Setenv("HOME", homeDir)
 
 				cleanup := func() {
-					os.Setenv("HOME", origHome)
+					_ = os.Setenv("HOME", origHome)
+
 					viper.Reset()
 				}
 
@@ -215,10 +225,12 @@ func TestConfigPrecedence(t *testing.T) {
 
 				// Save original HOME and set test HOME
 				origHome := os.Getenv("HOME")
-				os.Setenv("HOME", homeDir)
+
+				_ = os.Setenv("HOME", homeDir)
 
 				cleanup := func() {
-					os.Setenv("HOME", origHome)
+					_ = os.Setenv("HOME", origHome)
+
 					viper.Reset()
 				}
 
@@ -235,7 +247,9 @@ func TestConfigPrecedence(t *testing.T) {
 
 			// Save and restore original working directory
 			origDir, _ := os.Getwd()
-			defer os.Chdir(origDir)
+			defer func(dir string) {
+				_ = os.Chdir(dir)
+			}(origDir)
 
 			// Change to test working directory
 			require.NoError(t, os.Chdir(workDir))
@@ -248,9 +262,11 @@ func TestConfigPrecedence(t *testing.T) {
 			viper.AutomaticEnv()
 
 			cwd, _ := os.Getwd()
+
 			home, _ := os.UserHomeDir()
 			if configPath := findConfigFile(cwd, home); configPath != "" {
 				viper.SetConfigFile(configPath)
+
 				err := viper.ReadInConfig()
 				require.NoError(t, err)
 			}
