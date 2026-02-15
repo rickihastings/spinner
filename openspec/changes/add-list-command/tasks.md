@@ -44,8 +44,8 @@
 
 ## 5.0 GCP integration tests
 
-- [ ] 5.1 Extend `TestGCPLifecycle_FullCycle` in `tests/integration/gcp_lifecycle_test.go` to verify
+- [x] 5.1 Extend `TestGCPLifecycle_FullCycle` in `tests/integration/gcp_lifecycle_test.go` to verify
   `spinner list` shows the instance with correct status/metadata/labels after spin
-- [ ] 5.2 Verify state enrichment from GCS: iteration count, agent status, and timestamps are populated
+- [x] 5.2 Verify state enrichment from GCS: iteration count, agent status, and timestamps are populated
   from the GCS state file when `--state-bucket` is configured
-- [ ] 5.3 Verify build succeeds and all integration tests pass
+- [x] 5.3 Verify build succeeds and all integration tests pass

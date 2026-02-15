@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,6 +57,34 @@ func TestGCPLifecycle_FullCycle(t *testing.T) {
 	// Verify VM is running
 	status := testutil.GCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName)
 	assert.Equal(t, "RUNNING", status, "VM should be RUNNING after spin")
+
+	// 2b. List: verify `spinner list` shows the instance with correct status/metadata
+	listArgs := []string{
+		"list",
+		"--project", cfg.Project,
+		"--zone", cfg.Zone,
+		"--state-bucket", cfg.Bucket,
+	}
+	listStdout, listStderr := testutil.RunCommandExpectSuccess(t, listArgs...)
+	listOutput := listStdout + listStderr
+
+	// Verify table headers are present
+	assert.Contains(t, listOutput, "BACKEND", "list should have BACKEND column header")
+	assert.Contains(t, listOutput, "NAME", "list should have NAME column header")
+	assert.Contains(t, listOutput, "STATUS", "list should have STATUS column header")
+
+	// Verify the instance appears in the output with correct backend and status
+	assert.Contains(t, listOutput, instanceName, "list should show the spun GCP instance")
+	assert.Contains(t, listOutput, "gcp", "list should show gcp backend")
+
+	// Find the line with our instance and verify it shows running status
+	for _, line := range strings.Split(listOutput, "\n") {
+		if strings.Contains(line, instanceName) {
+			assert.Contains(t, line, "running", "instance line should show running status")
+			assert.Contains(t, line, "gcp", "instance line should show gcp backend")
+			break
+		}
+	}
 
 	// 3. Stop: stop the VM
 	testutil.StopGCPInstance(t, cfg.Project, cfg.Zone, instanceName)
@@ -169,6 +198,68 @@ func TestGCPLifecycle_VMStaysRunningOnError(t *testing.T) {
 	// Verify VM is still running
 	status := testutil.GCPInstanceStatus(t, cfg.Project, cfg.Zone, instanceName)
 	assert.Equal(t, "RUNNING", status, "VM should still be RUNNING after error for debugging")
+}
+
+// TestGCPList_StateEnrichmentFromGCS verifies that `spinner list` populates execution state
+// (iteration count, agent status) from the GCS state file when --state-bucket is configured.
+func TestGCPList_StateEnrichmentFromGCS(t *testing.T) {
+	cfg := testutil.SkipIfGCPNotAvailable(t)
+
+	imageName := testutil.GetSharedGCPImage(t)
+
+	// Spin a VM with a prompt that will cause an error (invalid repo → quick state write)
+	spinArgs := []string{
+		"spin",
+		"--backend", "gcp",
+		"--image", imageName,
+		"--repo", "https://github.com/invalid/nonexistent-repo-list-test",
+		"--prompt", "do something",
+		"--project", cfg.Project,
+		"--zone", cfg.Zone,
+		"--state-bucket", cfg.Bucket,
+		"--max-iterations", "5",
+	}
+
+	instanceName, _, _ := testutil.RunGCPSpinCommand(t, spinArgs...)
+	require.NotEmpty(t, instanceName, "should get instance name")
+
+	t.Cleanup(func() {
+		testutil.RemoveGCPInstance(t, cfg.Project, cfg.Zone, instanceName)
+		testutil.CleanupGCSPrefix(t, cfg.Bucket, instanceName+"/")
+	})
+
+	// Wait for error state in GCS (repo clone will fail, writing state.json)
+	testutil.WaitForGCSStateStatus(t, cfg.Bucket, instanceName, "error", 120)
+
+	// Run list command with state-bucket to enable state enrichment
+	listArgs := []string{
+		"list",
+		"--project", cfg.Project,
+		"--zone", cfg.Zone,
+		"--state-bucket", cfg.Bucket,
+	}
+	listStdout, listStderr := testutil.RunCommandExpectSuccess(t, listArgs...)
+	listOutput := listStdout + listStderr
+
+	// Verify the instance appears
+	assert.Contains(t, listOutput, instanceName, "list should show the instance")
+
+	// Find the line with our instance and verify state enrichment fields
+	for _, line := range strings.Split(listOutput, "\n") {
+		if strings.Contains(line, instanceName) {
+			// STATE column should show "error" from GCS state file
+			assert.Contains(t, line, "error", "instance line should show error state from GCS")
+
+			// ITER column should show iteration count (e.g., "0/5" or similar)
+			// The max-iterations was set to 5, so we should see "/5"
+			assert.Contains(t, line, "/5", "instance line should show max iterations from metadata")
+
+			// AGE or LAST UPDATE columns should have a time value (not "-")
+			// Since state was written, last_updated should be populated
+			assert.NotContains(t, line, "\t-\t-\n", "instance should have populated time fields")
+			break
+		}
+	}
 }
 
 // TestGCPLifecycle_VMStaysRunningWithoutPrompt tests that VMs stay running when no prompt is specified.
