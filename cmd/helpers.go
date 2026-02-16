@@ -32,6 +32,7 @@ const (
 	flagEnvFile       = "env-file"
 	flagModel         = "model"
 	flagProviderArgs  = "provider-args"
+	flagSecret        = "secret"
 
 	// Config file keys for command-specific provider args.
 	// Using separate keys prevents build flags (e.g. -f ./Dockerfile) from

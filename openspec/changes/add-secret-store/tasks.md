@@ -10,10 +10,10 @@
 
 ## 2.0 `spinner secret` CLI Subcommand
 
-- [ ] 2.1 Add `flagSecret` constant to `cmd/helpers.go`
-- [ ] 2.2 Create `cmd/secret.go` with `spinner secret` parent command and `set`, `list`, `delete` subcommands using Store interface injection
-- [ ] 2.3 Create `cmd/secret_test.go` with MockStore-based tests: set (prompted and `--value`), list, delete, delete nonexistent key error
-- [ ] 2.4 Verify build and all tests pass
+- [x] 2.1 Add `flagSecret` constant to `cmd/helpers.go`
+- [x] 2.2 Create `cmd/secret.go` with `spinner secret` parent command and `set`, `list`, `delete` subcommands using Store interface injection
+- [x] 2.3 Create `cmd/secret_test.go` with MockStore-based tests: set (prompted and `--value`), list, delete, delete nonexistent key error
+- [x] 2.4 Verify build and all tests pass
 
 ## 3.0 Encrypted Blob Transport
 
