@@ -244,9 +244,12 @@ func newEventCollector() *eventCollector {
 // Returns when the channel is closed.
 func (c *eventCollector) collect(ch <-chan agent.Event) {
 	for event := range ch {
-		c.mu.Lock()
-		c.collected = append(c.collected, event)
-		c.mu.Unlock()
+		func() {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+
+			c.collected = append(c.collected, event)
+		}()
 	}
 }
 

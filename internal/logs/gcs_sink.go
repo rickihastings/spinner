@@ -61,9 +61,10 @@ func NewGCSSink(ctx context.Context, writer ObjectWriter, bucket, object string)
 // Write is safe for concurrent use.
 func (s *GCSSink) Write(p []byte) (int, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.buf = append(s.buf, p...)
 	s.dirty = true
-	s.mu.Unlock()
 
 	return len(p), nil
 }

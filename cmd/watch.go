@@ -69,9 +69,7 @@ EXAMPLES:
 	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 
 	// GCP backend flags
-	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
-	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
-	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
+	addGCPQueryFlags(cmd)
 
 	return cmd
 }

@@ -82,17 +82,11 @@ EXAMPLES:
   spinner spin --image my-env --repo https://github.com/octocat/Hello-World.git --prompt "Fix the bug"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind general flags to Viper
-			_ = viper.BindPFlag(flagImage, cmd.Flags().Lookup(flagImage))
-			_ = viper.BindPFlag(flagRepo, cmd.Flags().Lookup(flagRepo))
-			_ = viper.BindPFlag(flagPrompt, cmd.Flags().Lookup(flagPrompt))
-			_ = viper.BindPFlag(flagBranch, cmd.Flags().Lookup(flagBranch))
-			_ = viper.BindPFlag(flagMaxIterations, cmd.Flags().Lookup(flagMaxIterations))
-			_ = viper.BindPFlag(flagModel, cmd.Flags().Lookup(flagModel))
-			_ = viper.BindPFlag(flagRecreate, cmd.Flags().Lookup(flagRecreate))
-			_ = viper.BindPFlag(flagSetup, cmd.Flags().Lookup(flagSetup))
-			_ = viper.BindPFlag(flagBaseImage, cmd.Flags().Lookup(flagBaseImage))
-			_ = viper.BindPFlag(flagDockerfile, cmd.Flags().Lookup(flagDockerfile))
-			_ = viper.BindPFlag(flagWatch, cmd.Flags().Lookup(flagWatch))
+			bindFlags(cmd,
+				flagImage, flagRepo, flagPrompt, flagBranch,
+				flagMaxIterations, flagModel, flagRecreate,
+				flagSetup, flagBaseImage, flagDockerfile, flagWatch,
+			)
 
 			// Resolve and validate backend
 			backend, err := resolveAndValidateBackend(cmd)
@@ -307,13 +301,7 @@ EXAMPLES:
 	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile (Docker backend, requires --setup)")
 
 	// GCP backend flags
-	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
-	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
-	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
-	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
-	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
-	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
-	cmd.Flags().String(flagServiceAccount, "", "GCP service account email (GCP backend)")
+	addGCPSetupFlags(cmd)
 
 	return cmd
 }

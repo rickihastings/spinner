@@ -16,6 +16,14 @@ import (
 	"github.com/rickihastings/spinner/internal/version"
 )
 
+const (
+	// defaultStopTimeoutSecs is the grace period before force-killing a container.
+	defaultStopTimeoutSecs = "10"
+
+	// defaultLogTailLines is the number of trailing log lines to fetch for diagnostics.
+	defaultLogTailLines = "100"
+)
+
 // Client defines the interface for Docker operations.
 // This interface enables dependency injection and mocking for testability.
 type Client interface {
@@ -321,7 +329,7 @@ func (c *RealDockerClient) StartContainer(ctx context.Context, name string) (Con
 
 // StopContainer stops a running container using the Docker CLI.
 func (c *RealDockerClient) StopContainer(ctx context.Context, name string) error {
-	cmd := exec.CommandContext(ctx, "docker", "stop", "-t", "10", name)
+	cmd := exec.CommandContext(ctx, "docker", "stop", "-t", defaultStopTimeoutSecs, name)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to stop container: %s", strings.TrimSpace(string(output)))
 	}
@@ -364,7 +372,7 @@ func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name strin
 
 	if !running {
 		// Get last 100 lines of logs to show what went wrong
-		logsCmd := exec.CommandContext(ctx, "docker", "logs", "--tail", "100", name)
+		logsCmd := exec.CommandContext(ctx, "docker", "logs", "--tail", defaultLogTailLines, name)
 		logsOutput, _ := logsCmd.CombinedOutput()
 
 		return ContainerResult{

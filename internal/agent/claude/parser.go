@@ -11,6 +11,14 @@ import (
 	"github.com/rickihastings/spinner/internal/agent"
 )
 
+const (
+	// scannerBufSize is the initial buffer size for the JSON line scanner.
+	scannerBufSize = 64 * 1024
+
+	// scannerMaxSize is the maximum line size the scanner will handle (1MB).
+	scannerMaxSize = 1024 * 1024
+)
+
 // Parser parses streaming JSON output from the Claude CLI and emits structured events.
 type Parser struct {
 	// includeRaw includes the raw JSON line in emitted events when true.
@@ -35,8 +43,8 @@ func (p *Parser) Parse(ctx context.Context, reader io.Reader) <-chan agent.Event
 
 		scanner := bufio.NewScanner(reader)
 		// Increase buffer size for potentially large JSON lines
-		buf := make([]byte, 0, 64*1024)
-		scanner.Buffer(buf, 1024*1024) // 1MB max line size
+		buf := make([]byte, 0, scannerBufSize)
+		scanner.Buffer(buf, scannerMaxSize)
 
 		for scanner.Scan() {
 			select {

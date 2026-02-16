@@ -52,9 +52,7 @@ EXAMPLES:
   spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind general flags to Viper
-			_ = viper.BindPFlag(flagName, cmd.Flags().Lookup(flagName))
-			_ = viper.BindPFlag(flagBaseImage, cmd.Flags().Lookup(flagBaseImage))
-			_ = viper.BindPFlag(flagDockerfile, cmd.Flags().Lookup(flagDockerfile))
+			bindFlags(cmd, flagName, flagBaseImage, flagDockerfile)
 
 			// Resolve and validate backend
 			backend, err := resolveAndValidateBackend(cmd)
@@ -89,13 +87,7 @@ EXAMPLES:
 	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile (optional)")
 
 	// GCP backend flags
-	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
-	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
-	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
-	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
-	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
-	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
-	cmd.Flags().String(flagServiceAccount, "", "GCP service account email (GCP backend)")
+	addGCPSetupFlags(cmd)
 
 	return cmd
 }

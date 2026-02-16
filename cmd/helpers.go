@@ -163,14 +163,14 @@ func validateDockerFlags(cmd *cobra.Command) error {
 	if setupFlag := cmd.Flags().Lookup(flagSetup); setupFlag != nil {
 		setup, _ := cmd.Flags().GetBool(flagSetup)
 
-		if !setup && baseImage != "" {
-			fmt.Fprintf(os.Stderr, "Error: --%s requires --%s flag\n", flagBaseImage, flagSetup)
-			return fmt.Errorf("--%s requires --%s flag", flagBaseImage, flagSetup)
-		}
-
-		if !setup && dockerfile != "" {
-			fmt.Fprintf(os.Stderr, "Error: --%s requires --%s flag\n", flagDockerfile, flagSetup)
-			return fmt.Errorf("--%s requires --%s flag", flagDockerfile, flagSetup)
+		for _, f := range []struct{ name, value string }{
+			{flagBaseImage, baseImage},
+			{flagDockerfile, dockerfile},
+		} {
+			if !setup && f.value != "" {
+				fmt.Fprintf(os.Stderr, "Error: --%s requires --%s flag\n", f.name, flagSetup)
+				return fmt.Errorf("--%s requires --%s flag", f.name, flagSetup)
+			}
 		}
 	}
 
@@ -282,5 +282,30 @@ func dockerSetupOptions() map[string]string {
 	return map[string]string{
 		flagBaseImage:  viper.GetString(flagBaseImage),
 		flagDockerfile: viper.GetString(flagDockerfile),
+	}
+}
+
+// addGCPSetupFlags registers all GCP-specific flags on a command.
+// Used by setup and spin which need the full set of GCP options.
+func addGCPSetupFlags(cmd *cobra.Command) {
+	addGCPQueryFlags(cmd)
+	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
+	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
+	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
+	cmd.Flags().String(flagServiceAccount, "", "GCP service account email (GCP backend)")
+}
+
+// addGCPQueryFlags registers the minimal GCP flags needed for querying instances.
+// Used by watch and destroy which only need project/zone/bucket to locate instances.
+func addGCPQueryFlags(cmd *cobra.Command) {
+	cmd.Flags().String(flagProject, "", "GCP project ID (GCP backend)")
+	cmd.Flags().String(flagZone, "", "GCP zone (GCP backend)")
+	cmd.Flags().String(flagStateBucket, "", "GCS bucket for state persistence (GCP backend)")
+}
+
+// bindFlags binds the named flags on cmd to Viper.
+func bindFlags(cmd *cobra.Command, flags ...string) {
+	for _, f := range flags {
+		_ = viper.BindPFlag(f, cmd.Flags().Lookup(f))
 	}
 }
