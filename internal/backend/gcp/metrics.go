@@ -84,16 +84,10 @@ func getVMState(ctx context.Context, client Client, project, zone, name string) 
 		return provider.StateUnknown, err
 	}
 
-	vmStatus := vmStatus(instance.Status)
-
-	switch vmStatus {
-	case vmStatusRunning:
+	switch mapVMStatus(instance.Status) {
+	case provider.InstanceStatusRunning:
 		return provider.StateRunning, nil
-	case vmStatusTerminated, vmStatusStopped, vmStatusSuspended:
-		return provider.StateStopped, nil
-	case vmStatusProvisioning, vmStatusStaging:
-		return provider.StateRunning, nil
-	case vmStatusStopping, vmStatusSuspending:
+	case provider.InstanceStatusStopped:
 		return provider.StateStopped, nil
 	default:
 		return provider.StateUnknown, nil

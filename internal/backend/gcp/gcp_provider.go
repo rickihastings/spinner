@@ -363,7 +363,6 @@ func (p *Provider) Status(ctx context.Context, name string) (provider.InstanceSt
 	instance, err := p.client.GetInstance(ctx, p.project, p.zone, name)
 	if err != nil {
 		// If the instance doesn't exist, return None (not an error).
-		// GCP SDK wraps 404s in an error; check the message.
 		if isNotFoundError(err) {
 			return provider.InstanceStatusNone, nil
 		}
@@ -405,42 +404,21 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 		InstanceID: name, // For GCP, the instance name is the identifier
 	}
 
-	// Extract boot disk name as the "image" identifier
+	// Extract boot disk name as the "image" identifier.
+	// The boot disk source is a full URL like:
+	// https://www.googleapis.com/compute/v1/projects/PROJECT/zones/ZONE/disks/DISK_NAME
 	if len(instance.Disks) > 0 {
-		// The boot disk source is a full URL like:
-		// https://www.googleapis.com/compute/v1/projects/PROJECT/zones/ZONE/disks/DISK_NAME
-		// Extract just the disk name
 		diskSource := instance.Disks[0].Source
 		if diskSource != "" {
-			// Get the last part of the URL path
 			parts := strings.Split(diskSource, "/")
-			if len(parts) > 0 {
-				metadata.ImageID = parts[len(parts)-1]
-			}
+			metadata.ImageID = parts[len(parts)-1]
 		}
 	}
 
-	// Try to get agent and max iterations from instance metadata
-	if instance.Metadata != nil {
-		for _, item := range instance.Metadata.Items {
-			switch item.Key {
-			case "ANTHROPIC_MODEL":
-				if item.Value != "" {
-					metadata.Agent = item.Value
-				}
-			case "MAX_ITERATIONS":
-				if item.Value != "" {
-					if val, parseErr := fmt.Sscanf(item.Value, "%d", &metadata.MaxIterations); parseErr != nil || val != 1 {
-						_ = fmt.Errorf("failed to parse max iterations: %s", item.Value)
-					}
-				}
-			case "BRANCH":
-				if item.Value != "" {
-					metadata.Branch = item.Value
-				}
-			}
-		}
-	}
+	vm := parseVMMetadata(instance.Metadata)
+	metadata.Agent = vm.Agent
+	metadata.MaxIterations = vm.MaxIterations
+	metadata.Branch = vm.Branch
 
 	return metadata, nil
 }
@@ -475,18 +453,10 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 		}
 
 		// Extract info from VM metadata items
-		if inst.Metadata != nil {
-			for _, item := range inst.Metadata.Items {
-				switch item.Key {
-				case "ANTHROPIC_MODEL":
-					info.Agent = item.Value
-				case "MAX_ITERATIONS":
-					_, _ = fmt.Sscanf(item.Value, "%d", &info.MaxIterations)
-				case "BRANCH":
-					info.Branch = item.Value
-				}
-			}
-		}
+		vm := parseVMMetadata(inst.Metadata)
+		info.Agent = vm.Agent
+		info.MaxIterations = vm.MaxIterations
+		info.Branch = vm.Branch
 
 		// Enrich from GCS state file if bucket is configured
 		p.enrichFromGCSState(ctx, &info, name)
@@ -513,6 +483,37 @@ func (p *Provider) enrichFromGCSState(ctx context.Context, info *provider.Instan
 	provider.EnrichFromStateData(info, data)
 }
 
+// vmMetadata holds parsed values from a VM's metadata items.
+type vmMetadata struct {
+	Agent         string
+	MaxIterations int
+	Branch        string
+}
+
+// parseVMMetadata extracts known metadata fields from a GCP instance's metadata items.
+func parseVMMetadata(metadata *GCPMetadata) vmMetadata {
+	var m vmMetadata
+
+	if metadata == nil {
+		return m
+	}
+
+	for _, item := range metadata.Items {
+		switch item.Key {
+		case "ANTHROPIC_MODEL":
+			m.Agent = item.Value
+		case "MAX_ITERATIONS":
+			if parsed, err := strconv.Atoi(item.Value); err == nil {
+				m.MaxIterations = parsed
+			}
+		case "BRANCH":
+			m.Branch = item.Value
+		}
+	}
+
+	return m
+}
+
 // gcpGitConfigValue reads a git config value from the host machine.
 // Returns empty string if the value is not set or git is not available.
 func gcpGitConfigValue(key string) string {
@@ -524,7 +525,7 @@ func gcpGitConfigValue(key string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// isNotFoundError checks whether a GCP API error indicates a resource was not found.
+// isNotFoundError checks whether a GCP/gcloud error indicates a resource was not found.
 func isNotFoundError(err error) bool {
 	if err == nil {
 		return false
@@ -534,5 +535,7 @@ func isNotFoundError(err error) bool {
 
 	return strings.Contains(msg, "notfound") ||
 		strings.Contains(msg, "not found") ||
-		strings.Contains(msg, "404")
+		strings.Contains(msg, "404") ||
+		strings.Contains(msg, "commandexception") ||
+		strings.Contains(msg, "matched no objects or files")
 }

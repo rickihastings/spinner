@@ -46,7 +46,7 @@ func isOnGCEWithURL(url string) bool {
 type gcsEnv struct {
 	bucket       string
 	instanceName string
-	writer       *gcsObjectWriter
+	client       Client
 }
 
 // resolveGCSEnv checks whether we're on GCE, reads the given bucket env var,
@@ -74,9 +74,7 @@ func resolveGCSEnv(ctx context.Context, bucketEnvVar, feature string) *gcsEnv {
 		return nil
 	}
 
-	objectWriter := newGCSObjectWriter(client)
-
-	return &gcsEnv{bucket: bucket, instanceName: instanceName, writer: objectWriter}
+	return &gcsEnv{bucket: bucket, instanceName: instanceName, client: client}
 }
 
 // NewLogSinkFactory returns a LogSinkFactory that creates a GCS log sink
@@ -89,13 +87,13 @@ func NewLogSinkFactory() exec.LogSinkFactory {
 		}
 
 		object := env.instanceName + "/logs/raw.log"
-		sink := logs.NewGCSSink(ctx, env.writer, env.bucket, object)
+		sink := logs.NewGCSSink(ctx, env.client, env.bucket, object)
 
 		fmt.Printf("GCS log streaming enabled: gs://%s/%s\n", env.bucket, object)
 
 		cleanup := func() {
 			_ = sink.Close()
-			_ = env.writer.Close()
+			_ = env.client.Close()
 		}
 
 		return sink, cleanup
@@ -121,7 +119,7 @@ func NewStateSyncFactory() exec.StateSyncFactory {
 				return
 			}
 
-			if writeErr := env.writer.WriteObject(context.Background(), env.bucket, object, data); writeErr != nil {
+			if writeErr := env.client.WriteObject(context.Background(), env.bucket, object, data); writeErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to sync state to GCS: %v\n", writeErr)
 			}
 		}

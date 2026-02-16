@@ -351,7 +351,10 @@ func CleanupGCSPrefix(t *testing.T, bucket, prefix string) {
 
 	cmd := exec.Command("gcloud", "storage", "rm", fmt.Sprintf("gs://%s/%s**", bucket, prefix), "--recursive")
 	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Logf("Warning: failed to cleanup GCS prefix %s/%s: %v\n%s", bucket, prefix, err, output)
+		// Ignore "matched no objects or files" — prefix may be empty or never created
+		if !strings.Contains(string(output), "matched no objects or files") {
+			t.Logf("Warning: failed to cleanup GCS prefix %s/%s: %v\n%s", bucket, prefix, err, output)
+		}
 	}
 }
 

@@ -3,10 +3,13 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestMockGCPClientImplementsInterface verifies that MockGCPClient satisfies
@@ -273,4 +276,60 @@ func TestMockClose(t *testing.T) {
 	err := mockClient.Close()
 	assert.NoError(t, err)
 	mockClient.AssertExpectations(t)
+}
+
+func TestBuildMetadataFromFileArg_SimpleValues(t *testing.T) {
+	metadata := map[string]string{
+		"KEY1": "value1",
+		"KEY2": "value2",
+	}
+
+	arg, tmpDir, err := buildMetadataFromFileArg(metadata)
+	require.NoError(t, err)
+
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	assert.True(t, strings.HasPrefix(arg, "--metadata-from-file="))
+
+	// Verify files exist and contain correct values
+	for k, v := range metadata {
+		content, readErr := os.ReadFile(tmpDir + "/" + k)
+		require.NoError(t, readErr)
+		assert.Equal(t, v, string(content))
+	}
+}
+
+func TestBuildMetadataFromFileArg_SpecialCharacters(t *testing.T) {
+	// This is the exact scenario that was failing: values with spaces, commas, brackets
+	metadata := map[string]string{
+		"PROMPT":         "Fix the bug [sets up the environment], then test it",
+		"startup-script": "#!/bin/bash\necho \"hello, world\"\nexport FOO=bar,baz",
+	}
+
+	arg, tmpDir, err := buildMetadataFromFileArg(metadata)
+	require.NoError(t, err)
+
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	assert.True(t, strings.HasPrefix(arg, "--metadata-from-file="))
+
+	// Verify the values are written verbatim (no escaping needed)
+	promptContent, err := os.ReadFile(tmpDir + "/PROMPT")
+	require.NoError(t, err)
+	assert.Equal(t, metadata["PROMPT"], string(promptContent))
+
+	scriptContent, err := os.ReadFile(tmpDir + "/startup-script")
+	require.NoError(t, err)
+	assert.Equal(t, metadata["startup-script"], string(scriptContent))
+}
+
+func TestBuildMetadataFromFileArg_EmptyMap(t *testing.T) {
+	metadata := map[string]string{}
+
+	arg, tmpDir, err := buildMetadataFromFileArg(metadata)
+	require.NoError(t, err)
+
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	assert.Equal(t, "--metadata-from-file=", arg)
 }

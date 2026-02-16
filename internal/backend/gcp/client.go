@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -105,12 +108,14 @@ func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfi
 	}
 
 	if len(config.Metadata) > 0 {
-		var pairs []string
-		for k, v := range config.Metadata {
-			pairs = append(pairs, k+"="+v)
+		metadataArg, tmpDir, metaErr := buildMetadataFromFileArg(config.Metadata)
+		if metaErr != nil {
+			return fmt.Errorf("failed to prepare metadata files: %w", metaErr)
 		}
 
-		args = append(args, "--metadata="+strings.Join(pairs, ","))
+		defer func() { _ = os.RemoveAll(tmpDir) }()
+
+		args = append(args, metadataArg)
 	}
 
 	if len(config.Labels) > 0 {
@@ -167,16 +172,23 @@ func (c *RealGCPClient) SetMetadata(ctx context.Context, project, zone, name str
 		return nil
 	}
 
-	var pairs []string
+	metadataMap := make(map[string]string, len(metadata.Items))
 	for _, item := range metadata.Items {
-		pairs = append(pairs, item.Key+"="+item.Value)
+		metadataMap[item.Key] = item.Value
 	}
+
+	metadataArg, tmpDir, metaErr := buildMetadataFromFileArg(metadataMap)
+	if metaErr != nil {
+		return fmt.Errorf("failed to prepare metadata files: %w", metaErr)
+	}
+
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	_, err := runGcloud(ctx,
 		"compute", "instances", "add-metadata", name,
 		"--project="+project,
 		"--zone="+zone,
-		"--metadata="+strings.Join(pairs, ","),
+		metadataArg,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
@@ -365,8 +377,8 @@ func (c *RealGCPClient) GetSerialPortOutput(ctx context.Context, project, zone, 
 		content = content[:idx]
 
 		// Extract number from "Specify --start=N to continue reading"
-		if start := strings.Index(trailer, "--start="); start != -1 {
-			numStr := trailer[start+len("--start="):]
+		if startIdx := strings.Index(trailer, "--start="); startIdx != -1 {
+			numStr := trailer[startIdx+len("--start="):]
 			if end := strings.IndexByte(numStr, ' '); end != -1 {
 				numStr = numStr[:end]
 			}
@@ -387,6 +399,7 @@ func (c *RealGCPClient) WriteObject(ctx context.Context, bucket, object string, 
 
 	cmd := exec.CommandContext(ctx, "gcloud", "storage", "cp", "-", gcsPath)
 	cmd.Stdin = bytes.NewReader(data)
+	cmd.Stdout = io.Discard
 
 	var stderr bytes.Buffer
 
@@ -461,10 +474,7 @@ func (c *RealGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 
 	_, err := runGcloud(ctx, "storage", "ls", gcsPath)
 	if err != nil {
-		// gcloud storage ls exits non-zero when object doesn't exist
-		if strings.Contains(err.Error(), "not found") ||
-			strings.Contains(err.Error(), "NotFound") ||
-			strings.Contains(err.Error(), "CommandException") {
+		if isNotFoundError(err) {
 			return false, nil
 		}
 
@@ -474,16 +484,39 @@ func (c *RealGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 	return true, nil
 }
 
+// buildMetadataFromFileArg writes each metadata value to a temporary file and
+// returns a --metadata-from-file=KEY1=FILE1,KEY2=FILE2 argument string.
+// This avoids gcloud's --metadata flag parsing issues with values containing
+// commas, spaces, or other special characters (e.g., startup scripts, prompts).
+// The caller must defer os.RemoveAll(tmpDir) to clean up.
+func buildMetadataFromFileArg(metadata map[string]string) (arg string, tmpDir string, err error) {
+	tmpDir, err = os.MkdirTemp("", "spinner-metadata-*")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create temp dir: %w", err)
+	}
+
+	var pairs []string
+
+	for k, v := range metadata {
+		filePath := filepath.Join(tmpDir, k)
+		if writeErr := os.WriteFile(filePath, []byte(v), 0600); writeErr != nil {
+			_ = os.RemoveAll(tmpDir)
+			return "", "", fmt.Errorf("failed to write metadata file for key %q: %w", k, writeErr)
+		}
+
+		pairs = append(pairs, k+"="+filePath)
+	}
+
+	return "--metadata-from-file=" + strings.Join(pairs, ","), tmpDir, nil
+}
+
 // DeleteObjectsWithPrefix deletes all objects in a bucket with the given prefix.
 func (c *RealGCPClient) DeleteObjectsWithPrefix(ctx context.Context, bucket, prefix string) error {
 	gcsPath := fmt.Sprintf("gs://%s/%s**", bucket, prefix)
 
 	_, err := runGcloud(ctx, "storage", "rm", gcsPath)
 	if err != nil {
-		// Ignore "not found" errors — no objects to delete is not an error
-		if strings.Contains(err.Error(), "not found") ||
-			strings.Contains(err.Error(), "NotFound") ||
-			strings.Contains(err.Error(), "CommandException") {
+		if isNotFoundError(err) {
 			return nil
 		}
 

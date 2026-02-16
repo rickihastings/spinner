@@ -77,36 +77,3 @@ func TestReadState_ReadError(t *testing.T) {
 	assert.Nil(t, data)
 	mockClient.AssertExpectations(t)
 }
-
-func TestWriteState_Success(t *testing.T) {
-	mockClient := &MockGCPClient{}
-	ctx := context.Background()
-	bucket := "test-bucket"
-	instance := "test-instance"
-
-	stateJSON := []byte(`{"status":"completed","iteration":5}`)
-
-	mockClient.On("WriteObject", ctx, bucket, "test-instance/state.json", stateJSON).Return(nil)
-
-	err := writeState(ctx, mockClient, bucket, instance, stateJSON)
-	assert.NoError(t, err)
-	mockClient.AssertExpectations(t)
-}
-
-func TestWriteState_Error(t *testing.T) {
-	mockClient := &MockGCPClient{}
-	ctx := context.Background()
-	bucket := "test-bucket"
-	instance := "test-instance"
-
-	stateJSON := []byte(`{"status":"running","iteration":1}`)
-
-	mockClient.On("WriteObject", ctx, bucket, "test-instance/state.json", stateJSON).
-		Return(fmt.Errorf("bucket not found"))
-
-	err := writeState(ctx, mockClient, bucket, instance, stateJSON)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to write state")
-	assert.Contains(t, err.Error(), "gs://test-bucket/test-instance/state.json")
-	mockClient.AssertExpectations(t)
-}
