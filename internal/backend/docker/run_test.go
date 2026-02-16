@@ -447,27 +447,6 @@ func TestBuildDockerRunCommand_RepoURLPassthrough(t *testing.T) {
 	assert.Contains(t, string(content), "REPO_URL=https://github.com/user/repo.git\n", "should pass repo URL through as-is")
 }
 
-// TestEscapeShellArg tests shell argument escaping
-func TestEscapeShellArg(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"simple", "'simple'"},
-		{"with spaces", "'with spaces'"},
-		{"with'quote", "'with'\\''quote'"},
-		{"multiple'quotes'here", "'multiple'\\''quotes'\\''here'"},
-		{"", "''"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result := escapeShellArg(tt.input)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 // TestContainerReuse_MockClient tests container reuse logic with mock (7.6)
 func TestContainerReuse_MockClient(t *testing.T) {
 	tests := []struct {

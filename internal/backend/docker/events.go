@@ -43,17 +43,6 @@ type LogStreamOptions struct {
 	Stderr bool
 }
 
-// defaultLogStreamOptions returns sensible defaults for log streaming.
-func defaultLogStreamOptions() LogStreamOptions {
-	return LogStreamOptions{
-		Follow:     false,
-		Timestamps: false,
-		Tail:       "all",
-		Stdout:     true,
-		Stderr:     true,
-	}
-}
-
 // ContainerListEntry represents a container returned by ListContainers.
 // This replaces the Docker SDK's container.Summary type.
 type ContainerListEntry struct {

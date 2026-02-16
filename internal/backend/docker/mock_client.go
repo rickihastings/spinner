@@ -98,3 +98,6 @@ func (m *MockDockerClient) ContainerEnvVars(ctx context.Context, name string) (m
 
 	return args.Get(0).(map[string]string), args.Error(1)
 }
+
+// Ensure MockDockerClient implements Client interface.
+var _ Client = (*MockDockerClient)(nil)

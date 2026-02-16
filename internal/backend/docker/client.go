@@ -356,13 +356,14 @@ func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name strin
 	}
 
 	if !running {
-		// Get logs to show what went wrong
-		logsOutput := c.getContainerLogsTail(ctx, name)
+		// Get last 100 lines of logs to show what went wrong
+		logsCmd := exec.CommandContext(ctx, "docker", "logs", "--tail", "100", name)
+		logsOutput, _ := logsCmd.CombinedOutput()
 
 		return ContainerResult{
 			Success:       false,
 			ContainerName: name,
-			Error:         fmt.Sprintf("Container exited. Logs: %s", logsOutput),
+			Error:         fmt.Sprintf("Container exited. Logs: %s", strings.TrimSpace(string(logsOutput))),
 		}, fmt.Errorf("container not running: %s", stateStatus)
 	}
 
@@ -370,18 +371,6 @@ func (c *RealDockerClient) VerifyContainerStatus(ctx context.Context, name strin
 		Success:       true,
 		ContainerName: name,
 	}, nil
-}
-
-// getContainerLogsTail retrieves the last 100 lines of container logs using the Docker CLI.
-func (c *RealDockerClient) getContainerLogsTail(ctx context.Context, name string) string {
-	cmd := exec.CommandContext(ctx, "docker", "logs", "--tail", "100", name)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(string(output))
 }
 
 // StreamContainerLogs streams container logs in real-time using the Docker CLI.
@@ -565,5 +554,40 @@ func containerListEntryFromJSON(raw dockerPSJSON) ContainerListEntry {
 
 // ContainerEnvVars reads environment variables from a container using docker inspect.
 func (c *RealDockerClient) ContainerEnvVars(ctx context.Context, name string) (map[string]string, error) {
-	return getContainerEnvVars(ctx, name)
+	inspectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(inspectCtx, "docker", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", name)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	envMap := make(map[string]string)
+
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		if idx := strings.IndexByte(line, '='); idx >= 0 {
+			envMap[line[:idx]] = line[idx+1:]
+		}
+	}
+
+	return envMap, nil
+}
+
+// execCommand executes a shell command and returns the output.
+func execCommand(ctx context.Context, command string) (string, error) {
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
 }
