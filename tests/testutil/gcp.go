@@ -444,7 +444,6 @@ func WaitForGCSStateStatus(t *testing.T, bucket, instanceName, expectedStatus st
 
 			if err := json.Unmarshal(data, &state); err == nil {
 				if state.Status == expectedStatus {
-					t.Logf("GCS state reached expected status: %s", expectedStatus)
 					return
 				}
 			}
@@ -466,7 +465,6 @@ func WaitForGCPInstanceStatus(t *testing.T, project, zone, instanceName, expecte
 		status := GCPInstanceStatus(t, project, zone, instanceName)
 
 		if status == expectedStatus {
-			t.Logf("VM reached expected status: %s", expectedStatus)
 			return
 		}
 

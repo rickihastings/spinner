@@ -236,14 +236,8 @@ func TestWatch_MissingLogDirectory(t *testing.T) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, binaryPath, "watch", containerName)
-	output, err := cmd.CombinedOutput()
+	output, _ := cmd.CombinedOutput()
 	outputStr := string(output)
-
-	// Command should be terminated by timeout or error
-	if err != nil {
-		// This is expected - either timeout or log watcher error
-		t.Logf("Command terminated as expected: %v", err)
-	}
 
 	// Verify warning message about missing logs directory
 	assert.Contains(t, outputStr, "Log watcher error", "should show log watcher error")
