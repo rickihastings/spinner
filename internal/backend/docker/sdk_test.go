@@ -19,41 +19,6 @@ func TestDefaultLogStreamOptions(t *testing.T) {
 	assert.True(t, opts.Stderr)
 }
 
-func TestBuildEvent_IsError(t *testing.T) {
-	tests := []struct {
-		name     string
-		event    buildEvent
-		expected bool
-	}{
-		{
-			name:     "no error",
-			event:    buildEvent{Stream: "Step 1/3 : FROM ubuntu"},
-			expected: false,
-		},
-		{
-			name:     "error string set",
-			event:    buildEvent{Error: "build failed"},
-			expected: true,
-		},
-		{
-			name:     "error detail set",
-			event:    buildEvent{ErrorDetail: &buildErrorDetail{Code: 1, Message: "failed"}},
-			expected: true,
-		},
-		{
-			name:     "both error and detail set",
-			event:    buildEvent{Error: "error", ErrorDetail: &buildErrorDetail{Code: 1}},
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.event.isError())
-		})
-	}
-}
-
 func TestLogEvent_Fields(t *testing.T) {
 	event := LogEvent{
 		Stream:  "stdout",

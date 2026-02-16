@@ -62,10 +62,10 @@ Replace SDK-based metrics collection with CLI-based collection using `docker sta
 Delete SDK wrapper, remove all Docker SDK imports, and clean up dependencies.
 
 - [x] 5.1 Delete `internal/backend/docker/sdk.go` — completed in 3.0 (linter required removal of unused code)
-- [ ] 5.2 Remove unused SDK-specific types from `events.go` (`buildEvent`, `buildErrorDetail`, `buildAux`)
-- [ ] 5.3 Remove all `github.com/docker/docker` imports from remaining files
-- [ ] 5.4 Remove `containerd/errdefs` import (used for SDK not-found detection)
-- [ ] 5.5 Run `go mod tidy` to remove unused dependencies
-- [ ] 5.6 Verify binary size reduction
-- [ ] 5.7 Run full test suite and verify everything passes
-- [ ] 5.8 Update docker-client spec to reflect CLI-based implementation
+- [x] 5.2 Remove unused SDK-specific types from `events.go` (`buildEvent`, `buildErrorDetail`, `buildAux`)
+- [x] 5.3 Remove all `github.com/docker/docker` imports from remaining files — already removed in prior slices
+- [x] 5.4 Remove `containerd/errdefs` import (used for SDK not-found detection) — removed from go.mod
+- [x] 5.5 Run `go mod tidy` to remove unused dependencies
+- [x] 5.6 Verify binary size reduction — binary unchanged (deps weren't compiled in since imports already removed)
+- [x] 5.7 Run full test suite and verify everything passes — all unit tests pass
+- [x] 5.8 Update docker-client spec to reflect CLI-based implementation
