@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -180,6 +181,8 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		"CLAUDE_CODE_OAUTH_TOKEN": os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"),
 		"SPINNER_INSTANCE_NAME":   name,
 		"ANTHROPIC_MODEL":         config.Model,
+		"GIT_USER_NAME":           gcpGitConfigValue("user.name"),
+		"GIT_USER_EMAIL":          gcpGitConfigValue("user.email"),
 	}
 
 	if p.bucket != "" {
@@ -529,6 +532,17 @@ func (p *Provider) enrichFromGCSState(ctx context.Context, info *provider.Instan
 	}
 
 	provider.EnrichFromStateData(info, data)
+}
+
+// gcpGitConfigValue reads a git config value from the host machine.
+// Returns empty string if the value is not set or git is not available.
+func gcpGitConfigValue(key string) string {
+	out, err := exec.Command("git", "config", key).Output()
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(out))
 }
 
 // isNotFoundError checks whether a GCP API error indicates a resource was not found.

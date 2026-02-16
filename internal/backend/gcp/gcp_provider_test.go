@@ -769,6 +769,41 @@ func TestProviderCreateCustomEnvVarsNoCollision(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestProviderCreatePassesGitUserConfig(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	// Image exists
+	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
+		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+
+	// CreateInstance - verify git user config is passed in metadata
+	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
+		_, hasName := config.Metadata["GIT_USER_NAME"]
+		_, hasEmail := config.Metadata["GIT_USER_EMAIL"]
+
+		return hasName && hasEmail
+	})).Return(nil)
+
+	config := provider.CreateConfig{
+		Repo:   "https://github.com/user/repo.git",
+		Prompt: "Fix the bug",
+		Options: map[string]string{
+			"image": "my-env",
+		},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.NoError(t, err)
+	assert.NotNil(t, instance)
+	mockClient.AssertExpectations(t)
+}
+
+func TestGCPGitConfigValue_InvalidKey(t *testing.T) {
+	result := gcpGitConfigValue("nonexistent.key.that.doesnt.exist")
+	assert.Empty(t, result, "should return empty for non-existent git config key")
+}
+
 func TestProviderCreateWithEnvFile(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)

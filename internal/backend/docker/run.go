@@ -3,6 +3,7 @@ package docker
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -123,6 +124,15 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	_, _ = fmt.Fprintf(tmpFile, "CLAUDE_CODE_OAUTH_TOKEN=%s\n", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"))
 	_, _ = fmt.Fprintf(tmpFile, "REPO_URL=%s\n", config.Repo)
 
+	// Pass host git user config so commits are attributed correctly
+	if name := gitConfigValue("user.name"); name != "" {
+		_, _ = fmt.Fprintf(tmpFile, "GIT_USER_NAME=%s\n", name)
+	}
+
+	if email := gitConfigValue("user.email"); email != "" {
+		_, _ = fmt.Fprintf(tmpFile, "GIT_USER_EMAIL=%s\n", email)
+	}
+
 	// Add branch if specified
 	if config.Branch != "" {
 		_, _ = fmt.Fprintf(tmpFile, "BRANCH=%s\n", config.Branch)
@@ -188,4 +198,15 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	dockerArgs = append(dockerArgs, config.Image)
 
 	return dockerArgs, tmpFilePath, nil
+}
+
+// gitConfigValue reads a git config value from the host machine.
+// Returns empty string if the value is not set or git is not available.
+func gitConfigValue(key string) string {
+	out, err := exec.Command("git", "config", key).Output()
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(out))
 }

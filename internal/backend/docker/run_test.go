@@ -999,3 +999,61 @@ func TestBuildDockerRunCommand_NoUserEnvFile(t *testing.T) {
 
 	assert.Equal(t, 1, count, "should have exactly one --env-file flag")
 }
+
+// TestBuildDockerRunCommand_GitUserConfig tests that git user config from host is passed through
+func TestBuildDockerRunCommand_GitUserConfig(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image: "spinner:test",
+		Repo:  "https://github.com/user/repo.git",
+	}
+
+	_, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+
+	contentStr := string(content)
+
+	// The host should have git user config set; verify it's passed through
+	expectedName := gitConfigValue("user.name")
+	expectedEmail := gitConfigValue("user.email")
+
+	if expectedName != "" {
+		assert.Contains(t, contentStr, "GIT_USER_NAME="+expectedName+"\n")
+	} else {
+		assert.NotContains(t, contentStr, "GIT_USER_NAME=")
+	}
+
+	if expectedEmail != "" {
+		assert.Contains(t, contentStr, "GIT_USER_EMAIL="+expectedEmail+"\n")
+	} else {
+		assert.NotContains(t, contentStr, "GIT_USER_EMAIL=")
+	}
+}
+
+// TestGitConfigValue tests that gitConfigValue reads valid git config keys
+func TestGitConfigValue(t *testing.T) {
+	// user.name should be set on any dev machine
+	name := gitConfigValue("user.name")
+	assert.NotEmpty(t, name, "expected git user.name to be configured on host")
+
+	email := gitConfigValue("user.email")
+	assert.NotEmpty(t, email, "expected git user.email to be configured on host")
+}
+
+// TestGitConfigValue_InvalidKey tests that gitConfigValue returns empty for unknown keys
+func TestGitConfigValue_InvalidKey(t *testing.T) {
+	result := gitConfigValue("nonexistent.key.that.doesnt.exist")
+	assert.Empty(t, result, "should return empty for non-existent git config key")
+}

@@ -15,6 +15,15 @@ gh auth setup-git
 # Configure git credential cache with 1-year timeout
 git config --global credential.helper 'cache --timeout=31536000'
 
+# Configure git user identity from host
+if [ -n "$GIT_USER_NAME" ]; then
+  git config --global user.name "$GIT_USER_NAME"
+fi
+
+if [ -n "$GIT_USER_EMAIL" ]; then
+  git config --global user.email "$GIT_USER_EMAIL"
+fi
+
 # Check if REPO_URL is set
 if [ -z "$REPO_URL" ]; then
   echo "Error: REPO_URL environment variable is not set"
