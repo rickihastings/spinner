@@ -17,9 +17,9 @@
 
 ## 3.0 Encrypted Blob Transport
 
-- [ ] 3.1 Create `internal/secret/blob.go` with `EncryptBlob(secrets map[string]string, passphrase string) ([]byte, error)` and `DecryptBlob(path string, passphrase string) (map[string]string, error)` — same AES-256-GCM + Argon2id scheme as store, fresh salt per blob
-- [ ] 3.2 Create `internal/secret/blob_test.go` with tests: round-trip encrypt/decrypt, wrong passphrase error, corrupted blob error, empty secrets map
-- [ ] 3.3 Verify build and all tests pass
+- [x] 3.1 Create `internal/secret/blob.go` with `EncryptBlob(secrets map[string]string, passphrase string) ([]byte, error)` and `DecryptBlob(path string, passphrase string) (map[string]string, error)` — same AES-256-GCM + Argon2id scheme as store, fresh salt per blob
+- [x] 3.2 Create `internal/secret/blob_test.go` with tests: round-trip encrypt/decrypt, wrong passphrase error, corrupted blob error, empty secrets map
+- [x] 3.3 Verify build and all tests pass
 
 ## 4.0 Secret Resolver + Spin Command Integration
 
