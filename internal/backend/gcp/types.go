@@ -72,6 +72,67 @@ type serialPortOutput struct {
 	Next int64
 }
 
+// GCPInstance represents a Compute Engine VM instance.
+type GCPInstance struct {
+	Name              string                `json:"name"`
+	Status            string                `json:"status"`
+	MachineType       string                `json:"machineType"`
+	Zone              string                `json:"zone"`
+	Disks             []GCPDisk             `json:"disks"`
+	NetworkInterfaces []GCPNetworkInterface `json:"networkInterfaces"`
+	Metadata          *GCPMetadata          `json:"metadata"`
+	Labels            map[string]string     `json:"labels"`
+	ServiceAccounts   []GCPServiceAccount   `json:"serviceAccounts"`
+}
+
+// GCPDisk represents an attached disk on a Compute Engine instance.
+type GCPDisk struct {
+	Source     string `json:"source"`
+	Boot       bool   `json:"boot"`
+	AutoDelete bool   `json:"autoDelete"`
+}
+
+// GCPNetworkInterface represents a network interface on a Compute Engine instance.
+type GCPNetworkInterface struct {
+	Network       string            `json:"network"`
+	Subnetwork    string            `json:"subnetwork"`
+	AccessConfigs []GCPAccessConfig `json:"accessConfigs"`
+}
+
+// GCPAccessConfig represents an access configuration for a network interface.
+type GCPAccessConfig struct {
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+	NatIP string `json:"natIP"`
+}
+
+// GCPMetadata represents instance metadata with a fingerprint for consistency.
+type GCPMetadata struct {
+	Fingerprint string            `json:"fingerprint"`
+	Items       []GCPMetadataItem `json:"items"`
+}
+
+// GCPMetadataItem represents a single metadata key-value pair.
+type GCPMetadataItem struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// GCPServiceAccount represents a service account attached to an instance.
+type GCPServiceAccount struct {
+	Email  string   `json:"email"`
+	Scopes []string `json:"scopes"`
+}
+
+// GCPImage represents a Compute Engine image.
+type GCPImage struct {
+	Name        string            `json:"name"`
+	Status      string            `json:"status"`
+	SourceDisk  string            `json:"sourceDisk"`
+	Description string            `json:"description"`
+	Labels      map[string]string `json:"labels"`
+}
+
 // vmStatus represents the status of a GCP VM instance as reported by the API.
 type vmStatus string
 

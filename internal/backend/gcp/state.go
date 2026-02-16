@@ -32,15 +32,3 @@ func readState(ctx context.Context, client Client, bucket, instanceName string) 
 
 	return data, nil
 }
-
-// writeState uploads the state JSON to GCS for the given instance.
-// Overwrites any existing state object with the new data.
-func writeState(ctx context.Context, client Client, bucket, instanceName string, data []byte) error {
-	object := stateObjectPath(instanceName)
-
-	if err := client.WriteObject(ctx, bucket, object, data); err != nil {
-		return fmt.Errorf("failed to write state to gs://%s/%s: %w", bucket, object, err)
-	}
-
-	return nil
-}

@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -63,11 +62,10 @@ func TestProviderStatusRunning(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	running := "RUNNING"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{
-			Name:   strPtr("test-vm"),
-			Status: &running,
+		Return(&GCPInstance{
+			Name:   "test-vm",
+			Status: "RUNNING",
 		}, nil)
 
 	status, err := p.Status(context.Background(), "test-vm")
@@ -80,11 +78,10 @@ func TestProviderStatusStopped(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	terminated := "TERMINATED"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{
-			Name:   strPtr("test-vm"),
-			Status: &terminated,
+		Return(&GCPInstance{
+			Name:   "test-vm",
+			Status: "TERMINATED",
 		}, nil)
 
 	status, err := p.Status(context.Background(), "test-vm")
@@ -124,14 +121,13 @@ func TestProviderStartSuccess(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	fingerprint := "abc123"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{
-			Name: strPtr("test-vm"),
-			Metadata: &computepb.Metadata{
-				Fingerprint: &fingerprint,
-				Items: []*computepb.Items{
-					{Key: strPtr("PROMPT"), Value: strPtr("old prompt")},
+		Return(&GCPInstance{
+			Name: "test-vm",
+			Metadata: &GCPMetadata{
+				Fingerprint: "abc123",
+				Items: []GCPMetadataItem{
+					{Key: "PROMPT", Value: "old prompt"},
 				},
 			},
 		}, nil)
@@ -152,13 +148,12 @@ func TestProviderStartError(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	fingerprint := "abc123"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{
-			Name: strPtr("test-vm"),
-			Metadata: &computepb.Metadata{
-				Fingerprint: &fingerprint,
-				Items:       []*computepb.Items{},
+		Return(&GCPInstance{
+			Name: "test-vm",
+			Metadata: &GCPMetadata{
+				Fingerprint: "abc123",
+				Items:       []GCPMetadataItem{},
 			},
 		}, nil)
 	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm", mock.Anything).
@@ -202,16 +197,14 @@ func TestProviderRestartSuccess(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	fingerprint := "abc123"
-
 	mockClient.On("StopInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
 		Return(nil)
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{
-			Name: strPtr("test-vm"),
-			Metadata: &computepb.Metadata{
-				Fingerprint: &fingerprint,
-				Items:       []*computepb.Items{},
+		Return(&GCPInstance{
+			Name: "test-vm",
+			Metadata: &GCPMetadata{
+				Fingerprint: "abc123",
+				Items:       []GCPMetadataItem{},
 			},
 		}, nil)
 	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm", mock.Anything).
@@ -294,7 +287,7 @@ func TestProviderCreateInstanceError(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance fails
 	mockClient.On("CreateInstance", mock.Anything, mock.Anything).
@@ -321,7 +314,7 @@ func TestProviderCreateSuccess(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance succeeds - use mock.MatchedBy to verify key fields
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
@@ -363,7 +356,7 @@ func TestProviderCreateWithModel(t *testing.T) {
 	p := newTestProvider(mockClient)
 
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
 		return config.Metadata["ANTHROPIC_MODEL"] == "claude-sonnet-4-5-20250929"
@@ -389,7 +382,7 @@ func TestProviderCreateWithoutModel(t *testing.T) {
 	p := newTestProvider(mockClient)
 
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
 		return config.Metadata["ANTHROPIC_MODEL"] == ""
@@ -413,22 +406,21 @@ func TestProviderStartWithModel(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	fingerprint := "abc123"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{
-			Name: strPtr("test-vm"),
-			Metadata: &computepb.Metadata{
-				Fingerprint: &fingerprint,
-				Items: []*computepb.Items{
-					{Key: strPtr("PROMPT"), Value: strPtr("old prompt")},
+		Return(&GCPInstance{
+			Name: "test-vm",
+			Metadata: &GCPMetadata{
+				Fingerprint: "abc123",
+				Items: []GCPMetadataItem{
+					{Key: "PROMPT", Value: "old prompt"},
 				},
 			},
 		}, nil)
 	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm",
-		mock.MatchedBy(func(m *computepb.Metadata) bool {
+		mock.MatchedBy(func(m *GCPMetadata) bool {
 			// Verify ANTHROPIC_MODEL was added to metadata
 			for _, item := range m.Items {
-				if item.GetKey() == "ANTHROPIC_MODEL" && item.GetValue() == "claude-opus-4-6" {
+				if item.Key == "ANTHROPIC_MODEL" && item.Value == "claude-opus-4-6" {
 					return true
 				}
 			}
@@ -452,22 +444,21 @@ func TestProviderStartWithoutModelDoesNotUpdateMetadata(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	fingerprint := "abc123"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{
-			Name: strPtr("test-vm"),
-			Metadata: &computepb.Metadata{
-				Fingerprint: &fingerprint,
-				Items: []*computepb.Items{
-					{Key: strPtr("PROMPT"), Value: strPtr("old prompt")},
+		Return(&GCPInstance{
+			Name: "test-vm",
+			Metadata: &GCPMetadata{
+				Fingerprint: "abc123",
+				Items: []GCPMetadataItem{
+					{Key: "PROMPT", Value: "old prompt"},
 				},
 			},
 		}, nil)
 	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm",
-		mock.MatchedBy(func(m *computepb.Metadata) bool {
+		mock.MatchedBy(func(m *GCPMetadata) bool {
 			// Verify ANTHROPIC_MODEL was NOT added when model is empty
 			for _, item := range m.Items {
-				if item.GetKey() == "ANTHROPIC_MODEL" {
+				if item.Key == "ANTHROPIC_MODEL" {
 					return false
 				}
 			}
@@ -492,7 +483,7 @@ func TestProviderCreateWithCustomOptions(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance with custom machine type and disk size
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
@@ -525,7 +516,7 @@ func TestProviderCreateNoBucket(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// Verify no log/state bucket metadata when bucket is empty
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
@@ -637,9 +628,8 @@ func TestProviderWatchMetrics_StoppedVM(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	terminated := "TERMINATED"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Status: &terminated}, nil)
+		Return(&GCPInstance{Status: "TERMINATED"}, nil)
 
 	ch := make(chan provider.ContainerMetrics, 10)
 	err := p.WatchMetrics(context.Background(), "test-vm", ch)
@@ -661,7 +651,7 @@ func TestProviderCreateWithCustomEnvVars(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance with custom env vars - verify they have SPINNER_ENV_ prefix
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
@@ -693,7 +683,7 @@ func TestProviderCreateWithEmptyEnvVars(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance with empty env vars map - verify no SPINNER_ENV_ keys
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
@@ -728,7 +718,7 @@ func TestProviderCreateCustomEnvVarsNoCollision(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance - verify custom env vars don't overwrite internal metadata
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
@@ -775,7 +765,7 @@ func TestProviderCreatePassesGitUserConfig(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance - verify git user config is passed in metadata
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
@@ -816,7 +806,7 @@ func TestProviderCreateWithEnvFile(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance - verify env file is base64-encoded in metadata
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
@@ -853,30 +843,27 @@ func TestProviderListWithInstances(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
-	running := "RUNNING"
-	terminated := "TERMINATED"
-
 	mockClient.On("ListInstances", mock.Anything, "test-project", "us-central1-a", "labels.spinner-managed=true").
-		Return([]*computepb.Instance{
+		Return([]*GCPInstance{
 			{
-				Name:   strPtr("spinner-default-my-repo"),
-				Status: &running,
+				Name:   "spinner-default-my-repo",
+				Status: "RUNNING",
 				Labels: map[string]string{
 					"spinner-managed": "true",
 					"spinner-image":   "default",
 					"spinner-repo":    "my-repo",
 				},
-				Metadata: &computepb.Metadata{
-					Items: []*computepb.Items{
-						{Key: strPtr("ANTHROPIC_MODEL"), Value: strPtr("claude-sonnet-4-5-20250929")},
-						{Key: strPtr("MAX_ITERATIONS"), Value: strPtr("100")},
-						{Key: strPtr("BRANCH"), Value: strPtr("main")},
+				Metadata: &GCPMetadata{
+					Items: []GCPMetadataItem{
+						{Key: "ANTHROPIC_MODEL", Value: "claude-sonnet-4-5-20250929"},
+						{Key: "MAX_ITERATIONS", Value: "100"},
+						{Key: "BRANCH", Value: "main"},
 					},
 				},
 			},
 			{
-				Name:   strPtr("spinner-default-other-repo"),
-				Status: &terminated,
+				Name:   "spinner-default-other-repo",
+				Status: "TERMINATED",
 				Labels: map[string]string{
 					"spinner-managed": "true",
 					"spinner-image":   "default",
@@ -931,7 +918,7 @@ func TestProviderListNoInstances(t *testing.T) {
 	p := newTestProvider(mockClient)
 
 	mockClient.On("ListInstances", mock.Anything, "test-project", "us-central1-a", "labels.spinner-managed=true").
-		Return([]*computepb.Instance{}, nil)
+		Return([]*GCPInstance{}, nil)
 
 	instances, err := p.List(context.Background())
 	assert.NoError(t, err)
@@ -958,19 +945,18 @@ func TestProviderListNoBucket(t *testing.T) {
 	// Provider with no bucket configured
 	p := NewGCPProvider(mockClient, "test-project", "us-central1-a", "")
 
-	running := "RUNNING"
 	mockClient.On("ListInstances", mock.Anything, "test-project", "us-central1-a", "labels.spinner-managed=true").
-		Return([]*computepb.Instance{
+		Return([]*GCPInstance{
 			{
-				Name:   strPtr("spinner-default-repo"),
-				Status: &running,
+				Name:   "spinner-default-repo",
+				Status: "RUNNING",
 				Labels: map[string]string{
 					"spinner-managed": "true",
 					"spinner-image":   "default",
 				},
-				Metadata: &computepb.Metadata{
-					Items: []*computepb.Items{
-						{Key: strPtr("MAX_ITERATIONS"), Value: strPtr("50")},
+				Metadata: &GCPMetadata{
+					Items: []GCPMetadataItem{
+						{Key: "MAX_ITERATIONS", Value: "50"},
 					},
 				},
 			},
@@ -996,7 +982,7 @@ func TestProviderCreateWithEnvFileNotFound(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	config := provider.CreateConfig{
 		Repo:    "https://github.com/user/repo.git",
@@ -1020,7 +1006,7 @@ func TestProviderCreateWithEmptyEnvFile(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance - verify no SPINNER_ENV_FILE metadata when EnvFile is empty
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {

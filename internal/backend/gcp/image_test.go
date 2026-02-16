@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -71,12 +70,10 @@ func TestBakeImageSuccess(t *testing.T) {
 	}).Return(nil)
 
 	// GetInstance returns RUNNING first, then TERMINATED
-	terminated := "TERMINATED"
-	running := "RUNNING"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
-		Return(&computepb.Instance{Name: strPtr("spinner-bake-test-image"), Status: &running}, nil).Once()
+		Return(&GCPInstance{Name: "spinner-bake-test-image", Status: "RUNNING"}, nil).Once()
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
-		Return(&computepb.Instance{Name: strPtr("spinner-bake-test-image"), Status: &terminated}, nil).Once()
+		Return(&GCPInstance{Name: "spinner-bake-test-image", Status: "TERMINATED"}, nil).Once()
 
 	// Expect CreateImage
 	mockClient.On("CreateImage", mock.Anything, "test-project", imageConfig{
@@ -137,9 +134,8 @@ func TestBakeImageCreateImageError(t *testing.T) {
 	mockClient.On("CreateInstance", mock.Anything, mock.Anything).Return(nil)
 
 	// VM terminates immediately
-	terminated := "TERMINATED"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
-		Return(&computepb.Instance{Name: strPtr("spinner-bake-test-image"), Status: &terminated}, nil)
+		Return(&GCPInstance{Name: "spinner-bake-test-image", Status: "TERMINATED"}, nil)
 
 	// CreateImage fails
 	mockClient.On("CreateImage", mock.Anything, "test-project", mock.Anything).
@@ -174,9 +170,8 @@ func TestBakeImageWaitError(t *testing.T) {
 	mockClient.On("CreateInstance", mock.Anything, mock.Anything).Return(nil)
 
 	// VM enters unexpected state
-	suspended := "SUSPENDED"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
-		Return(&computepb.Instance{Name: strPtr("spinner-bake-test-image"), Status: &suspended}, nil)
+		Return(&GCPInstance{Name: "spinner-bake-test-image", Status: "SUSPENDED"}, nil)
 
 	// Cleanup should still happen
 	mockClient.On("DeleteInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
@@ -204,9 +199,8 @@ func TestBakeImageCleanupErrorDoesNotOverride(t *testing.T) {
 
 	mockClient.On("CreateInstance", mock.Anything, mock.Anything).Return(nil)
 
-	terminated := "TERMINATED"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "spinner-bake-test-image").
-		Return(&computepb.Instance{Name: strPtr("spinner-bake-test-image"), Status: &terminated}, nil)
+		Return(&GCPInstance{Name: "spinner-bake-test-image", Status: "TERMINATED"}, nil)
 
 	mockClient.On("CreateImage", mock.Anything, "test-project", mock.Anything).Return(nil)
 
@@ -223,9 +217,8 @@ func TestWaitForVMTerminatedSuccess(t *testing.T) {
 
 	mockClient := &MockGCPClient{}
 
-	terminated := "TERMINATED"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Name: strPtr("test-vm"), Status: &terminated}, nil)
+		Return(&GCPInstance{Name: "test-vm", Status: "TERMINATED"}, nil)
 
 	err := waitForVMTerminated(context.Background(), mockClient, "test-project", "us-central1-a", "test-vm")
 	assert.NoError(t, err)
@@ -236,16 +229,12 @@ func TestWaitForVMTerminatedTransitionsToTerminated(t *testing.T) {
 
 	mockClient := &MockGCPClient{}
 
-	running := "RUNNING"
-	stopping := "STOPPING"
-	terminated := "TERMINATED"
-
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Name: strPtr("test-vm"), Status: &running}, nil).Once()
+		Return(&GCPInstance{Name: "test-vm", Status: "RUNNING"}, nil).Once()
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Name: strPtr("test-vm"), Status: &stopping}, nil).Once()
+		Return(&GCPInstance{Name: "test-vm", Status: "STOPPING"}, nil).Once()
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Name: strPtr("test-vm"), Status: &terminated}, nil).Once()
+		Return(&GCPInstance{Name: "test-vm", Status: "TERMINATED"}, nil).Once()
 
 	err := waitForVMTerminated(context.Background(), mockClient, "test-project", "us-central1-a", "test-vm")
 	assert.NoError(t, err)
@@ -256,9 +245,8 @@ func TestWaitForVMTerminatedUnexpectedState(t *testing.T) {
 
 	mockClient := &MockGCPClient{}
 
-	suspended := "SUSPENDED"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Name: strPtr("test-vm"), Status: &suspended}, nil)
+		Return(&GCPInstance{Name: "test-vm", Status: "SUSPENDED"}, nil)
 
 	err := waitForVMTerminated(context.Background(), mockClient, "test-project", "us-central1-a", "test-vm")
 	assert.Error(t, err)
@@ -285,9 +273,8 @@ func TestWaitForVMTerminatedContextCancelled(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
 	// Return RUNNING forever — the context cancellation should stop the loop
-	running := "RUNNING"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Name: strPtr("test-vm"), Status: &running}, nil)
+		Return(&GCPInstance{Name: "test-vm", Status: "RUNNING"}, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
@@ -309,9 +296,8 @@ func TestWaitForVMTerminatedTimeout(t *testing.T) {
 
 	mockClient := &MockGCPClient{}
 
-	running := "RUNNING"
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Name: strPtr("test-vm"), Status: &running}, nil)
+		Return(&GCPInstance{Name: "test-vm", Status: "RUNNING"}, nil)
 
 	err := waitForVMTerminated(context.Background(), mockClient, "test-project", "us-central1-a", "test-vm")
 	assert.Error(t, err)

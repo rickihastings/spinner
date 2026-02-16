@@ -1,18 +1,15 @@
 package testutil
 
 import (
-	"context"
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
-
-	"cloud.google.com/go/storage"
 )
 
 // GCP test configuration is provided via environment variables:
@@ -72,16 +69,11 @@ func SkipIfGCPNotAvailable(t *testing.T) *GCPTestConfig {
 		t.Skip("skipping: GCP test environment not configured (set SPINNER_TEST_GCP_PROJECT, SPINNER_TEST_GCP_BUCKET)")
 	}
 
-	// Check that ADC credentials are available by attempting to create a storage client
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		t.Skipf("skipping: GCP credentials not available: %v", err)
+	// Check that gcloud is available and authenticated
+	cmd := exec.Command("gcloud", "auth", "print-access-token")
+	if err := cmd.Run(); err != nil {
+		t.Skipf("skipping: GCP credentials not available (gcloud auth print-access-token failed): %v", err)
 	}
-
-	_ = client.Close()
 
 	return cfg
 }
@@ -320,25 +312,11 @@ func ValidateSharedImage(t *testing.T, project, imageName, expectedHash string) 
 func WriteGCSObject(t *testing.T, bucket, object string, data []byte) {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	cmd := exec.Command("gcloud", "storage", "cp", "-", fmt.Sprintf("gs://%s/%s", bucket, object))
+	cmd.Stdin = bytes.NewReader(data)
 
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		t.Fatalf("failed to create GCS client for write: %v", err)
-	}
-
-	defer func() { _ = client.Close() }()
-
-	w := client.Bucket(bucket).Object(object).NewWriter(ctx)
-	if _, err := w.Write(data); err != nil {
-		_ = w.Close()
-
-		t.Fatalf("failed to write GCS object %s/%s: %v", bucket, object, err)
-	}
-
-	if err := w.Close(); err != nil {
-		t.Fatalf("failed to close GCS writer for %s/%s: %v", bucket, object, err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to write GCS object %s/%s: %v\n%s", bucket, object, err, output)
 	}
 }
 
@@ -346,64 +324,24 @@ func WriteGCSObject(t *testing.T, bucket, object string, data []byte) {
 func GCSObjectExists(t *testing.T, bucket, object string) bool {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	cmd := exec.Command("gcloud", "storage", "ls", fmt.Sprintf("gs://%s/%s", bucket, object))
+	err := cmd.Run()
 
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		t.Fatalf("failed to create GCS client: %v", err)
-	}
-
-	defer func() { _ = client.Close() }()
-
-	_, err = client.Bucket(bucket).Object(object).Attrs(ctx)
-	if err != nil {
-		if errors.Is(err, storage.ErrObjectNotExist) {
-			return false
-		}
-
-		t.Fatalf("failed to check GCS object %s/%s: %v", bucket, object, err)
-	}
-
-	return true
+	return err == nil
 }
 
 // ReadGCSObject reads the full contents of a GCS object.
 func ReadGCSObject(t *testing.T, bucket, object string) []byte {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	cmd := exec.Command("gcloud", "storage", "cat", fmt.Sprintf("gs://%s/%s", bucket, object))
 
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		t.Fatalf("failed to create GCS client for read: %v", err)
-	}
-
-	defer func() { _ = client.Close() }()
-
-	r, err := client.Bucket(bucket).Object(object).NewReader(ctx)
+	output, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("failed to read GCS object %s/%s: %v", bucket, object, err)
 	}
 
-	defer func() { _ = r.Close() }()
-
-	data := make([]byte, 0, 1024)
-	buf := make([]byte, 4096)
-
-	for {
-		n, readErr := r.Read(buf)
-		if n > 0 {
-			data = append(data, buf[:n]...)
-		}
-
-		if readErr != nil {
-			break
-		}
-	}
-
-	return data
+	return output
 }
 
 // CleanupGCSPrefix removes all objects under a given prefix in a GCS bucket.
@@ -411,28 +349,11 @@ func ReadGCSObject(t *testing.T, bucket, object string) []byte {
 func CleanupGCSPrefix(t *testing.T, bucket, prefix string) {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		t.Logf("Warning: failed to create GCS client for cleanup: %v", err)
-		return
-	}
-
-	defer func() { _ = client.Close() }()
-
-	bkt := client.Bucket(bucket)
-	it := bkt.Objects(ctx, &storage.Query{Prefix: prefix})
-
-	for {
-		attrs, iterErr := it.Next()
-		if iterErr != nil {
-			break // iterator.Done or error
-		}
-
-		if delErr := bkt.Object(attrs.Name).Delete(ctx); delErr != nil {
-			t.Logf("Warning: failed to delete GCS object %s: %v", attrs.Name, delErr)
+	cmd := exec.Command("gcloud", "storage", "rm", fmt.Sprintf("gs://%s/%s**", bucket, prefix), "--recursive")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		// Ignore "matched no objects or files" — prefix may be empty or never created
+		if !strings.Contains(string(output), "matched no objects or files") {
+			t.Logf("Warning: failed to cleanup GCS prefix %s/%s: %v\n%s", bucket, prefix, err, output)
 		}
 	}
 }
@@ -523,7 +444,6 @@ func WaitForGCSStateStatus(t *testing.T, bucket, instanceName, expectedStatus st
 
 			if err := json.Unmarshal(data, &state); err == nil {
 				if state.Status == expectedStatus {
-					t.Logf("GCS state reached expected status: %s", expectedStatus)
 					return
 				}
 			}
@@ -545,7 +465,6 @@ func WaitForGCPInstanceStatus(t *testing.T, project, zone, instanceName, expecte
 		status := GCPInstanceStatus(t, project, zone, instanceName)
 
 		if status == expectedStatus {
-			t.Logf("VM reached expected status: %s", expectedStatus)
 			return
 		}
 

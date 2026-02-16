@@ -3,11 +3,13 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
-	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestMockGCPClientImplementsInterface verifies that MockGCPClient satisfies
@@ -61,10 +63,9 @@ func TestMockCreateInstanceError(t *testing.T) {
 func TestMockGetInstance(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	status := "RUNNING"
-	expected := &computepb.Instance{
-		Name:   strPtr("test-instance"),
-		Status: &status,
+	expected := &GCPInstance{
+		Name:   "test-instance",
+		Status: "RUNNING",
 	}
 
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-instance").
@@ -72,8 +73,8 @@ func TestMockGetInstance(t *testing.T) {
 
 	instance, err := mockClient.GetInstance(context.Background(), "test-project", "us-central1-a", "test-instance")
 	assert.NoError(t, err)
-	assert.Equal(t, "test-instance", instance.GetName())
-	assert.Equal(t, "RUNNING", instance.GetStatus())
+	assert.Equal(t, "test-instance", instance.Name)
+	assert.Equal(t, "RUNNING", instance.Status)
 	mockClient.AssertExpectations(t)
 }
 
@@ -152,8 +153,8 @@ func TestMockCreateImage(t *testing.T) {
 func TestMockGetImage(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	expected := &computepb.Image{
-		Name: strPtr("spinner-test"),
+	expected := &GCPImage{
+		Name: "spinner-test",
 	}
 
 	mockClient.On("GetImage", mock.Anything, "test-project", "spinner-test").
@@ -161,7 +162,7 @@ func TestMockGetImage(t *testing.T) {
 
 	image, err := mockClient.GetImage(context.Background(), "test-project", "spinner-test")
 	assert.NoError(t, err)
-	assert.Equal(t, "spinner-test", image.GetName())
+	assert.Equal(t, "spinner-test", image.Name)
 	mockClient.AssertExpectations(t)
 }
 
@@ -277,26 +278,58 @@ func TestMockClose(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestHelperFunctions(t *testing.T) {
-	t.Run("strPtr", func(t *testing.T) {
-		s := strPtr("test")
-		assert.NotNil(t, s)
-		assert.Equal(t, "test", *s)
-	})
+func TestBuildMetadataFromFileArg_SimpleValues(t *testing.T) {
+	metadata := map[string]string{
+		"KEY1": "value1",
+		"KEY2": "value2",
+	}
 
-	t.Run("boolPtr", func(t *testing.T) {
-		b := boolPtr(true)
-		assert.NotNil(t, b)
-		assert.True(t, *b)
+	arg, tmpDir, err := buildMetadataFromFileArg(metadata)
+	require.NoError(t, err)
 
-		b2 := boolPtr(false)
-		assert.NotNil(t, b2)
-		assert.False(t, *b2)
-	})
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	t.Run("int64Ptr", func(t *testing.T) {
-		i := int64Ptr(42)
-		assert.NotNil(t, i)
-		assert.Equal(t, int64(42), *i)
-	})
+	assert.True(t, strings.HasPrefix(arg, "--metadata-from-file="))
+
+	// Verify files exist and contain correct values
+	for k, v := range metadata {
+		content, readErr := os.ReadFile(tmpDir + "/" + k)
+		require.NoError(t, readErr)
+		assert.Equal(t, v, string(content))
+	}
+}
+
+func TestBuildMetadataFromFileArg_SpecialCharacters(t *testing.T) {
+	// This is the exact scenario that was failing: values with spaces, commas, brackets
+	metadata := map[string]string{
+		"PROMPT":         "Fix the bug [sets up the environment], then test it",
+		"startup-script": "#!/bin/bash\necho \"hello, world\"\nexport FOO=bar,baz",
+	}
+
+	arg, tmpDir, err := buildMetadataFromFileArg(metadata)
+	require.NoError(t, err)
+
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	assert.True(t, strings.HasPrefix(arg, "--metadata-from-file="))
+
+	// Verify the values are written verbatim (no escaping needed)
+	promptContent, err := os.ReadFile(tmpDir + "/PROMPT")
+	require.NoError(t, err)
+	assert.Equal(t, metadata["PROMPT"], string(promptContent))
+
+	scriptContent, err := os.ReadFile(tmpDir + "/startup-script")
+	require.NoError(t, err)
+	assert.Equal(t, metadata["startup-script"], string(scriptContent))
+}
+
+func TestBuildMetadataFromFileArg_EmptyMap(t *testing.T) {
+	metadata := map[string]string{}
+
+	arg, tmpDir, err := buildMetadataFromFileArg(metadata)
+	require.NoError(t, err)
+
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	assert.Equal(t, "--metadata-from-file=", arg)
 }

@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/util"
 )
@@ -266,7 +265,7 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 		return fmt.Errorf("failed to get instance: %w", err)
 	}
 
-	metadata := instance.GetMetadata()
+	metadata := instance.Metadata
 	if metadata == nil {
 		return nil
 	}
@@ -287,14 +286,10 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 	}
 
 	// Update existing metadata items in-place
-	for _, item := range metadata.Items {
-		if item == nil {
-			continue
-		}
-
-		key := item.GetKey()
+	for i := range metadata.Items {
+		key := metadata.Items[i].Key
 		if newVal, ok := updates[key]; ok {
-			item.Value = strPtr(newVal)
+			metadata.Items[i].Value = newVal
 
 			delete(updates, key)
 		}
@@ -302,9 +297,9 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 
 	// Append any new keys that didn't exist in the original metadata
 	for key, value := range updates {
-		metadata.Items = append(metadata.Items, &computepb.Items{
-			Key:   strPtr(key),
-			Value: strPtr(value),
+		metadata.Items = append(metadata.Items, GCPMetadataItem{
+			Key:   key,
+			Value: value,
 		})
 	}
 
@@ -368,7 +363,6 @@ func (p *Provider) Status(ctx context.Context, name string) (provider.InstanceSt
 	instance, err := p.client.GetInstance(ctx, p.project, p.zone, name)
 	if err != nil {
 		// If the instance doesn't exist, return None (not an error).
-		// GCP SDK wraps 404s in an error; check the message.
 		if isNotFoundError(err) {
 			return provider.InstanceStatusNone, nil
 		}
@@ -376,7 +370,7 @@ func (p *Provider) Status(ctx context.Context, name string) (provider.InstanceSt
 		return provider.InstanceStatusNone, fmt.Errorf("failed to get instance status: %w", err)
 	}
 
-	return mapVMStatus(instance.GetStatus()), nil
+	return mapVMStatus(instance.Status), nil
 }
 
 // WatchLogs streams log lines from GCS by polling for new content.
@@ -410,49 +404,21 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 		InstanceID: name, // For GCP, the instance name is the identifier
 	}
 
-	// Extract boot disk name as the "image" identifier
-	if len(instance.Disks) > 0 && instance.Disks[0] != nil {
-		// The boot disk source is a full URL like:
-		// https://www.googleapis.com/compute/v1/projects/PROJECT/zones/ZONE/disks/DISK_NAME
-		// Extract just the disk name
-		diskSource := instance.Disks[0].GetSource()
+	// Extract boot disk name as the "image" identifier.
+	// The boot disk source is a full URL like:
+	// https://www.googleapis.com/compute/v1/projects/PROJECT/zones/ZONE/disks/DISK_NAME
+	if len(instance.Disks) > 0 {
+		diskSource := instance.Disks[0].Source
 		if diskSource != "" {
-			// Get the last part of the URL path
 			parts := strings.Split(diskSource, "/")
-			if len(parts) > 0 {
-				metadata.ImageID = parts[len(parts)-1]
-			}
+			metadata.ImageID = parts[len(parts)-1]
 		}
 	}
 
-	// Try to get agent and max iterations from instance metadata
-	if instance.Metadata != nil && instance.Metadata.Items != nil {
-		for _, item := range instance.Metadata.Items {
-			if item == nil {
-				continue
-			}
-
-			key := item.GetKey()
-			value := item.GetValue()
-
-			switch key {
-			case "ANTHROPIC_MODEL":
-				if value != "" {
-					metadata.Agent = value
-				}
-			case "MAX_ITERATIONS":
-				if value != "" {
-					if val, parseErr := fmt.Sscanf(value, "%d", &metadata.MaxIterations); parseErr != nil || val != 1 {
-						_ = fmt.Errorf("failed to parse max iterations: %s", value)
-					}
-				}
-			case "BRANCH":
-				if value != "" {
-					metadata.Branch = value
-				}
-			}
-		}
-	}
+	vm := parseVMMetadata(instance.Metadata)
+	metadata.Agent = vm.Agent
+	metadata.MaxIterations = vm.MaxIterations
+	metadata.Branch = vm.Branch
 
 	return metadata, nil
 }
@@ -468,8 +434,8 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 	var result []provider.InstanceInfo
 
 	for _, inst := range instances {
-		name := inst.GetName()
-		status := mapVMStatus(inst.GetStatus())
+		name := inst.Name
+		status := mapVMStatus(inst.Status)
 
 		info := provider.InstanceInfo{
 			Name:    name,
@@ -478,36 +444,19 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 		}
 
 		// Extract info from VM labels
-		if labels := inst.GetLabels(); labels != nil {
-			if image, ok := labels["spinner-image"]; ok {
-				info.Image = image
-			}
+		if image, ok := inst.Labels["spinner-image"]; ok {
+			info.Image = image
+		}
 
-			if repo, ok := labels["spinner-repo"]; ok {
-				info.Repo = repo
-			}
+		if repo, ok := inst.Labels["spinner-repo"]; ok {
+			info.Repo = repo
 		}
 
 		// Extract info from VM metadata items
-		if inst.Metadata != nil {
-			for _, item := range inst.Metadata.Items {
-				if item == nil {
-					continue
-				}
-
-				key := item.GetKey()
-				value := item.GetValue()
-
-				switch key {
-				case "ANTHROPIC_MODEL":
-					info.Agent = value
-				case "MAX_ITERATIONS":
-					_, _ = fmt.Sscanf(value, "%d", &info.MaxIterations)
-				case "BRANCH":
-					info.Branch = value
-				}
-			}
-		}
+		vm := parseVMMetadata(inst.Metadata)
+		info.Agent = vm.Agent
+		info.MaxIterations = vm.MaxIterations
+		info.Branch = vm.Branch
 
 		// Enrich from GCS state file if bucket is configured
 		p.enrichFromGCSState(ctx, &info, name)
@@ -534,6 +483,37 @@ func (p *Provider) enrichFromGCSState(ctx context.Context, info *provider.Instan
 	provider.EnrichFromStateData(info, data)
 }
 
+// vmMetadata holds parsed values from a VM's metadata items.
+type vmMetadata struct {
+	Agent         string
+	MaxIterations int
+	Branch        string
+}
+
+// parseVMMetadata extracts known metadata fields from a GCP instance's metadata items.
+func parseVMMetadata(metadata *GCPMetadata) vmMetadata {
+	var m vmMetadata
+
+	if metadata == nil {
+		return m
+	}
+
+	for _, item := range metadata.Items {
+		switch item.Key {
+		case "ANTHROPIC_MODEL":
+			m.Agent = item.Value
+		case "MAX_ITERATIONS":
+			if parsed, err := strconv.Atoi(item.Value); err == nil {
+				m.MaxIterations = parsed
+			}
+		case "BRANCH":
+			m.Branch = item.Value
+		}
+	}
+
+	return m
+}
+
 // gcpGitConfigValue reads a git config value from the host machine.
 // Returns empty string if the value is not set or git is not available.
 func gcpGitConfigValue(key string) string {
@@ -545,7 +525,7 @@ func gcpGitConfigValue(key string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// isNotFoundError checks whether a GCP API error indicates a resource was not found.
+// isNotFoundError checks whether a GCP/gcloud error indicates a resource was not found.
 func isNotFoundError(err error) bool {
 	if err == nil {
 		return false
@@ -555,5 +535,7 @@ func isNotFoundError(err error) bool {
 
 	return strings.Contains(msg, "notfound") ||
 		strings.Contains(msg, "not found") ||
-		strings.Contains(msg, "404")
+		strings.Contains(msg, "404") ||
+		strings.Contains(msg, "commandexception") ||
+		strings.Contains(msg, "matched no objects or files")
 }

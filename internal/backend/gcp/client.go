@@ -1,15 +1,16 @@
 package gcp
 
 import (
+	"bytes"
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
-
-	compute "cloud.google.com/go/compute/apiv1"
-	"cloud.google.com/go/compute/apiv1/computepb"
-	"cloud.google.com/go/storage"
-	"google.golang.org/api/iterator"
 )
 
 // Client defines the interface for GCP operations.
@@ -18,8 +19,8 @@ import (
 type Client interface {
 	// Instance operations
 	CreateInstance(ctx context.Context, config instanceConfig) error
-	GetInstance(ctx context.Context, project, zone, name string) (*computepb.Instance, error)
-	SetMetadata(ctx context.Context, project, zone, name string, metadata *computepb.Metadata) error
+	GetInstance(ctx context.Context, project, zone, name string) (*GCPInstance, error)
+	SetMetadata(ctx context.Context, project, zone, name string, metadata *GCPMetadata) error
 	StartInstance(ctx context.Context, project, zone, name string) error
 	StopInstance(ctx context.Context, project, zone, name string) error
 	ResetInstance(ctx context.Context, project, zone, name string) error
@@ -27,11 +28,11 @@ type Client interface {
 
 	// Image operations
 	CreateImage(ctx context.Context, project string, config imageConfig) error
-	GetImage(ctx context.Context, project, name string) (*computepb.Image, error)
+	GetImage(ctx context.Context, project, name string) (*GCPImage, error)
 	DeleteImage(ctx context.Context, project, name string) error
 
 	// ListInstances lists VM instances matching a label filter.
-	ListInstances(ctx context.Context, project, zone string, filter string) ([]*computepb.Instance, error)
+	ListInstances(ctx context.Context, project, zone string, filter string) ([]*GCPInstance, error)
 
 	// Serial port (for boot/bake diagnostics)
 	GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*serialPortOutput, error)
@@ -44,100 +45,51 @@ type Client interface {
 	ObjectExists(ctx context.Context, bucket, object string) (bool, error)
 	DeleteObjectsWithPrefix(ctx context.Context, bucket, prefix string) error
 
-	// Close releases all underlying SDK clients.
+	// Close releases resources (no-op for CLI-based client).
 	Close() error
 }
 
-// RealGCPClient implements Client using the official GCP Go SDK.
-// It uses Application Default Credentials (ADC) for authentication.
-type RealGCPClient struct {
-	instances *compute.InstancesClient
-	images    *compute.ImagesClient
-	storage   *storage.Client
+// RealGCPClient implements Client using the gcloud CLI.
+// Authentication is delegated to gcloud's own credential management.
+type RealGCPClient struct{}
+
+// checkGcloudInstalled verifies that the gcloud CLI is available on PATH.
+func checkGcloudInstalled() error {
+	if _, err := exec.LookPath("gcloud"); err != nil {
+		return fmt.Errorf("gcloud CLI not found on PATH: install from https://cloud.google.com/sdk/docs/install")
+	}
+
+	return nil
 }
 
-// NewRealGCPClient creates a new RealGCPClient with all SDK clients initialized
-// using Application Default Credentials (ADC).
-//
-// ADC supports all standard authentication methods:
-//   - GOOGLE_APPLICATION_CREDENTIALS environment variable
-//   - gcloud auth application-default login
-//   - Service account key files
-//   - Workload identity (on GCE, GKE, Cloud Run)
-func NewRealGCPClient(ctx context.Context) (*RealGCPClient, error) {
-	instancesClient, err := compute.NewInstancesRESTClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create instances client: %w", err)
+// NewRealGCPClient creates a new RealGCPClient after verifying that the gcloud
+// CLI is available on PATH.
+func NewRealGCPClient(_ context.Context) (*RealGCPClient, error) {
+	if err := checkGcloudInstalled(); err != nil {
+		return nil, err
 	}
 
-	imagesClient, err := compute.NewImagesRESTClient(ctx)
-	if err != nil {
-		_ = instancesClient.Close()
-
-		return nil, fmt.Errorf("failed to create images client: %w", err)
-	}
-
-	storageClient, err := storage.NewClient(ctx)
-	if err != nil {
-		_ = instancesClient.Close()
-		_ = imagesClient.Close()
-
-		return nil, fmt.Errorf("failed to create storage client: %w", err)
-	}
-
-	return &RealGCPClient{
-		instances: instancesClient,
-		images:    imagesClient,
-		storage:   storageClient,
-	}, nil
+	return &RealGCPClient{}, nil
 }
 
-// Close releases all underlying SDK clients.
+// Close is a no-op for the CLI-based client (no SDK resources to release).
 func (c *RealGCPClient) Close() error {
-	var firstErr error
-
-	if err := c.instances.Close(); err != nil && firstErr == nil {
-		firstErr = err
-	}
-
-	if err := c.images.Close(); err != nil && firstErr == nil {
-		firstErr = err
-	}
-
-	if err := c.storage.Close(); err != nil && firstErr == nil {
-		firstErr = err
-	}
-
-	return firstErr
+	return nil
 }
 
-// CreateInstance creates a GCP Compute Engine VM instance and waits for the
-// operation to complete.
+// CreateInstance creates a GCP Compute Engine VM instance using gcloud CLI.
 func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfig) error {
-	networkInterface := &computepb.NetworkInterface{
-		Network: strPtr(fmt.Sprintf("global/networks/%s", config.Network)),
-	}
-
-	if config.Subnet != "" {
-		networkInterface.Subnetwork = strPtr(config.Subnet)
-	}
-
-	if config.ExternalIP {
-		networkInterface.AccessConfigs = []*computepb.AccessConfig{
-			{
-				Name: strPtr("External NAT"),
-				Type: strPtr("ONE_TO_ONE_NAT"),
-			},
-		}
-	}
-
-	// Build metadata items from config
-	var metadataItems []*computepb.Items
-	for k, v := range config.Metadata {
-		metadataItems = append(metadataItems, &computepb.Items{
-			Key:   strPtr(k),
-			Value: strPtr(v),
-		})
+	args := []string{
+		"compute", "instances", "create", config.Name,
+		"--project=" + config.Project,
+		"--zone=" + config.Zone,
+		"--machine-type=" + config.MachineType,
+		"--image=" + config.ImageName,
+		"--image-project=" + config.ImageProject,
+		"--boot-disk-size=" + strconv.FormatInt(config.DiskSizeGB, 10) + "GB",
+		"--network=" + config.Network,
+		"--quiet",
+		"--format=json",
 	}
 
 	diskType := config.DiskType
@@ -145,27 +97,34 @@ func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfi
 		diskType = "pd-balanced"
 	}
 
-	sourceImage := fmt.Sprintf("projects/%s/global/images/%s", config.ImageProject, config.ImageName)
+	args = append(args, "--boot-disk-type="+diskType)
 
-	instance := &computepb.Instance{
-		Name:        strPtr(config.Name),
-		MachineType: strPtr(fmt.Sprintf("zones/%s/machineTypes/%s", config.Zone, config.MachineType)),
-		Disks: []*computepb.AttachedDisk{
-			{
-				Boot:       boolPtr(true),
-				AutoDelete: boolPtr(true),
-				InitializeParams: &computepb.AttachedDiskInitializeParams{
-					SourceImage: strPtr(sourceImage),
-					DiskSizeGb:  int64Ptr(config.DiskSizeGB),
-					DiskType:    strPtr(fmt.Sprintf("zones/%s/diskTypes/%s", config.Zone, diskType)),
-				},
-			},
-		},
-		NetworkInterfaces: []*computepb.NetworkInterface{networkInterface},
-		Metadata: &computepb.Metadata{
-			Items: metadataItems,
-		},
-		Labels: config.Labels,
+	if config.Subnet != "" {
+		args = append(args, "--subnet="+config.Subnet)
+	}
+
+	if !config.ExternalIP {
+		args = append(args, "--no-address")
+	}
+
+	if len(config.Metadata) > 0 {
+		metadataArg, tmpDir, metaErr := buildMetadataFromFileArg(config.Metadata)
+		if metaErr != nil {
+			return fmt.Errorf("failed to prepare metadata files: %w", metaErr)
+		}
+
+		defer func() { _ = os.RemoveAll(tmpDir) }()
+
+		args = append(args, metadataArg)
+	}
+
+	if len(config.Labels) > 0 {
+		var pairs []string
+		for k, v := range config.Labels {
+			pairs = append(pairs, k+"="+v)
+		}
+
+		args = append(args, "--labels="+strings.Join(pairs, ","))
 	}
 
 	if config.ServiceAccount != "" || len(config.Scopes) > 0 {
@@ -174,256 +133,281 @@ func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfi
 			email = "default"
 		}
 
-		sa := &computepb.ServiceAccount{
-			Email:  strPtr(email),
-			Scopes: config.Scopes,
-		}
+		args = append(args, "--service-account="+email)
 
-		instance.ServiceAccounts = []*computepb.ServiceAccount{sa}
+		if len(config.Scopes) > 0 {
+			args = append(args, "--scopes="+strings.Join(config.Scopes, ","))
+		}
 	}
 
-	op, err := c.instances.Insert(ctx, &computepb.InsertInstanceRequest{
-		Project:          config.Project,
-		Zone:             config.Zone,
-		InstanceResource: instance,
-	})
+	_, err := runGcloud(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("failed to create instance: %w", err)
-	}
-
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("instance creation failed: %w", err)
 	}
 
 	return nil
 }
 
 // GetInstance retrieves information about a VM instance.
-func (c *RealGCPClient) GetInstance(ctx context.Context, project, zone, name string) (*computepb.Instance, error) {
-	instance, err := c.instances.Get(ctx, &computepb.GetInstanceRequest{
-		Project:  project,
-		Zone:     zone,
-		Instance: name,
-	})
+func (c *RealGCPClient) GetInstance(ctx context.Context, project, zone, name string) (*GCPInstance, error) {
+	var instance GCPInstance
+
+	err := runGcloudJSON(ctx, &instance,
+		"compute", "instances", "describe", name,
+		"--project="+project,
+		"--zone="+zone,
+		"--format=json",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance: %w", err)
 	}
 
-	return instance, nil
+	return &instance, nil
 }
 
-// SetMetadata replaces the metadata on a VM instance and waits for the operation to complete.
-// The metadata must include the current fingerprint to prevent concurrent modification conflicts.
-func (c *RealGCPClient) SetMetadata(ctx context.Context, project, zone, name string, metadata *computepb.Metadata) error {
-	op, err := c.instances.SetMetadata(ctx, &computepb.SetMetadataInstanceRequest{
-		Project:          project,
-		Zone:             zone,
-		Instance:         name,
-		MetadataResource: metadata,
-	})
+// SetMetadata sets metadata on a VM instance using gcloud compute instances add-metadata.
+// gcloud handles fingerprint conflicts internally with retries.
+func (c *RealGCPClient) SetMetadata(ctx context.Context, project, zone, name string, metadata *GCPMetadata) error {
+	if len(metadata.Items) == 0 {
+		return nil
+	}
+
+	metadataMap := make(map[string]string, len(metadata.Items))
+	for _, item := range metadata.Items {
+		metadataMap[item.Key] = item.Value
+	}
+
+	metadataArg, tmpDir, metaErr := buildMetadataFromFileArg(metadataMap)
+	if metaErr != nil {
+		return fmt.Errorf("failed to prepare metadata files: %w", metaErr)
+	}
+
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	_, err := runGcloud(ctx,
+		"compute", "instances", "add-metadata", name,
+		"--project="+project,
+		"--zone="+zone,
+		metadataArg,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("set metadata failed: %w", err)
-	}
-
 	return nil
 }
 
-// StartInstance starts a stopped VM instance and waits for the operation to complete.
+// StartInstance starts a stopped VM instance.
 func (c *RealGCPClient) StartInstance(ctx context.Context, project, zone, name string) error {
-	op, err := c.instances.Start(ctx, &computepb.StartInstanceRequest{
-		Project:  project,
-		Zone:     zone,
-		Instance: name,
-	})
+	_, err := runGcloud(ctx,
+		"compute", "instances", "start", name,
+		"--project="+project,
+		"--zone="+zone,
+		"--quiet",
+	)
 	if err != nil {
 		return fmt.Errorf("failed to start instance: %w", err)
 	}
 
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("instance start failed: %w", err)
-	}
-
 	return nil
 }
 
-// StopInstance stops a running VM instance and waits for the operation to complete.
+// StopInstance stops a running VM instance.
 func (c *RealGCPClient) StopInstance(ctx context.Context, project, zone, name string) error {
-	op, err := c.instances.Stop(ctx, &computepb.StopInstanceRequest{
-		Project:  project,
-		Zone:     zone,
-		Instance: name,
-	})
+	_, err := runGcloud(ctx,
+		"compute", "instances", "stop", name,
+		"--project="+project,
+		"--zone="+zone,
+		"--quiet",
+	)
 	if err != nil {
 		return fmt.Errorf("failed to stop instance: %w", err)
 	}
 
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("instance stop failed: %w", err)
-	}
-
 	return nil
 }
 
-// ResetInstance resets a VM instance (hard reboot) and waits for the operation to complete.
+// ResetInstance resets a VM instance (hard reboot).
 func (c *RealGCPClient) ResetInstance(ctx context.Context, project, zone, name string) error {
-	op, err := c.instances.Reset(ctx, &computepb.ResetInstanceRequest{
-		Project:  project,
-		Zone:     zone,
-		Instance: name,
-	})
+	_, err := runGcloud(ctx,
+		"compute", "instances", "reset", name,
+		"--project="+project,
+		"--zone="+zone,
+		"--quiet",
+	)
 	if err != nil {
 		return fmt.Errorf("failed to reset instance: %w", err)
 	}
 
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("instance reset failed: %w", err)
-	}
-
 	return nil
 }
 
-// DeleteInstance deletes a VM instance and waits for the operation to complete.
+// DeleteInstance deletes a VM instance.
 func (c *RealGCPClient) DeleteInstance(ctx context.Context, project, zone, name string) error {
-	op, err := c.instances.Delete(ctx, &computepb.DeleteInstanceRequest{
-		Project:  project,
-		Zone:     zone,
-		Instance: name,
-	})
+	_, err := runGcloud(ctx,
+		"compute", "instances", "delete", name,
+		"--project="+project,
+		"--zone="+zone,
+		"--quiet",
+	)
 	if err != nil {
 		return fmt.Errorf("failed to delete instance: %w", err)
-	}
-
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("instance deletion failed: %w", err)
 	}
 
 	return nil
 }
 
 // ListInstances lists VM instances matching a label filter expression.
-// The filter uses GCP's filter syntax (e.g., "labels.spinner-managed=true").
-func (c *RealGCPClient) ListInstances(ctx context.Context, project, zone string, filter string) ([]*computepb.Instance, error) {
-	req := &computepb.ListInstancesRequest{
-		Project: project,
-		Zone:    zone,
+func (c *RealGCPClient) ListInstances(ctx context.Context, project, zone string, filter string) ([]*GCPInstance, error) {
+	args := []string{
+		"compute", "instances", "list",
+		"--project=" + project,
+		"--zones=" + zone,
+		"--format=json",
 	}
 
 	if filter != "" {
-		req.Filter = &filter
+		args = append(args, "--filter="+filter)
 	}
 
-	var instances []*computepb.Instance
+	var instances []*GCPInstance
 
-	it := c.instances.List(ctx, req)
-
-	for {
-		instance, err := it.Next()
-		if err != nil {
-			if errors.Is(err, iterator.Done) {
-				break
-			}
-
-			return nil, fmt.Errorf("failed to list instances: %w", err)
-		}
-
-		instances = append(instances, instance)
+	err := runGcloudJSON(ctx, &instances, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list instances: %w", err)
 	}
 
 	return instances, nil
 }
 
-// CreateImage creates a Compute Engine image from a source disk and waits for
-// the operation to complete.
+// CreateImage creates a Compute Engine image from a source disk.
 func (c *RealGCPClient) CreateImage(ctx context.Context, project string, config imageConfig) error {
-	image := &computepb.Image{
-		Name:       strPtr(config.Name),
-		SourceDisk: strPtr(config.SourceDisk),
-		Labels:     config.Labels,
+	args := []string{
+		"compute", "images", "create", config.Name,
+		"--project=" + project,
+		"--source-disk=" + config.SourceDisk,
+		"--quiet",
+		"--format=json",
+	}
+
+	// Extract zone from source disk URL if present
+	// Format: projects/PROJECT/zones/ZONE/disks/DISK_NAME
+	if parts := strings.Split(config.SourceDisk, "/"); len(parts) >= 4 {
+		for i, p := range parts {
+			if p == "zones" && i+1 < len(parts) {
+				args = append(args, "--source-disk-zone="+parts[i+1])
+
+				break
+			}
+		}
+	}
+
+	if len(config.Labels) > 0 {
+		var pairs []string
+		for k, v := range config.Labels {
+			pairs = append(pairs, k+"="+v)
+		}
+
+		args = append(args, "--labels="+strings.Join(pairs, ","))
 	}
 
 	if config.Description != "" {
-		image.Description = strPtr(config.Description)
+		args = append(args, "--description="+config.Description)
 	}
 
-	op, err := c.images.Insert(ctx, &computepb.InsertImageRequest{
-		Project:       project,
-		ImageResource: image,
-	})
+	_, err := runGcloud(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("failed to create image: %w", err)
-	}
-
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("image creation failed: %w", err)
 	}
 
 	return nil
 }
 
 // GetImage retrieves information about a Compute Engine image.
-func (c *RealGCPClient) GetImage(ctx context.Context, project, name string) (*computepb.Image, error) {
-	image, err := c.images.Get(ctx, &computepb.GetImageRequest{
-		Project: project,
-		Image:   name,
-	})
+func (c *RealGCPClient) GetImage(ctx context.Context, project, name string) (*GCPImage, error) {
+	var image GCPImage
+
+	err := runGcloudJSON(ctx, &image,
+		"compute", "images", "describe", name,
+		"--project="+project,
+		"--format=json",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image: %w", err)
 	}
 
-	return image, nil
+	return &image, nil
 }
 
-// DeleteImage deletes a Compute Engine image and waits for the operation to complete.
+// DeleteImage deletes a Compute Engine image.
 func (c *RealGCPClient) DeleteImage(ctx context.Context, project, name string) error {
-	op, err := c.images.Delete(ctx, &computepb.DeleteImageRequest{
-		Project: project,
-		Image:   name,
-	})
+	_, err := runGcloud(ctx,
+		"compute", "images", "delete", name,
+		"--project="+project,
+		"--quiet",
+	)
 	if err != nil {
 		return fmt.Errorf("failed to delete image: %w", err)
-	}
-
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("image deletion failed: %w", err)
 	}
 
 	return nil
 }
 
 // GetSerialPortOutput reads serial port output from a VM instance.
-// The start parameter specifies the byte offset to start reading from (0 for beginning).
 func (c *RealGCPClient) GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*serialPortOutput, error) {
-	output, err := c.instances.GetSerialPortOutput(ctx, &computepb.GetSerialPortOutputInstanceRequest{
-		Project:  project,
-		Zone:     zone,
-		Instance: name,
-		Start:    &start,
-	})
+	output, err := runGcloud(ctx,
+		"compute", "instances", "get-serial-port-output", name,
+		"--project="+project,
+		"--zone="+zone,
+		"--start="+strconv.FormatInt(start, 10),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get serial port output: %w", err)
 	}
 
+	// gcloud get-serial-port-output writes content to stdout and the next byte offset
+	// as the last line in the format: "Specify --start=N to continue reading"
+	content := string(output)
+
+	var next int64
+
+	if idx := strings.LastIndex(content, "\n--\nSpecify --start="); idx != -1 {
+		// Parse next offset from the trailer line
+		trailer := content[idx:]
+		content = content[:idx]
+
+		// Extract number from "Specify --start=N to continue reading"
+		if startIdx := strings.Index(trailer, "--start="); startIdx != -1 {
+			numStr := trailer[startIdx+len("--start="):]
+			if end := strings.IndexByte(numStr, ' '); end != -1 {
+				numStr = numStr[:end]
+			}
+
+			next, _ = strconv.ParseInt(numStr, 10, 64)
+		}
+	}
+
 	return &serialPortOutput{
-		Contents: output.GetContents(),
-		Next:     output.GetNext(),
+		Contents: content,
+		Next:     next,
 	}, nil
 }
 
-// WriteObject writes data to a GCS object, overwriting if it exists.
+// WriteObject writes data to a GCS object using gcloud storage cp with stdin.
 func (c *RealGCPClient) WriteObject(ctx context.Context, bucket, object string, data []byte) error {
-	w := c.storage.Bucket(bucket).Object(object).NewWriter(ctx)
+	gcsPath := fmt.Sprintf("gs://%s/%s", bucket, object)
 
-	if _, err := w.Write(data); err != nil {
-		_ = w.Close()
-		return fmt.Errorf("failed to write object: %w", err)
-	}
+	cmd := exec.CommandContext(ctx, "gcloud", "storage", "cp", "-", gcsPath)
+	cmd.Stdin = bytes.NewReader(data)
+	cmd.Stdout = io.Discard
 
-	if err := w.Close(); err != nil {
-		return fmt.Errorf("failed to close writer: %w", err)
+	var stderr bytes.Buffer
+
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to write object: %s: %w",
+			strings.TrimSpace(stderr.String()), err)
 	}
 
 	return nil
@@ -431,71 +415,66 @@ func (c *RealGCPClient) WriteObject(ctx context.Context, bucket, object string, 
 
 // ReadObject reads the full contents of a GCS object.
 func (c *RealGCPClient) ReadObject(ctx context.Context, bucket, object string) ([]byte, error) {
-	r, err := c.storage.Bucket(bucket).Object(object).NewReader(ctx)
+	gcsPath := fmt.Sprintf("gs://%s/%s", bucket, object)
+
+	output, err := runGcloud(ctx, "storage", "cat", gcsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read object: %w", err)
 	}
 
-	defer func() { _ = r.Close() }()
-
-	data := make([]byte, 0, 1024)
-	buf := make([]byte, 4096)
-
-	for {
-		n, readErr := r.Read(buf)
-		if n > 0 {
-			data = append(data, buf[:n]...)
-		}
-
-		if readErr != nil {
-			break
-		}
-	}
-
-	return data, nil
+	return output, nil
 }
 
 // ReadObjectRange reads a GCS object starting from the given byte offset.
+// Reads the full object and slices from offset in Go (sufficient for small state files).
 func (c *RealGCPClient) ReadObjectRange(ctx context.Context, bucket, object string, offset int64) ([]byte, error) {
-	r, err := c.storage.Bucket(bucket).Object(object).NewRangeReader(ctx, offset, -1)
+	data, err := c.ReadObject(ctx, bucket, object)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read object range: %w", err)
+		return nil, err
 	}
 
-	defer func() { _ = r.Close() }()
-
-	data := make([]byte, 0, 1024)
-	buf := make([]byte, 4096)
-
-	for {
-		n, readErr := r.Read(buf)
-		if n > 0 {
-			data = append(data, buf[:n]...)
-		}
-
-		if readErr != nil {
-			break
-		}
+	if offset >= int64(len(data)) {
+		return []byte{}, nil
 	}
 
-	return data, nil
+	return data[offset:], nil
+}
+
+// gcsObjectInfo represents a single object in gcloud storage ls --format=json output.
+type gcsObjectInfo struct {
+	Size json.Number `json:"size"`
 }
 
 // ObjectSize returns the size of a GCS object in bytes.
 func (c *RealGCPClient) ObjectSize(ctx context.Context, bucket, object string) (int64, error) {
-	attrs, err := c.storage.Bucket(bucket).Object(object).Attrs(ctx)
+	gcsPath := fmt.Sprintf("gs://%s/%s", bucket, object)
+
+	var objects []gcsObjectInfo
+
+	err := runGcloudJSON(ctx, &objects, "storage", "ls", "-l", gcsPath, "--format=json")
 	if err != nil {
-		return 0, fmt.Errorf("failed to get object attrs: %w", err)
+		return 0, fmt.Errorf("failed to get object size: %w", err)
 	}
 
-	return attrs.Size, nil
+	if len(objects) == 0 {
+		return 0, fmt.Errorf("object not found: %s", gcsPath)
+	}
+
+	size, err := objects[0].Size.Int64()
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse object size: %w", err)
+	}
+
+	return size, nil
 }
 
 // ObjectExists checks whether a GCS object exists.
 func (c *RealGCPClient) ObjectExists(ctx context.Context, bucket, object string) (bool, error) {
-	_, err := c.storage.Bucket(bucket).Object(object).Attrs(ctx)
+	gcsPath := fmt.Sprintf("gs://%s/%s", bucket, object)
+
+	_, err := runGcloud(ctx, "storage", "ls", gcsPath)
 	if err != nil {
-		if errors.Is(err, storage.ErrObjectNotExist) {
+		if isNotFoundError(err) {
 			return false, nil
 		}
 
@@ -505,46 +484,44 @@ func (c *RealGCPClient) ObjectExists(ctx context.Context, bucket, object string)
 	return true, nil
 }
 
-// DeleteObjectsWithPrefix deletes all objects in a bucket with the given prefix.
-func (c *RealGCPClient) DeleteObjectsWithPrefix(ctx context.Context, bucket, prefix string) error {
-	bkt := c.storage.Bucket(bucket)
-	it := bkt.Objects(ctx, &storage.Query{Prefix: prefix})
-
-	var errs []string
-
-	for {
-		attrs, err := it.Next()
-		if err != nil {
-			if errors.Is(err, iterator.Done) {
-				break
-			}
-
-			return fmt.Errorf("failed to iterate objects: %w", err)
-		}
-
-		if err := bkt.Object(attrs.Name).Delete(ctx); err != nil {
-			errs = append(errs, fmt.Sprintf("failed to delete %s: %v", attrs.Name, err))
-		}
+// buildMetadataFromFileArg writes each metadata value to a temporary file and
+// returns a --metadata-from-file=KEY1=FILE1,KEY2=FILE2 argument string.
+// This avoids gcloud's --metadata flag parsing issues with values containing
+// commas, spaces, or other special characters (e.g., startup scripts, prompts).
+// The caller must defer os.RemoveAll(tmpDir) to clean up.
+func buildMetadataFromFileArg(metadata map[string]string) (arg string, tmpDir string, err error) {
+	tmpDir, err = os.MkdirTemp("", "spinner-metadata-*")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("failed to delete some objects: %s", strings.Join(errs, "; "))
+	var pairs []string
+
+	for k, v := range metadata {
+		filePath := filepath.Join(tmpDir, k)
+		if writeErr := os.WriteFile(filePath, []byte(v), 0600); writeErr != nil {
+			_ = os.RemoveAll(tmpDir)
+			return "", "", fmt.Errorf("failed to write metadata file for key %q: %w", k, writeErr)
+		}
+
+		pairs = append(pairs, k+"="+filePath)
+	}
+
+	return "--metadata-from-file=" + strings.Join(pairs, ","), tmpDir, nil
+}
+
+// DeleteObjectsWithPrefix deletes all objects in a bucket with the given prefix.
+func (c *RealGCPClient) DeleteObjectsWithPrefix(ctx context.Context, bucket, prefix string) error {
+	gcsPath := fmt.Sprintf("gs://%s/%s**", bucket, prefix)
+
+	_, err := runGcloud(ctx, "storage", "rm", gcsPath)
+	if err != nil {
+		if isNotFoundError(err) {
+			return nil
+		}
+
+		return fmt.Errorf("failed to delete objects with prefix: %w", err)
 	}
 
 	return nil
-}
-
-// strPtr returns a pointer to the given string.
-func strPtr(s string) *string {
-	return &s
-}
-
-// boolPtr returns a pointer to the given bool.
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-// int64Ptr returns a pointer to the given int64.
-func int64Ptr(i int64) *int64 {
-	return &i
 }

@@ -4,26 +4,56 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
-
-	"cloud.google.com/go/compute/metadata"
+	"time"
 
 	"github.com/rickihastings/spinner/internal/exec"
 	"github.com/rickihastings/spinner/internal/logs"
 )
 
+const gceMetadataURL = "http://metadata.google.internal/computeMetadata/v1/"
+
+// isOnGCE checks whether the code is running on a GCE instance by querying
+// the GCE metadata server with a 1-second timeout.
+func isOnGCE() bool {
+	return isOnGCEWithURL(gceMetadataURL)
+}
+
+// isOnGCEWithURL queries the given URL with the GCE metadata header.
+// Extracted for testability.
+func isOnGCEWithURL(url string) bool {
+	client := &http.Client{Timeout: 1 * time.Second}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false
+	}
+
+	req.Header.Set("Metadata-Flavor", "Google")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	return resp.StatusCode == http.StatusOK
+}
+
 // gcsEnv holds the resolved GCS environment for a GCE VM.
 type gcsEnv struct {
 	bucket       string
 	instanceName string
-	writer       *gcsObjectWriter
+	client       Client
 }
 
 // resolveGCSEnv checks whether we're on GCE, reads the given bucket env var,
 // verifies SPINNER_INSTANCE_NAME, and creates an ObjectWriter. Returns nil if
 // any precondition is not met (not on GCE, env var unset, client error).
 func resolveGCSEnv(ctx context.Context, bucketEnvVar, feature string) *gcsEnv {
-	if !metadata.OnGCE() {
+	if !isOnGCE() {
 		return nil
 	}
 
@@ -38,13 +68,13 @@ func resolveGCSEnv(ctx context.Context, bucketEnvVar, feature string) *gcsEnv {
 		return nil
 	}
 
-	objectWriter, err := newGCSObjectWriter(ctx)
+	client, err := NewRealGCPClient(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to create GCS client for %s: %v\n", feature, err)
 		return nil
 	}
 
-	return &gcsEnv{bucket: bucket, instanceName: instanceName, writer: objectWriter}
+	return &gcsEnv{bucket: bucket, instanceName: instanceName, client: client}
 }
 
 // NewLogSinkFactory returns a LogSinkFactory that creates a GCS log sink
@@ -57,13 +87,13 @@ func NewLogSinkFactory() exec.LogSinkFactory {
 		}
 
 		object := env.instanceName + "/logs/raw.log"
-		sink := logs.NewGCSSink(ctx, env.writer, env.bucket, object)
+		sink := logs.NewGCSSink(ctx, env.client, env.bucket, object)
 
 		fmt.Printf("GCS log streaming enabled: gs://%s/%s\n", env.bucket, object)
 
 		cleanup := func() {
 			_ = sink.Close()
-			_ = env.writer.Close()
+			_ = env.client.Close()
 		}
 
 		return sink, cleanup
@@ -89,7 +119,7 @@ func NewStateSyncFactory() exec.StateSyncFactory {
 				return
 			}
 
-			if writeErr := env.writer.WriteObject(context.Background(), env.bucket, object, data); writeErr != nil {
+			if writeErr := env.client.WriteObject(context.Background(), env.bucket, object, data); writeErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to sync state to GCS: %v\n", writeErr)
 			}
 		}
