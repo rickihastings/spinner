@@ -94,7 +94,7 @@ func (f *Formatter) formatAssistantRich(event *agent.Event) (string, bool) {
 
 	if len(textParts) > 0 {
 		rendered := f.renderMarkdown(strings.Join(textParts, "\n\n"))
-		parts = append(parts, rendered)
+		parts = append(parts, "[dodgerblue]⏺[-] "+rendered)
 	}
 
 	parts = append(parts, toolParts...)
@@ -130,7 +130,7 @@ func (f *Formatter) formatToolResult(event *agent.Event) (string, bool) {
 
 		// Build the header line: "⏺ ToolName ⎯⎯⎯⎯⎯⎯"
 		separator := strings.Repeat("⎯", 30)
-		header := fmt.Sprintf("[lightblue]⏺[-] [cyan]%s[-] [darkgray]%s[-]", toolName, separator)
+		header := fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-] [darkgray]%s[-]", toolName, separator)
 
 		// Extract text content and build summary line
 		text := extractToolResultText(block)
@@ -233,10 +233,10 @@ func (f *Formatter) formatToolUse(block contentBlock) string {
 
 	summary := extractToolSummary(block.Name, block.Input)
 	if summary != "" {
-		return fmt.Sprintf("[lightblue]⏺[-] [cyan]%s[-](%s)", block.Name, summary)
+		return fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-](%s)", block.Name, summary)
 	}
 
-	return fmt.Sprintf("[lightblue]⏺[-] [cyan]%s[-]", block.Name)
+	return fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-]", block.Name)
 }
 
 // extractToolSummary extracts a human-readable parameter summary from tool input JSON.
@@ -317,18 +317,17 @@ func formatResultEvent(event *agent.Event) string {
 		return "[cyan]Result:[-] [gray](unknown)[-]"
 	}
 
-	status := "[green]✓ Success[-]"
 	if data.IsError {
-		status = "[red]✗ Error[-]"
+		return "[red]⏺[-] [cyan]Result:[-] [red]✗ Error[-]"
 	}
 
-	return fmt.Sprintf("[cyan]Result:[-] %s", status)
+	return "[green]⏺[-] [cyan]Result:[-] [green]✓ Success[-]"
 }
 
 func formatErrorEvent(event *agent.Event) string {
 	data, ok := event.Data.(errorData)
 	if !ok {
-		return "[red]Error:[-] [gray](unknown error)[-]"
+		return "[red]⏺[-] [red]Error:[-] [gray](unknown error)[-]"
 	}
 
 	msg := data.Message
@@ -336,5 +335,5 @@ func formatErrorEvent(event *agent.Event) string {
 		msg = msg[:97] + "..."
 	}
 
-	return fmt.Sprintf("[red]Error:[-] %s", msg)
+	return fmt.Sprintf("[red]⏺[-] [red]Error:[-] %s", msg)
 }

@@ -99,6 +99,7 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 	logView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(true)
+	logView.SetBorderPadding(1, 0, 2, 2)
 
 	// Note: SetChangedFunc for auto-scroll is set up after the WatchUI struct is created
 	// so the closure can reference ui.userScrolled directly.
@@ -108,6 +109,7 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignLeft)
 	footer.SetBackgroundColor(tcell.ColorDarkSlateGray)
+	footer.SetBorderPadding(0, 0, 1, 0)
 	footer.SetText(" [white]q[darkgray]: quit  [-][white]↑↓[darkgray]: scroll  [-][white]h[darkgray]: header  [-][white]?[darkgray]: help[-]")
 
 	// Determine initial header visibility
@@ -457,10 +459,10 @@ func (ui *WatchUI) appendLog(event agent.Event) {
 
 		// Format the event using the formatter
 		if formatted, ok := ui.formatter.FormatEvent(&event); ok {
-			line = formatted + "\n"
+			line = formatted + "\n\n"
 		} else if event.Raw != "" {
 			// Display raw message for unrecognized events
-			line = fmt.Sprintf("[-]%s\n", event.Raw)
+			line = fmt.Sprintf("[-]%s\n\n", event.Raw)
 		} else {
 			// Skip events we can't format
 			return
