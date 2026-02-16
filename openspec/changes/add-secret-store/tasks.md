@@ -2,11 +2,11 @@
 
 ## 1.0 Store Interface + Encrypted File Backend
 
-- [ ] 1.1 Create `internal/secret/store.go` with `Store` interface (`Set`, `Get`, `Delete`, `List`) and `ErrNotFound` sentinel error
-- [ ] 1.2 Create `internal/secret/encrypted.go` with `EncryptedFileStore` implementation (AES-256-GCM + Argon2id, configurable path via `SPINNER_SECRET_STORE` env var defaulting to `~/.spinner/secrets.enc`, atomic writes, `0600` permissions, injectable passphrase function)
-- [ ] 1.3 Create `internal/secret/encrypted_test.go` with tests: round-trip set/get, multiple keys, delete, list, wrong passphrase error, corrupted file error, missing file returns empty store, atomic write safety, custom store path via env var
-- [ ] 1.4 Create `internal/secret/mock_store.go` with testify `MockStore` for consumer tests
-- [ ] 1.5 Verify build and all tests pass
+- [x] 1.1 Create `internal/secret/store.go` with `Store` interface (`Set`, `Get`, `Delete`, `List`) and `ErrNotFound` sentinel error
+- [x] 1.2 Create `internal/secret/encrypted.go` with `EncryptedFileStore` implementation (AES-256-GCM + Argon2id, configurable path via `SPINNER_SECRET_STORE` env var defaulting to `~/.spinner/secrets.enc`, atomic writes, `0600` permissions, injectable passphrase function)
+- [x] 1.3 Create `internal/secret/encrypted_test.go` with tests: round-trip set/get, multiple keys, delete, list, wrong passphrase error, corrupted file error, missing file returns empty store, atomic write safety, custom store path via env var
+- [x] 1.4 Create `internal/secret/mock_store.go` with testify `MockStore` for consumer tests
+- [x] 1.5 Verify build and all tests pass
 
 ## 2.0 `spinner secret` CLI Subcommand
 
