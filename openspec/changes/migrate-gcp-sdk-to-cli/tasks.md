@@ -43,14 +43,14 @@
 
 ## 4.0 Implement CLI-based GCS operations
 
-- [ ] 4.1 Rewrite `WriteObject` — `gcloud storage cp - gs://bucket/object` (pipe data to stdin)
-- [ ] 4.2 Rewrite `ReadObject` — `gcloud storage cat gs://bucket/object`
-- [ ] 4.3 Rewrite `ReadObjectRange` — read full object via `gcloud storage cat` and slice from offset in Go
-- [ ] 4.4 Rewrite `ObjectSize` — `gcloud storage ls -l gs://bucket/object --format=json` + parse size
-- [ ] 4.5 Rewrite `ObjectExists` — `gcloud storage ls gs://bucket/object` (check exit code)
-- [ ] 4.6 Rewrite `DeleteObjectsWithPrefix` — `gcloud storage rm gs://bucket/prefix/**`
-- [ ] 4.7 Rewrite `object_writer.go` — use Client interface `WriteObject` instead of `storage.Client`
-- [ ] 4.8 Verify build and all tests pass
+- [x] 4.1 Rewrite `WriteObject` — `gcloud storage cp - gs://bucket/object` (pipe data to stdin)
+- [x] 4.2 Rewrite `ReadObject` — `gcloud storage cat gs://bucket/object`
+- [x] 4.3 Rewrite `ReadObjectRange` — read full object via `gcloud storage cat` and slice from offset in Go
+- [x] 4.4 Rewrite `ObjectSize` — `gcloud storage ls -l gs://bucket/object --format=json` + parse size
+- [x] 4.5 Rewrite `ObjectExists` — `gcloud storage ls gs://bucket/object` (check exit code)
+- [x] 4.6 Rewrite `DeleteObjectsWithPrefix` — `gcloud storage rm gs://bucket/prefix/**`
+- [x] 4.7 Rewrite `object_writer.go` — use Client interface `WriteObject` instead of `storage.Client`
+- [x] 4.8 Verify build and all tests pass
 
 ## 5.0 Replace metadata.OnGCE() and add gcloud prerequisite check
 

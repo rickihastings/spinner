@@ -38,11 +38,13 @@ func resolveGCSEnv(ctx context.Context, bucketEnvVar, feature string) *gcsEnv {
 		return nil
 	}
 
-	objectWriter, err := newGCSObjectWriter(ctx)
+	client, err := NewRealGCPClient(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to create GCS client for %s: %v\n", feature, err)
 		return nil
 	}
+
+	objectWriter := newGCSObjectWriter(client)
 
 	return &gcsEnv{bucket: bucket, instanceName: instanceName, writer: objectWriter}
 }
