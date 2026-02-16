@@ -35,11 +35,11 @@
 
 ## 3.0 Implement CLI-based Image operations
 
-- [ ] 3.1 Rewrite `CreateImage` —
+- [x] 3.1 Rewrite `CreateImage` —
   `gcloud compute images create --source-disk=... --source-disk-zone=... --labels=... --description=... --quiet --format=json`
-- [ ] 3.2 Rewrite `GetImage` — `gcloud compute images describe --format=json`
-- [ ] 3.3 Rewrite `DeleteImage` — `gcloud compute images delete --quiet`
-- [ ] 3.4 Verify build and all tests pass
+- [x] 3.2 Rewrite `GetImage` — `gcloud compute images describe --format=json`
+- [x] 3.3 Rewrite `DeleteImage` — `gcloud compute images delete --quiet`
+- [x] 3.4 Verify build and all tests pass
 
 ## 4.0 Implement CLI-based GCS operations
 
