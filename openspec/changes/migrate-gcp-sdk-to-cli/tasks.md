@@ -54,12 +54,12 @@
 
 ## 5.0 Replace metadata.OnGCE() and add gcloud prerequisite check
 
-- [ ] 5.1 Replace `metadata.OnGCE()` in `exec_hooks.go` with HTTP GET to
+- [x] 5.1 Replace `metadata.OnGCE()` in `exec_hooks.go` with HTTP GET to
   `http://metadata.google.internal/computeMetadata/v1/` with `Metadata-Flavor: Google` header (1-second timeout)
-- [ ] 5.2 Add `checkGcloudInstalled()` using `exec.LookPath("gcloud")`
-- [ ] 5.3 Call `checkGcloudInstalled()` from `NewRealGCPClient`
-- [ ] 5.4 Add tests for `isOnGCE()` and `checkGcloudInstalled()`
-- [ ] 5.5 Verify build and all tests pass
+- [x] 5.2 Add `checkGcloudInstalled()` using `exec.LookPath("gcloud")`
+- [x] 5.3 Call `checkGcloudInstalled()` from `NewRealGCPClient`
+- [x] 5.4 Add tests for `isOnGCE()` and `checkGcloudInstalled()`
+- [x] 5.5 Verify build and all tests pass
 
 ## 6.0 Remove SDK dependencies and final validation
 

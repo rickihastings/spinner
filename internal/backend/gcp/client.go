@@ -50,11 +50,20 @@ type Client interface {
 // Authentication is delegated to gcloud's own credential management.
 type RealGCPClient struct{}
 
+// checkGcloudInstalled verifies that the gcloud CLI is available on PATH.
+func checkGcloudInstalled() error {
+	if _, err := exec.LookPath("gcloud"); err != nil {
+		return fmt.Errorf("gcloud CLI not found on PATH: install from https://cloud.google.com/sdk/docs/install")
+	}
+
+	return nil
+}
+
 // NewRealGCPClient creates a new RealGCPClient after verifying that the gcloud
 // CLI is available on PATH.
 func NewRealGCPClient(_ context.Context) (*RealGCPClient, error) {
-	if _, err := exec.LookPath("gcloud"); err != nil {
-		return nil, fmt.Errorf("gcloud CLI not found on PATH: install from https://cloud.google.com/sdk/docs/install")
+	if err := checkGcloudInstalled(); err != nil {
+		return nil, err
 	}
 
 	return &RealGCPClient{}, nil
