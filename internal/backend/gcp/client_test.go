@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -61,10 +60,9 @@ func TestMockCreateInstanceError(t *testing.T) {
 func TestMockGetInstance(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	status := "RUNNING"
-	expected := &computepb.Instance{
-		Name:   strPtr("test-instance"),
-		Status: &status,
+	expected := &GCPInstance{
+		Name:   "test-instance",
+		Status: "RUNNING",
 	}
 
 	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-instance").
@@ -72,8 +70,8 @@ func TestMockGetInstance(t *testing.T) {
 
 	instance, err := mockClient.GetInstance(context.Background(), "test-project", "us-central1-a", "test-instance")
 	assert.NoError(t, err)
-	assert.Equal(t, "test-instance", instance.GetName())
-	assert.Equal(t, "RUNNING", instance.GetStatus())
+	assert.Equal(t, "test-instance", instance.Name)
+	assert.Equal(t, "RUNNING", instance.Status)
 	mockClient.AssertExpectations(t)
 }
 
@@ -152,8 +150,8 @@ func TestMockCreateImage(t *testing.T) {
 func TestMockGetImage(t *testing.T) {
 	mockClient := &MockGCPClient{}
 
-	expected := &computepb.Image{
-		Name: strPtr("spinner-test"),
+	expected := &GCPImage{
+		Name: "spinner-test",
 	}
 
 	mockClient.On("GetImage", mock.Anything, "test-project", "spinner-test").
@@ -161,7 +159,7 @@ func TestMockGetImage(t *testing.T) {
 
 	image, err := mockClient.GetImage(context.Background(), "test-project", "spinner-test")
 	assert.NoError(t, err)
-	assert.Equal(t, "spinner-test", image.GetName())
+	assert.Equal(t, "spinner-test", image.Name)
 	mockClient.AssertExpectations(t)
 }
 

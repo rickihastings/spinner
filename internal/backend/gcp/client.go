@@ -18,8 +18,8 @@ import (
 type Client interface {
 	// Instance operations
 	CreateInstance(ctx context.Context, config instanceConfig) error
-	GetInstance(ctx context.Context, project, zone, name string) (*computepb.Instance, error)
-	SetMetadata(ctx context.Context, project, zone, name string, metadata *computepb.Metadata) error
+	GetInstance(ctx context.Context, project, zone, name string) (*GCPInstance, error)
+	SetMetadata(ctx context.Context, project, zone, name string, metadata *GCPMetadata) error
 	StartInstance(ctx context.Context, project, zone, name string) error
 	StopInstance(ctx context.Context, project, zone, name string) error
 	ResetInstance(ctx context.Context, project, zone, name string) error
@@ -27,11 +27,11 @@ type Client interface {
 
 	// Image operations
 	CreateImage(ctx context.Context, project string, config imageConfig) error
-	GetImage(ctx context.Context, project, name string) (*computepb.Image, error)
+	GetImage(ctx context.Context, project, name string) (*GCPImage, error)
 	DeleteImage(ctx context.Context, project, name string) error
 
 	// ListInstances lists VM instances matching a label filter.
-	ListInstances(ctx context.Context, project, zone string, filter string) ([]*computepb.Instance, error)
+	ListInstances(ctx context.Context, project, zone string, filter string) ([]*GCPInstance, error)
 
 	// Serial port (for boot/bake diagnostics)
 	GetSerialPortOutput(ctx context.Context, project, zone, name string, start int64) (*serialPortOutput, error)
@@ -199,7 +199,7 @@ func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfi
 }
 
 // GetInstance retrieves information about a VM instance.
-func (c *RealGCPClient) GetInstance(ctx context.Context, project, zone, name string) (*computepb.Instance, error) {
+func (c *RealGCPClient) GetInstance(ctx context.Context, project, zone, name string) (*GCPInstance, error) {
 	instance, err := c.instances.Get(ctx, &computepb.GetInstanceRequest{
 		Project:  project,
 		Zone:     zone,
@@ -209,17 +209,27 @@ func (c *RealGCPClient) GetInstance(ctx context.Context, project, zone, name str
 		return nil, fmt.Errorf("failed to get instance: %w", err)
 	}
 
-	return instance, nil
+	return convertInstance(instance), nil
 }
 
 // SetMetadata replaces the metadata on a VM instance and waits for the operation to complete.
 // The metadata must include the current fingerprint to prevent concurrent modification conflicts.
-func (c *RealGCPClient) SetMetadata(ctx context.Context, project, zone, name string, metadata *computepb.Metadata) error {
+func (c *RealGCPClient) SetMetadata(ctx context.Context, project, zone, name string, metadata *GCPMetadata) error {
+	pbMeta := &computepb.Metadata{
+		Fingerprint: strPtr(metadata.Fingerprint),
+	}
+	for _, item := range metadata.Items {
+		pbMeta.Items = append(pbMeta.Items, &computepb.Items{
+			Key:   strPtr(item.Key),
+			Value: strPtr(item.Value),
+		})
+	}
+
 	op, err := c.instances.SetMetadata(ctx, &computepb.SetMetadataInstanceRequest{
 		Project:          project,
 		Zone:             zone,
 		Instance:         name,
-		MetadataResource: metadata,
+		MetadataResource: pbMeta,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
@@ -306,7 +316,7 @@ func (c *RealGCPClient) DeleteInstance(ctx context.Context, project, zone, name 
 
 // ListInstances lists VM instances matching a label filter expression.
 // The filter uses GCP's filter syntax (e.g., "labels.spinner-managed=true").
-func (c *RealGCPClient) ListInstances(ctx context.Context, project, zone string, filter string) ([]*computepb.Instance, error) {
+func (c *RealGCPClient) ListInstances(ctx context.Context, project, zone string, filter string) ([]*GCPInstance, error) {
 	req := &computepb.ListInstancesRequest{
 		Project: project,
 		Zone:    zone,
@@ -316,7 +326,7 @@ func (c *RealGCPClient) ListInstances(ctx context.Context, project, zone string,
 		req.Filter = &filter
 	}
 
-	var instances []*computepb.Instance
+	var instances []*GCPInstance
 
 	it := c.instances.List(ctx, req)
 
@@ -330,7 +340,7 @@ func (c *RealGCPClient) ListInstances(ctx context.Context, project, zone string,
 			return nil, fmt.Errorf("failed to list instances: %w", err)
 		}
 
-		instances = append(instances, instance)
+		instances = append(instances, convertInstance(instance))
 	}
 
 	return instances, nil
@@ -365,7 +375,7 @@ func (c *RealGCPClient) CreateImage(ctx context.Context, project string, config 
 }
 
 // GetImage retrieves information about a Compute Engine image.
-func (c *RealGCPClient) GetImage(ctx context.Context, project, name string) (*computepb.Image, error) {
+func (c *RealGCPClient) GetImage(ctx context.Context, project, name string) (*GCPImage, error) {
 	image, err := c.images.Get(ctx, &computepb.GetImageRequest{
 		Project: project,
 		Image:   name,
@@ -374,7 +384,13 @@ func (c *RealGCPClient) GetImage(ctx context.Context, project, name string) (*co
 		return nil, fmt.Errorf("failed to get image: %w", err)
 	}
 
-	return image, nil
+	return &GCPImage{
+		Name:        image.GetName(),
+		Status:      image.GetStatus(),
+		SourceDisk:  image.GetSourceDisk(),
+		Description: image.GetDescription(),
+		Labels:      image.GetLabels(),
+	}, nil
 }
 
 // DeleteImage deletes a Compute Engine image and waits for the operation to complete.
@@ -532,6 +548,61 @@ func (c *RealGCPClient) DeleteObjectsWithPrefix(ctx context.Context, bucket, pre
 	}
 
 	return nil
+}
+
+// convertInstance converts a computepb.Instance to a GCPInstance.
+func convertInstance(inst *computepb.Instance) *GCPInstance {
+	result := &GCPInstance{
+		Name:        inst.GetName(),
+		Status:      inst.GetStatus(),
+		MachineType: inst.GetMachineType(),
+		Zone:        inst.GetZone(),
+		Labels:      inst.GetLabels(),
+	}
+
+	for _, d := range inst.GetDisks() {
+		result.Disks = append(result.Disks, GCPDisk{
+			Source:     d.GetSource(),
+			Boot:       d.GetBoot(),
+			AutoDelete: d.GetAutoDelete(),
+		})
+	}
+
+	for _, ni := range inst.GetNetworkInterfaces() {
+		iface := GCPNetworkInterface{
+			Network:    ni.GetNetwork(),
+			Subnetwork: ni.GetSubnetwork(),
+		}
+		for _, ac := range ni.GetAccessConfigs() {
+			iface.AccessConfigs = append(iface.AccessConfigs, GCPAccessConfig{
+				Name:  ac.GetName(),
+				Type:  ac.GetType(),
+				NatIP: ac.GetNatIP(),
+			})
+		}
+		result.NetworkInterfaces = append(result.NetworkInterfaces, iface)
+	}
+
+	if m := inst.GetMetadata(); m != nil {
+		result.Metadata = &GCPMetadata{
+			Fingerprint: m.GetFingerprint(),
+		}
+		for _, item := range m.GetItems() {
+			result.Metadata.Items = append(result.Metadata.Items, GCPMetadataItem{
+				Key:   item.GetKey(),
+				Value: item.GetValue(),
+			})
+		}
+	}
+
+	for _, sa := range inst.GetServiceAccounts() {
+		result.ServiceAccounts = append(result.ServiceAccounts, GCPServiceAccount{
+			Email:  sa.GetEmail(),
+			Scopes: sa.GetScopes(),
+		})
+	}
+
+	return result
 }
 
 // strPtr returns a pointer to the given string.

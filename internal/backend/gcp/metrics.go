@@ -84,7 +84,7 @@ func getVMState(ctx context.Context, client Client, project, zone, name string) 
 		return provider.StateUnknown, err
 	}
 
-	vmStatus := vmStatus(instance.GetStatus())
+	vmStatus := vmStatus(instance.Status)
 
 	switch vmStatus {
 	case vmStatusRunning:

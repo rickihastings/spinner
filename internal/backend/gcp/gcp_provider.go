@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/util"
 )
@@ -266,7 +265,7 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 		return fmt.Errorf("failed to get instance: %w", err)
 	}
 
-	metadata := instance.GetMetadata()
+	metadata := instance.Metadata
 	if metadata == nil {
 		return nil
 	}
@@ -287,14 +286,10 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 	}
 
 	// Update existing metadata items in-place
-	for _, item := range metadata.Items {
-		if item == nil {
-			continue
-		}
-
-		key := item.GetKey()
+	for i := range metadata.Items {
+		key := metadata.Items[i].Key
 		if newVal, ok := updates[key]; ok {
-			item.Value = strPtr(newVal)
+			metadata.Items[i].Value = newVal
 
 			delete(updates, key)
 		}
@@ -302,9 +297,9 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 
 	// Append any new keys that didn't exist in the original metadata
 	for key, value := range updates {
-		metadata.Items = append(metadata.Items, &computepb.Items{
-			Key:   strPtr(key),
-			Value: strPtr(value),
+		metadata.Items = append(metadata.Items, GCPMetadataItem{
+			Key:   key,
+			Value: value,
 		})
 	}
 
@@ -376,7 +371,7 @@ func (p *Provider) Status(ctx context.Context, name string) (provider.InstanceSt
 		return provider.InstanceStatusNone, fmt.Errorf("failed to get instance status: %w", err)
 	}
 
-	return mapVMStatus(instance.GetStatus()), nil
+	return mapVMStatus(instance.Status), nil
 }
 
 // WatchLogs streams log lines from GCS by polling for new content.
@@ -411,11 +406,11 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 	}
 
 	// Extract boot disk name as the "image" identifier
-	if len(instance.Disks) > 0 && instance.Disks[0] != nil {
+	if len(instance.Disks) > 0 {
 		// The boot disk source is a full URL like:
 		// https://www.googleapis.com/compute/v1/projects/PROJECT/zones/ZONE/disks/DISK_NAME
 		// Extract just the disk name
-		diskSource := instance.Disks[0].GetSource()
+		diskSource := instance.Disks[0].Source
 		if diskSource != "" {
 			// Get the last part of the URL path
 			parts := strings.Split(diskSource, "/")
@@ -426,29 +421,22 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 	}
 
 	// Try to get agent and max iterations from instance metadata
-	if instance.Metadata != nil && instance.Metadata.Items != nil {
+	if instance.Metadata != nil {
 		for _, item := range instance.Metadata.Items {
-			if item == nil {
-				continue
-			}
-
-			key := item.GetKey()
-			value := item.GetValue()
-
-			switch key {
+			switch item.Key {
 			case "ANTHROPIC_MODEL":
-				if value != "" {
-					metadata.Agent = value
+				if item.Value != "" {
+					metadata.Agent = item.Value
 				}
 			case "MAX_ITERATIONS":
-				if value != "" {
-					if val, parseErr := fmt.Sscanf(value, "%d", &metadata.MaxIterations); parseErr != nil || val != 1 {
-						_ = fmt.Errorf("failed to parse max iterations: %s", value)
+				if item.Value != "" {
+					if val, parseErr := fmt.Sscanf(item.Value, "%d", &metadata.MaxIterations); parseErr != nil || val != 1 {
+						_ = fmt.Errorf("failed to parse max iterations: %s", item.Value)
 					}
 				}
 			case "BRANCH":
-				if value != "" {
-					metadata.Branch = value
+				if item.Value != "" {
+					metadata.Branch = item.Value
 				}
 			}
 		}
@@ -468,8 +456,8 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 	var result []provider.InstanceInfo
 
 	for _, inst := range instances {
-		name := inst.GetName()
-		status := mapVMStatus(inst.GetStatus())
+		name := inst.Name
+		status := mapVMStatus(inst.Status)
 
 		info := provider.InstanceInfo{
 			Name:    name,
@@ -478,33 +466,24 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 		}
 
 		// Extract info from VM labels
-		if labels := inst.GetLabels(); labels != nil {
-			if image, ok := labels["spinner-image"]; ok {
-				info.Image = image
-			}
+		if image, ok := inst.Labels["spinner-image"]; ok {
+			info.Image = image
+		}
 
-			if repo, ok := labels["spinner-repo"]; ok {
-				info.Repo = repo
-			}
+		if repo, ok := inst.Labels["spinner-repo"]; ok {
+			info.Repo = repo
 		}
 
 		// Extract info from VM metadata items
 		if inst.Metadata != nil {
 			for _, item := range inst.Metadata.Items {
-				if item == nil {
-					continue
-				}
-
-				key := item.GetKey()
-				value := item.GetValue()
-
-				switch key {
+				switch item.Key {
 				case "ANTHROPIC_MODEL":
-					info.Agent = value
+					info.Agent = item.Value
 				case "MAX_ITERATIONS":
-					_, _ = fmt.Sscanf(value, "%d", &info.MaxIterations)
+					_, _ = fmt.Sscanf(item.Value, "%d", &info.MaxIterations)
 				case "BRANCH":
-					info.Branch = value
+					info.Branch = item.Value
 				}
 			}
 		}

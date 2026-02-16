@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -16,9 +15,8 @@ func TestGetVMState_Running(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	running := "RUNNING"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &running}, nil)
+		Return(&GCPInstance{Status: "RUNNING"}, nil)
 
 	state, err := getVMState(ctx, client, "proj", "zone", "vm-1")
 	assert.NoError(t, err)
@@ -30,9 +28,8 @@ func TestGetVMState_Terminated(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	terminated := "TERMINATED"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &terminated}, nil)
+		Return(&GCPInstance{Status: "TERMINATED"}, nil)
 
 	state, err := getVMState(ctx, client, "proj", "zone", "vm-1")
 	assert.NoError(t, err)
@@ -44,9 +41,8 @@ func TestGetVMState_Stopped(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	stopped := "STOPPED"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &stopped}, nil)
+		Return(&GCPInstance{Status: "STOPPED"}, nil)
 
 	state, err := getVMState(ctx, client, "proj", "zone", "vm-1")
 	assert.NoError(t, err)
@@ -58,9 +54,8 @@ func TestGetVMState_Provisioning(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	provisioning := "PROVISIONING"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &provisioning}, nil)
+		Return(&GCPInstance{Status: "PROVISIONING"}, nil)
 
 	state, err := getVMState(ctx, client, "proj", "zone", "vm-1")
 	assert.NoError(t, err)
@@ -72,9 +67,8 @@ func TestGetVMState_Staging(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	staging := "STAGING"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &staging}, nil)
+		Return(&GCPInstance{Status: "STAGING"}, nil)
 
 	state, err := getVMState(ctx, client, "proj", "zone", "vm-1")
 	assert.NoError(t, err)
@@ -86,9 +80,8 @@ func TestGetVMState_Stopping(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	stopping := "STOPPING"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &stopping}, nil)
+		Return(&GCPInstance{Status: "STOPPING"}, nil)
 
 	state, err := getVMState(ctx, client, "proj", "zone", "vm-1")
 	assert.NoError(t, err)
@@ -126,9 +119,8 @@ func TestGetVMState_UnknownStatus(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	unknown := "REPAIRING"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &unknown}, nil)
+		Return(&GCPInstance{Status: "REPAIRING"}, nil)
 
 	state, err := getVMState(ctx, client, "proj", "zone", "vm-1")
 	assert.NoError(t, err)
@@ -140,9 +132,8 @@ func TestCollectGCPMetrics_RunningWithGCSState(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	running := "RUNNING"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &running}, nil)
+		Return(&GCPInstance{Status: "RUNNING"}, nil)
 
 	// Mock GCS state file with CPU and memory metrics
 	client.On("ObjectExists", ctx, "my-bucket", "vm-1/state.json").
@@ -163,9 +154,8 @@ func TestCollectGCPMetrics_RunningNoGCSState(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	running := "RUNNING"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &running}, nil)
+		Return(&GCPInstance{Status: "RUNNING"}, nil)
 
 	// No GCS state file yet
 	client.On("ObjectExists", ctx, "my-bucket", "vm-1/state.json").
@@ -184,9 +174,8 @@ func TestCollectGCPMetrics_RunningNoBucket(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	running := "RUNNING"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &running}, nil)
+		Return(&GCPInstance{Status: "RUNNING"}, nil)
 
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
 	assert.Equal(t, provider.StateRunning, metrics.State)
@@ -201,9 +190,8 @@ func TestCollectGCPMetrics_Stopped(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	terminated := "TERMINATED"
 	client.On("GetInstance", ctx, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &terminated}, nil)
+		Return(&GCPInstance{Status: "TERMINATED"}, nil)
 
 	// Should not read GCS state for stopped VMs
 	metrics := collectGCPMetrics(ctx, client, "proj", "zone", "vm-1", "")
@@ -297,9 +285,8 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	running := "RUNNING"
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &running}, nil).Once()
+		Return(&GCPInstance{Status: "RUNNING"}, nil).Once()
 
 	// GCS state with metrics
 	client.On("ObjectExists", mock.Anything, "my-bucket", "vm-1/state.json").
@@ -308,9 +295,8 @@ func TestStreamGCPMetrics_InitialSendRunning(t *testing.T) {
 		Return([]byte(`{"iteration": 2, "cpu_percent": 42.0, "memory_percent": 55.0}`), nil).Once()
 
 	// Second call (ticker fires) — return stopped to exit the loop
-	terminated := "TERMINATED"
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &terminated}, nil).Once()
+		Return(&GCPInstance{Status: "TERMINATED"}, nil).Once()
 
 	ch := make(chan provider.ContainerMetrics, 10)
 	done := make(chan error, 1)
@@ -341,9 +327,8 @@ func TestStreamGCPMetrics_StoppedVM(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx := context.Background()
 
-	terminated := "TERMINATED"
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &terminated}, nil)
+		Return(&GCPInstance{Status: "TERMINATED"}, nil)
 
 	ch := make(chan provider.ContainerMetrics, 10)
 
@@ -413,9 +398,8 @@ func TestStreamGCPMetrics_ContextCancellation(t *testing.T) {
 	client := new(MockGCPClient)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	running := "RUNNING"
 	client.On("GetInstance", mock.Anything, "proj", "zone", "vm-1").
-		Return(&computepb.Instance{Status: &running}, nil)
+		Return(&GCPInstance{Status: "RUNNING"}, nil)
 	client.On("ObjectExists", mock.Anything, "my-bucket", "vm-1/state.json").
 		Return(true, nil)
 	client.On("ReadObject", mock.Anything, "my-bucket", "vm-1/state.json").
@@ -451,9 +435,8 @@ func TestProviderWatchMetrics_Delegates(t *testing.T) {
 	defer cancel()
 
 	// VM is stopped — should send one metrics and return
-	terminated := "TERMINATED"
 	client.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&computepb.Instance{Status: &terminated}, nil)
+		Return(&GCPInstance{Status: "TERMINATED"}, nil)
 
 	ch := make(chan provider.ContainerMetrics, 10)
 

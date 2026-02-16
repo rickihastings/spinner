@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 
-	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -19,17 +18,17 @@ func (m *MockGCPClient) CreateInstance(ctx context.Context, config instanceConfi
 }
 
 // GetInstance mocks the GetInstance method.
-func (m *MockGCPClient) GetInstance(ctx context.Context, project, zone, name string) (*computepb.Instance, error) {
+func (m *MockGCPClient) GetInstance(ctx context.Context, project, zone, name string) (*GCPInstance, error) {
 	args := m.Called(ctx, project, zone, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).(*computepb.Instance), args.Error(1)
+	return args.Get(0).(*GCPInstance), args.Error(1)
 }
 
 // SetMetadata mocks the SetMetadata method.
-func (m *MockGCPClient) SetMetadata(ctx context.Context, project, zone, name string, metadata *computepb.Metadata) error {
+func (m *MockGCPClient) SetMetadata(ctx context.Context, project, zone, name string, metadata *GCPMetadata) error {
 	args := m.Called(ctx, project, zone, name, metadata)
 	return args.Error(0)
 }
@@ -59,13 +58,13 @@ func (m *MockGCPClient) DeleteInstance(ctx context.Context, project, zone, name 
 }
 
 // ListInstances mocks the ListInstances method.
-func (m *MockGCPClient) ListInstances(ctx context.Context, project, zone string, filter string) ([]*computepb.Instance, error) {
+func (m *MockGCPClient) ListInstances(ctx context.Context, project, zone string, filter string) ([]*GCPInstance, error) {
 	args := m.Called(ctx, project, zone, filter)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).([]*computepb.Instance), args.Error(1)
+	return args.Get(0).([]*GCPInstance), args.Error(1)
 }
 
 // CreateImage mocks the CreateImage method.
@@ -75,13 +74,13 @@ func (m *MockGCPClient) CreateImage(ctx context.Context, project string, config 
 }
 
 // GetImage mocks the GetImage method.
-func (m *MockGCPClient) GetImage(ctx context.Context, project, name string) (*computepb.Image, error) {
+func (m *MockGCPClient) GetImage(ctx context.Context, project, name string) (*GCPImage, error) {
 	args := m.Called(ctx, project, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).(*computepb.Image), args.Error(1)
+	return args.Get(0).(*GCPImage), args.Error(1)
 }
 
 // DeleteImage mocks the DeleteImage method.

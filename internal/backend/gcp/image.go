@@ -188,7 +188,7 @@ func waitForVMTerminated(ctx context.Context, client Client, project, zone, name
 				return fmt.Errorf("failed to check bake VM status: %w", err)
 			}
 
-			status := vmStatus(instance.GetStatus())
+			status := vmStatus(instance.Status)
 
 			switch status {
 			case vmStatusTerminated:

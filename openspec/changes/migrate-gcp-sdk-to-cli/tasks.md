@@ -2,18 +2,18 @@
 
 ## 1.0 Define plain Go types and update Client interface
 
-- [ ] 1.1 Add `GCPInstance`, `GCPImage`, `GCPMetadata`, `GCPMetadataItem`, `GCPDisk`, `GCPNetworkInterface`,
+- [x] 1.1 Add `GCPInstance`, `GCPImage`, `GCPMetadata`, `GCPMetadataItem`, `GCPDisk`, `GCPNetworkInterface`,
   `GCPAccessConfig`, `GCPServiceAccount` structs to `types.go` with JSON tags matching `gcloud --format=json` output
-- [ ] 1.2 Update `Client` interface in `client.go`: change `GetInstance` to return `*GCPInstance`, `GetImage` to return
+- [x] 1.2 Update `Client` interface in `client.go`: change `GetInstance` to return `*GCPInstance`, `GetImage` to return
   `*GCPImage`, `SetMetadata` to accept `*GCPMetadata`, `ListInstances` to return `[]*GCPInstance`
-- [ ] 1.3 Update `MockGCPClient` in `mock_client.go` to use new Go types
-- [ ] 1.4 Update `gcp_provider.go` to consume new Go types (replace `.GetName()` with `.Name`, `.GetStatus()` with
+- [x] 1.3 Update `MockGCPClient` in `mock_client.go` to use new Go types
+- [x] 1.4 Update `gcp_provider.go` to consume new Go types (replace `.GetName()` with `.Name`, `.GetStatus()` with
   `.Status`, `instance.Disks[0].GetSource()` with `instance.Disks[0].Source`, `.GetLabels()` with `.Labels`, metadata
   item field access, pointer assignments to direct assignments)
-- [ ] 1.5 Update all test files (`gcp_provider_test.go`, `client_test.go`, `image_test.go`, `metrics_test.go`) to
+- [x] 1.5 Update all test files (`gcp_provider_test.go`, `client_test.go`, `image_test.go`, `metrics_test.go`) to
   construct `GCPInstance`/`GCPImage`/`GCPMetadata` instead of `computepb` types
-- [ ] 1.6 Remove all `computepb` and `cloud.google.com/go` imports from the `gcp` package
-- [ ] 1.7 Verify build and all tests pass with new types (mock client still implements interface)
+- [x] 1.6 Remove all `computepb` and `cloud.google.com/go` imports from the `gcp` package
+- [x] 1.7 Verify build and all tests pass with new types (mock client still implements interface)
 
 ## 2.0 Implement CLI-based Compute Engine operations
 
