@@ -274,27 +274,3 @@ func TestMockClose(t *testing.T) {
 	assert.NoError(t, err)
 	mockClient.AssertExpectations(t)
 }
-
-func TestHelperFunctions(t *testing.T) {
-	t.Run("strPtr", func(t *testing.T) {
-		s := strPtr("test")
-		assert.NotNil(t, s)
-		assert.Equal(t, "test", *s)
-	})
-
-	t.Run("boolPtr", func(t *testing.T) {
-		b := boolPtr(true)
-		assert.NotNil(t, b)
-		assert.True(t, *b)
-
-		b2 := boolPtr(false)
-		assert.NotNil(t, b2)
-		assert.False(t, *b2)
-	})
-
-	t.Run("int64Ptr", func(t *testing.T) {
-		i := int64Ptr(42)
-		assert.NotNil(t, i)
-		assert.Equal(t, int64(42), *i)
-	})
-}

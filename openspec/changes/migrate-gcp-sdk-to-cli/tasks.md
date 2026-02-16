@@ -17,21 +17,21 @@
 
 ## 2.0 Implement CLI-based Compute Engine operations
 
-- [ ] 2.1 Create `cli_runner.go` with `runGcloud(ctx, args...) ([]byte, error)` and
+- [x] 2.1 Create `cli_runner.go` with `runGcloud(ctx, args...) ([]byte, error)` and
   `runGcloudJSON(ctx, target, args...) error` helpers
-- [ ] 2.2 Rewrite `NewRealGCPClient` — remove SDK client initialization; store only project/zone; verify `gcloud` on
+- [x] 2.2 Rewrite `NewRealGCPClient` — remove SDK client initialization; store only project/zone; verify `gcloud` on
   PATH
-- [ ] 2.3 Rewrite `CreateInstance` — `gcloud compute instances create` with flags for machine-type, image, disk-size,
+- [x] 2.3 Rewrite `CreateInstance` — `gcloud compute instances create` with flags for machine-type, image, disk-size,
   disk-type, network, subnet, external-ip, metadata, labels, service-account, scopes
-- [ ] 2.4 Rewrite `GetInstance` — `gcloud compute instances describe --format=json` + JSON unmarshal into `GCPInstance`
-- [ ] 2.5 Rewrite `SetMetadata` — `gcloud compute instances add-metadata --metadata=KEY=VALUE,...`
-- [ ] 2.6 Rewrite `StartInstance`, `StopInstance`, `ResetInstance`, `DeleteInstance` — simple
+- [x] 2.4 Rewrite `GetInstance` — `gcloud compute instances describe --format=json` + JSON unmarshal into `GCPInstance`
+- [x] 2.5 Rewrite `SetMetadata` — `gcloud compute instances add-metadata --metadata=KEY=VALUE,...`
+- [x] 2.6 Rewrite `StartInstance`, `StopInstance`, `ResetInstance`, `DeleteInstance` — simple
   `gcloud compute instances {start|stop|reset|delete} --quiet`
-- [ ] 2.7 Rewrite `ListInstances` — `gcloud compute instances list --filter=... --format=json`
-- [ ] 2.8 Rewrite `GetSerialPortOutput` — `gcloud compute instances get-serial-port-output --start=N`
-- [ ] 2.9 Rewrite `Close()` — no-op (no SDK clients to release)
-- [ ] 2.10 Add tests for `runGcloud` helper
-- [ ] 2.11 Verify build and all tests pass
+- [x] 2.7 Rewrite `ListInstances` — `gcloud compute instances list --filter=... --format=json`
+- [x] 2.8 Rewrite `GetSerialPortOutput` — `gcloud compute instances get-serial-port-output --start=N`
+- [x] 2.9 Rewrite `Close()` — no-op (no SDK clients to release)
+- [x] 2.10 Add tests for `runGcloud` helper
+- [x] 2.11 Verify build and all tests pass
 
 ## 3.0 Implement CLI-based Image operations
 
