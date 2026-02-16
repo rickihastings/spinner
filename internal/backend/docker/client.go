@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rickihastings/spinner/internal/util"
+	"github.com/rickihastings/spinner/internal/version"
 )
 
 // Client defines the interface for Docker operations.
@@ -179,6 +180,12 @@ func (c *RealDockerClient) buildWithCLI(ctx context.Context, contextDir, dockerf
 	localBuild := os.Getenv("LOCAL_BUILD")
 	if localBuild != "" {
 		args = append(args, "--build-arg", fmt.Sprintf("LOCAL_BUILD=%s", localBuild))
+	}
+
+	// Pin the container's spinner version to match the host binary.
+	// Skip for dev builds — they use LOCAL_BUILD instead.
+	if localBuild == "" && version.IsRelease() {
+		args = append(args, "--build-arg", fmt.Sprintf("SPINNER_VERSION=%s", version.Tag()))
 	}
 
 	if baseImage != "" {

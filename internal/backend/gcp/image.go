@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/rickihastings/spinner/internal/version"
 )
 
 // bakeConfig holds configuration for baking a GCP image.
@@ -78,10 +80,17 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 	// Step 1: Create temporary bake VM
 	fmt.Printf("Creating temporary bake VM: %s\n", bakeVMName)
 
+	// Pin spinner version to match host binary for production builds.
+	spinnerVersion := ""
+	if os.Getenv("LOCAL_BUILD") == "" && version.IsRelease() {
+		spinnerVersion = version.Tag()
+	}
+
 	metadata := map[string]string{
-		"startup-script": config.StartupScript,
-		"LOCAL_BUILD":    os.Getenv("LOCAL_BUILD"),
-		"STATE_BUCKET":   config.StateBucket,
+		"startup-script":  config.StartupScript,
+		"LOCAL_BUILD":     os.Getenv("LOCAL_BUILD"),
+		"STATE_BUCKET":    config.StateBucket,
+		"SPINNER_VERSION": spinnerVersion,
 	}
 	for k, v := range config.ExtraMetadata {
 		metadata[k] = v

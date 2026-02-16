@@ -7,6 +7,7 @@ set -e
 # Environment variables:
 #   LOCAL_BUILD - if "true", download from state bucket instead of GitHub
 #   STATE_BUCKET - GCS bucket containing local dev binary (required if LOCAL_BUILD=true)
+#   SPINNER_VERSION - if set, download this specific version instead of latest (e.g. "v1.0.0")
 
 echo "Installing spinner binary..."
 
@@ -34,8 +35,13 @@ elif [ "${LOCAL_BUILD}" = "true" ] && [ -f "/tmp/spinner" ] && [ -s "/tmp/spinne
     echo "✅ Installed local development spinner"
 else
     # Production mode: download from GitHub releases
-    echo "Downloading spinner from GitHub releases..."
-    SPINNER_VERSION=$(curl -sf https://api.github.com/repos/rickihastings/spinner/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+    # SPINNER_VERSION can be passed from the host to ensure version parity
+    if [ -z "$SPINNER_VERSION" ]; then
+        echo "Downloading latest spinner from GitHub releases..."
+        SPINNER_VERSION=$(curl -sf https://api.github.com/repos/rickihastings/spinner/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+    else
+        echo "Downloading spinner ${SPINNER_VERSION} (pinned to host version)..."
+    fi
 
     if [ -z "$SPINNER_VERSION" ]; then
         echo "Warning: Could not detect latest release, skipping spinner install"

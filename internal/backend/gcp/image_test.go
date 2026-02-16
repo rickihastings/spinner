@@ -54,9 +54,10 @@ func TestBakeImageSuccess(t *testing.T) {
 		Network:      "default",
 		ExternalIP:   true,
 		Metadata: map[string]string{
-			"startup-script": "#!/bin/bash\necho hello",
-			"LOCAL_BUILD":    os.Getenv("LOCAL_BUILD"),
-			"STATE_BUCKET":   "",
+			"startup-script":  "#!/bin/bash\necho hello",
+			"LOCAL_BUILD":     os.Getenv("LOCAL_BUILD"),
+			"STATE_BUCKET":    "",
+			"SPINNER_VERSION": "",
 		},
 		Labels: map[string]string{
 			"spinner-managed": "true",

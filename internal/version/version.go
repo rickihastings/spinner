@@ -23,3 +23,13 @@ func Info() string {
 func Full() string {
 	return Version + " (" + Commit + ") built " + Date
 }
+
+// IsRelease reports whether this is a release build (version set via ldflags).
+func IsRelease() bool {
+	return Version != "dev"
+}
+
+// Tag returns the version as a git tag (e.g. "v1.0.0").
+func Tag() string {
+	return "v" + Version
+}
