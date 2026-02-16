@@ -322,21 +322,21 @@ The CLI SHALL define a MetricsProvider interface to abstract container metrics c
 
 ### Requirement: Docker MetricsProvider Implementation
 
-The CLI SHALL provide a Docker-specific implementation of the MetricsProvider interface using the Docker SDK.
+The CLI SHALL provide a Docker-specific implementation of the MetricsProvider interface using Docker CLI commands.
 
 #### Scenario: Docker provider initialization
 
 - **WHEN** watch mode starts with a Docker container
-- **THEN** the CLI SHALL create a Docker SDK client using `github.com/docker/docker/client`
+- **THEN** the CLI SHALL use `docker stats` and `docker inspect` CLI commands for metrics collection
 
 #### Scenario: Docker provider polls stats
 
 - **WHEN** Docker metrics provider is streaming
-- **THEN** it SHALL poll ContainerStats API every 1-2 seconds and send results to metrics channel
+- **THEN** it SHALL poll `docker stats --no-stream` every 1-2 seconds and send results to metrics channel
 
 #### Scenario: Docker provider handles API errors
 
-- **WHEN** Docker stats API returns an error (e.g., container not found)
+- **WHEN** Docker stats CLI returns an error (e.g., container not found)
 - **THEN** the provider SHALL send an error via the metrics channel and stop streaming
 
 ### Requirement: Error Handling

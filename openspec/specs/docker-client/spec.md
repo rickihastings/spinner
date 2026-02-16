@@ -2,89 +2,87 @@
 
 ## Purpose
 
-The docker-client spec defines how the application interacts with the Docker Engine. It uses the Docker Go SDK (`github.com/docker/docker/client`) to provide type-safe, programmatic access to Docker operations including image building, container lifecycle management, and real-time log streaming. This abstraction enables the application to create isolated environments for code execution while maintaining testability through well-defined interfaces.
+The docker-client spec defines how the application interacts with the Docker Engine. It uses Docker CLI commands (`docker`) to provide access to Docker operations including image building, container lifecycle management, and real-time log streaming. This abstraction enables the application to create isolated environments for code execution while maintaining testability through well-defined interfaces.
 ## Requirements
-### Requirement: SDK-Based Docker Operations
+### Requirement: CLI-Based Docker Operations
 
-The Docker client SHALL use the Docker Go SDK (`github.com/docker/docker/client`) for all Docker Engine operations instead of CLI command execution.
+The Docker client SHALL use Docker CLI commands for all Docker Engine operations.
 
-#### Scenario: SDK client initialization
-
-- **WHEN** any Docker operation is requested
-- **THEN** an SDK client is lazily initialized with environment-based configuration
-- **AND** API version negotiation is enabled for compatibility
-
-#### Scenario: Image existence check uses SDK
+#### Scenario: Image existence check
 
 - **WHEN** checking if a Docker image exists
-- **THEN** the SDK's `ImageInspectWithRaw` method is used
-- **AND** the result is equivalent to `docker image inspect`
+- **THEN** `docker image inspect` is executed
+- **AND** the exit code determines existence (0 = exists, non-zero = not found)
 
-#### Scenario: Container inspection uses SDK
+#### Scenario: Container inspection
 
 - **WHEN** checking container status
-- **THEN** the SDK's `ContainerInspect` method is used
+- **THEN** `docker inspect --format` is used to query container state
 - **AND** the status (running/stopped/none) is correctly determined
 
-### Requirement: Container Lifecycle via SDK
+### Requirement: Container Lifecycle via CLI
 
-The Docker client SHALL manage container lifecycle using SDK methods.
+The Docker client SHALL manage container lifecycle using CLI commands.
 
-#### Scenario: Container creation and start
+#### Scenario: Container start
 
-- **WHEN** running a new container
-- **THEN** the SDK's `ContainerCreate` is called with appropriate config
-- **AND** the SDK's `ContainerStart` is called to start the container
-- **AND** volume mounts are configured via HostConfig
+- **WHEN** starting a container
+- **THEN** `docker start` is executed
+
+#### Scenario: Container stop
+
+- **WHEN** stopping a container
+- **THEN** `docker stop -t 10` is executed with a 10-second grace period
 
 #### Scenario: Container removal
 
 - **WHEN** removing a container
-- **THEN** the SDK's `ContainerRemove` with Force option is used
-- **AND** running containers are forcefully stopped and removed
+- **THEN** `docker rm -f` is used to force-remove the container
 
-#### Scenario: Container restart
+#### Scenario: Container creation and run
 
-- **WHEN** restarting a stopped container
-- **THEN** the SDK's `ContainerStart` method is used
+- **WHEN** running a new container
+- **THEN** `docker run` is executed with appropriate flags
+- **AND** volume mounts, labels, and environment variables are passed as CLI flags
 
-### Requirement: Image Building via SDK
+### Requirement: Image Building via CLI
 
-The Docker client SHALL build images using the SDK's ImageBuild method.
+The Docker client SHALL build images using `docker build`.
 
-#### Scenario: Build context as tar archive
+#### Scenario: Standard image build
 
 - **WHEN** building a Docker image
-- **THEN** the build context directory is packaged as a tar archive
-- **AND** the tar is streamed to the SDK's `ImageBuild` method
+- **THEN** `docker build -t <tag> -f <dockerfile> <context>` is executed
+- **AND** build arguments are passed via `--build-arg` flags
+- **AND** build output streams directly to stdout/stderr
 
 #### Scenario: User Dockerfile support
 
 - **WHEN** a user-provided Dockerfile path is specified
-- **THEN** the user's image is built first using SDK
+- **THEN** the user's image is built first using `docker build`
 - **AND** the resulting image is used as the base for the spinner image
-
-#### Scenario: Build output handling
-
-- **WHEN** building an image
-- **THEN** build output is processed for errors
-- **AND** build failures are reported with appropriate error messages
 
 ### Requirement: Container Log Streaming
 
-The Docker client SHALL support real-time container log streaming.
+The Docker client SHALL support real-time container log streaming via CLI.
 
 #### Scenario: Log stream initiation
 
 - **WHEN** requesting container logs with streaming
-- **THEN** a channel of log events is returned
-- **AND** logs are delivered in real-time as they are produced
+- **THEN** `docker logs --follow --timestamps` is executed
+- **AND** a channel of log events is returned with line-by-line reading
 
 #### Scenario: Log stream cancellation
 
 - **WHEN** the context is cancelled during log streaming
-- **THEN** the log stream is cleanly terminated
+- **THEN** the CLI process is terminated via context cancellation
 - **AND** the channel is closed
+
+#### Scenario: Non-streaming log retrieval
+
+- **WHEN** requesting container logs without streaming
+- **THEN** `docker logs` is executed
+- **AND** the full log output is returned as a string
 
 ### Requirement: Error Handling
 
@@ -119,8 +117,9 @@ The Docker Client interface SHALL support listing containers filtered by labels.
 #### Scenario: List by label filter
 
 - **WHEN** `ListContainers()` is called with a label filter
-- **THEN** the client SHALL use the Docker SDK `ContainerList` API with the provided filters
-- **AND** return all matching containers (both running and stopped)
+- **THEN** `docker ps -a --filter label=<key>=<value> --format json` is executed
+- **AND** JSON output is parsed into `ContainerListEntry` structs
+- **AND** all matching containers (both running and stopped) are returned
 
 ### Requirement: Docker Instance Listing
 
@@ -144,3 +143,18 @@ The Docker provider SHALL implement `Provider.List()` to discover all spinner-ma
 - **WHEN** Docker is not running or not installed
 - **THEN** `List()` SHALL return an error indicating Docker is unavailable
 
+### Requirement: Metrics Collection via CLI
+
+The Docker client SHALL collect container metrics using CLI commands.
+
+#### Scenario: Stats collection
+
+- **WHEN** collecting container metrics
+- **THEN** `docker stats --no-stream --format json` is executed
+- **AND** CPU and memory usage are parsed from the JSON output
+
+#### Scenario: Container state inspection
+
+- **WHEN** inspecting container state for metrics
+- **THEN** `docker inspect --format '{{json .State}}'` is executed
+- **AND** state fields (Running, ExitCode, Dead, OOMKilled) are parsed from JSON

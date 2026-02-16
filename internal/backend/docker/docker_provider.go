@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/rickihastings/spinner/internal/provider"
@@ -278,18 +276,7 @@ func (p *Provider) WatchLogs(ctx context.Context, name string, tailLines int, ch
 
 // WatchMetrics implements provider.Provider.WatchMetrics for Docker containers.
 func (p *Provider) WatchMetrics(ctx context.Context, name string, ch chan<- provider.ContainerMetrics) error {
-	// Create Docker client for metrics
-	cli, err := createMetricsClient()
-	if err != nil {
-		return fmt.Errorf("failed to create metrics client: %w", err)
-	}
-
-	defer func() {
-		_ = cli.Close()
-	}()
-
-	// Stream metrics using the helper function
-	return streamMetrics(ctx, cli, name, ch)
+	return streamMetrics(ctx, name, ch)
 }
 
 // GetInstanceMetadata returns metadata about a Docker container.
@@ -306,8 +293,8 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 
 	metadata := &provider.InstanceMetadata{
 		Backend:    "docker",
-		InstanceID: getDockerContainerID(name),
-		ImageID:    getDockerImageID(name),
+		InstanceID: dockerInspectField(name, "{{.Id}}"),
+		ImageID:    dockerInspectField(name, "{{.Image}}"),
 	}
 
 	// Read environment variables from the container (not the host process)
@@ -318,9 +305,7 @@ func (p *Provider) GetInstanceMetadata(ctx context.Context, name string) (*provi
 	}
 
 	if maxIter, ok := envVars["MAX_ITERATIONS"]; ok && maxIter != "" {
-		if val, parseErr := fmt.Sscanf(maxIter, "%d", &metadata.MaxIterations); parseErr != nil || val != 1 {
-			_ = fmt.Errorf("failed to parse max iterations: %s", maxIter)
-		}
+		_, _ = fmt.Sscanf(maxIter, "%d", &metadata.MaxIterations)
 	}
 
 	if branch, ok := envVars["BRANCH"]; ok && branch != "" {
@@ -342,7 +327,7 @@ func (p *Provider) List(ctx context.Context) ([]provider.InstanceInfo, error) {
 	var instances []provider.InstanceInfo
 
 	for _, c := range containers {
-		name := strings.TrimPrefix(c.Names[0], "/")
+		name := c.Names[0]
 
 		status := provider.InstanceStatusStopped
 		if c.State == "running" {
@@ -401,12 +386,12 @@ func (p *Provider) enrichFromStateFile(info *provider.InstanceInfo, containerNam
 	provider.EnrichFromStateData(info, data)
 }
 
-// getDockerContainerID gets the container ID for a given container name using docker inspect.
-func getDockerContainerID(containerName string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*1000000000) // 5 seconds
+// dockerInspectField retrieves a single field from docker inspect for a container.
+func dockerInspectField(containerName, format string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := fmt.Sprintf("docker inspect --format={{.Id}} %s", containerName)
+	cmd := fmt.Sprintf("docker inspect --format=%s %s", format, containerName)
 
 	result, err := execCommand(ctx, cmd)
 	if err != nil {
@@ -414,61 +399,6 @@ func getDockerContainerID(containerName string) string {
 	}
 
 	return result
-}
-
-// getDockerImageID gets the image ID for a given container name using docker inspect.
-func getDockerImageID(containerName string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*1000000000) // 5 seconds
-	defer cancel()
-
-	cmd := fmt.Sprintf("docker inspect --format={{.Image}} %s", containerName)
-
-	result, err := execCommand(ctx, cmd)
-	if err != nil {
-		return ""
-	}
-
-	return result
-}
-
-// getContainerEnvVars reads environment variables from a Docker container using docker inspect.
-func getContainerEnvVars(ctx context.Context, containerName string) (map[string]string, error) {
-	inspectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	cmd := fmt.Sprintf("docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' %s", containerName)
-
-	result, err := execCommand(inspectCtx, cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	envMap := make(map[string]string)
-
-	for _, line := range strings.Split(result, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		if idx := strings.IndexByte(line, '='); idx >= 0 {
-			envMap[line[:idx]] = line[idx+1:]
-		}
-	}
-
-	return envMap, nil
-}
-
-// execCommand executes a shell command and returns the output.
-func execCommand(ctx context.Context, command string) (string, error) {
-	cmd := exec.CommandContext(ctx, "sh", "-c", command)
-
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(string(output)), nil
 }
 
 // detectNpmrc checks whether ~/.npmrc exists on the host.

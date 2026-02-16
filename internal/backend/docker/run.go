@@ -9,6 +9,13 @@ import (
 	"strings"
 )
 
+// Pre-compiled regexes for container name sanitization.
+var (
+	reInvalidChars    = regexp.MustCompile(`[^a-z0-9-_]`)
+	reConsecutiveDash = regexp.MustCompile(`-+`)
+	reRepoName        = regexp.MustCompile(`([^/:]+)(\.git)?$`)
+)
+
 // spinConfig contains configuration for spinning up a container.
 type spinConfig struct {
 	Image         string
@@ -40,12 +47,6 @@ const (
 // defaultMaxIterations is the default maximum number of iterations for the exec loop.
 const defaultMaxIterations = "100"
 
-// escapeShellArg escapes a string for safe use as a shell argument.
-// Wraps the string in single quotes and escapes any single quotes within.
-func escapeShellArg(arg string) string {
-	return "'" + strings.ReplaceAll(arg, "'", "'\\''") + "'"
-}
-
 // sanitizeComponent sanitizes a component for use in a Docker container name.
 // Converts to lowercase, replaces invalid characters with hyphens,
 // collapses consecutive hyphens, and trims leading/trailing hyphens.
@@ -54,12 +55,10 @@ func sanitizeComponent(input string) string {
 	result := strings.ToLower(input)
 
 	// Replace invalid characters with hyphens
-	re := regexp.MustCompile(`[^a-z0-9-_]`)
-	result = re.ReplaceAllString(result, "-")
+	result = reInvalidChars.ReplaceAllString(result, "-")
 
 	// Collapse consecutive hyphens
-	re = regexp.MustCompile(`-+`)
-	result = re.ReplaceAllString(result, "-")
+	result = reConsecutiveDash.ReplaceAllString(result, "-")
 
 	// Trim leading/trailing hyphens
 	result = strings.Trim(result, "-")
@@ -70,9 +69,7 @@ func sanitizeComponent(input string) string {
 // extractRepoName extracts the repository name from a Git URL.
 // Handles both SSH (git@github.com:user/repo.git) and HTTPS (https://github.com/user/repo.git) formats.
 func extractRepoName(repoURL string) string {
-	re := regexp.MustCompile(`([^/:]+)(\.git)?$`)
-
-	matches := re.FindStringSubmatch(repoURL)
+	matches := reRepoName.FindStringSubmatch(repoURL)
 	if len(matches) > 1 {
 		return strings.TrimSuffix(matches[1], ".git")
 	}
