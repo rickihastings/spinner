@@ -3,32 +3,32 @@
 ## Purpose
 TBD - created by archiving change add-gcp-sandbox-backend. Update Purpose after archive.
 ## Requirements
-### Requirement: SDK-Based GCP Operations
+### Requirement: CLI-Based GCP Operations
 
-The GCP provider SHALL use the official GCP Go SDK (`cloud.google.com/go/compute/apiv1`) for all Compute Engine
-operations instead of CLI command execution (`gcloud`).
+The GCP provider SHALL use the `gcloud` CLI for all Compute Engine and Cloud Storage operations, with
+`--format=json` output parsed into plain Go structs. This keeps the binary lean (no SDK dependencies) and
+establishes a consistent CLI + JSON pattern across all backends.
 
-#### Scenario: SDK client initialization
+#### Scenario: gcloud prerequisite check
 
-- **WHEN** any GCP operation is requested
-- **THEN** SDK clients (Instances, Images, Operations) SHALL be lazily initialized
-- **AND** Application Default Credentials (ADC) SHALL be used for authentication
+- **WHEN** a `RealGCPClient` is created
+- **THEN** it SHALL verify `gcloud` is on PATH via `exec.LookPath`
+- **AND** return a clear error with install instructions if not found
 
-#### Scenario: Authentication via ADC
+#### Scenario: Authentication via gcloud
 
-- **WHEN** the GCP provider is created
-- **THEN** it SHALL use `google.FindDefaultCredentials()` for authentication
-- **AND** it SHALL support all ADC methods: environment variable, gcloud auth, service account key, workload identity
+- **WHEN** the GCP provider executes operations
+- **THEN** it SHALL delegate authentication to `gcloud` (which handles ADC, service accounts, and credential refresh)
 
 #### Scenario: Missing credentials
 
-- **WHEN** no valid GCP credentials are available
-- **THEN** the provider SHALL return a clear error message indicating how to configure credentials
+- **WHEN** `gcloud` is not authenticated
+- **THEN** the CLI error message from `gcloud` SHALL be propagated to the user
 
 #### Scenario: Invalid project ID
 
 - **WHEN** the provided project ID does not exist or is inaccessible
-- **THEN** the provider SHALL return an error indicating the project is invalid or inaccessible
+- **THEN** the provider SHALL return the error from `gcloud` indicating the project is invalid or inaccessible
 
 ### Requirement: GCP Image Baking
 
@@ -396,7 +396,7 @@ The GCP provider SHALL use an internal client interface to enable unit testing w
 #### Scenario: Real client for integration
 
 - **WHEN** integration tests or production code runs
-- **THEN** `RealGCPClient` SHALL use the GCP SDK with actual API calls
+- **THEN** `RealGCPClient` SHALL use `gcloud` CLI commands with `--format=json` output parsing
 
 #### Scenario: Client interface coverage
 

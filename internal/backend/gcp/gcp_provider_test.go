@@ -765,7 +765,7 @@ func TestProviderCreatePassesGitUserConfig(t *testing.T) {
 
 	// Image exists
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
-		Return(&computepb.Image{Name: strPtr("my-env")}, nil)
+		Return(&GCPImage{Name: "my-env"}, nil)
 
 	// CreateInstance - verify git user config is passed in metadata
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {

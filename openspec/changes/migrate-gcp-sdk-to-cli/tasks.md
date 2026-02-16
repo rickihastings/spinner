@@ -61,11 +61,11 @@
 - [x] 5.4 Add tests for `isOnGCE()` and `checkGcloudInstalled()`
 - [x] 5.5 Verify build and all tests pass
 
-## 6.0 Remove SDK dependencies and final validation
+## ~~6.0 Remove SDK dependencies and final validation~~
 
-- [ ] 6.1 Run `go mod tidy` to remove unused SDK dependencies
-- [ ] 6.2 Verify no `cloud.google.com/go` imports remain in `internal/backend/gcp/`
-- [ ] 6.3 Verify no `google.golang.org/api/iterator` import remains
-- [ ] 6.4 Run full test suite: `go test ./...`
-- [ ] 6.5 Run `go build -o dist/spinner` and verify binary size reduction
-- [ ] 6.6 Update spec (archive after deployment)
+- [x] 6.1 Run `go mod tidy` to remove unused SDK dependencies
+- [x] 6.2 Verify no `cloud.google.com/go` imports remain in `internal/backend/gcp/`
+- [x] 6.3 Verify no `google.golang.org/api/iterator` import remains
+- [x] 6.4 Run full test suite: `go test ./...`
+- [x] 6.5 Run `go build -o dist/spinner` and verify binary size reduction
+- [x] 6.6 Update spec (archive after deployment)
