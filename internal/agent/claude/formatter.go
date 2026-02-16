@@ -29,7 +29,7 @@ type Formatter struct {
 func NewFormatter() *Formatter {
 	renderer, _ := glamour.NewTermRenderer(
 		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(100),
+		glamour.WithWordWrap(0),
 	)
 
 	return &Formatter{
@@ -128,6 +128,11 @@ func (f *Formatter) formatToolResult(event *agent.Event) (string, bool) {
 			}
 		}
 
+		// Skip rendering tool results for TodoWrite - already rendered in formatToolUse
+		if toolName == "TodoWrite" {
+			continue
+		}
+
 		// Build the header line: "⏺ ToolName ⎯⎯⎯⎯⎯⎯"
 		separator := strings.Repeat("⎯", 30)
 		header := fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-] [darkgray]%s[-]", toolName, separator)
@@ -217,8 +222,9 @@ func (f *Formatter) renderMarkdown(text string) string {
 		return text
 	}
 
-	// glamour adds trailing newlines; trim them
+	// glamour adds leading/trailing newlines; trim them
 	rendered = strings.TrimRight(rendered, "\n")
+	rendered = strings.TrimLeft(rendered, "\n")
 
 	// Convert ANSI escape codes to tview color tags
 	return tview.TranslateANSI(rendered)
@@ -231,12 +237,63 @@ func (f *Formatter) formatToolUse(block contentBlock) string {
 		f.toolNames[block.ID] = block.Name
 	}
 
+	// Special rendering for TodoWrite - show as a task checklist
+	if block.Name == "TodoWrite" {
+		if rendered := formatTodoWrite(block.Input); rendered != "" {
+			return rendered
+		}
+	}
+
 	summary := extractToolSummary(block.Name, block.Input)
 	if summary != "" {
 		return fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-](%s)", block.Name, summary)
 	}
 
 	return fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-]", block.Name)
+}
+
+// formatTodoWrite renders TodoWrite input as a formatted task checklist.
+func formatTodoWrite(input json.RawMessage) string {
+	if len(input) == 0 {
+		return ""
+	}
+
+	var data struct {
+		Todos []struct {
+			Content string `json:"content"`
+			Status  string `json:"status"`
+		} `json:"todos"`
+	}
+
+	if err := json.Unmarshal(input, &data); err != nil || len(data.Todos) == 0 {
+		return ""
+	}
+
+	var lines []string
+
+	lines = append(lines, "[dodgerblue]⏺[-] [cyan]Tasks[-]")
+
+	for _, todo := range data.Todos {
+		var icon string
+
+		switch todo.Status {
+		case "completed":
+			icon = "[green]✓[-]"
+		case "in_progress":
+			icon = "[yellow]●[-]"
+		default:
+			icon = "[darkgray]○[-]"
+		}
+
+		content := todo.Content
+		if len(content) > 90 {
+			content = content[:87] + "..."
+		}
+
+		lines = append(lines, fmt.Sprintf("  %s %s", icon, content))
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // extractToolSummary extracts a human-readable parameter summary from tool input JSON.

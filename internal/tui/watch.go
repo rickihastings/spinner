@@ -84,7 +84,7 @@ func isTestEnvironment() bool {
 func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx WatchContext) *WatchUI {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	app := tview.NewApplication()
+	app := tview.NewApplication().EnableMouse(true)
 
 	// Create header view for container metadata and metrics
 	header := tview.NewTextView().
@@ -134,8 +134,8 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		SetBorderColor(tcell.ColorGray)
 	helpOverlay.SetText(
 		"\n" +
-			" ↑/↓         Scroll line\n" +
-			" PgUp/PgDn   Scroll page\n" +
+			" ↑/↓          Scroll line\n" +
+			" PgUp/PgDn    Scroll page\n" +
 			" Home/End     Top/Bottom\n" +
 			" h            Toggle header\n" +
 			" ?            This help\n" +
@@ -189,8 +189,9 @@ func NewWatchUI(containerName string, formatter agent.EventFormatter, wctx Watch
 		})
 	})
 
-	// Set up keyboard handlers
+	// Set up keyboard and mouse handlers
 	ui.setupKeyboardHandlers()
+	ui.setupMouseHandlers()
 
 	return ui
 }
@@ -253,6 +254,22 @@ func (ui *WatchUI) setupKeyboardHandlers() {
 		}
 
 		return event
+	})
+}
+
+// setupMouseHandlers configures mouse wheel scrolling for the log view
+func (ui *WatchUI) setupMouseHandlers() {
+	ui.logView.SetMouseCapture(func(action tview.MouseAction, event *tcell.EventMouse) (tview.MouseAction, *tcell.EventMouse) {
+		switch action {
+		case tview.MouseScrollUp:
+			ui.scrollUp(3)
+			return action, nil
+		case tview.MouseScrollDown:
+			ui.scrollDown(3)
+			return action, nil
+		}
+
+		return action, event
 	})
 }
 
