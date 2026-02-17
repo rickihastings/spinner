@@ -215,11 +215,19 @@ func secretsToEnvSlice(secrets map[string]string) []string {
 // readPassword is a package-level variable for testing.
 var readPassword = term.ReadPassword
 
+// cached passphrase from a previous interactive prompt within this process.
+var cachedPassphrase string
+
 // passphraseFromEnvOrPrompt returns the passphrase from SPINNER_SECRET_PASSPHRASE
-// env var, or prompts the user interactively.
+// env var, or prompts the user interactively. The interactive result is cached
+// for subsequent calls within the same process to avoid repeated prompts.
 func passphraseFromEnvOrPrompt() (string, error) {
 	if p := os.Getenv("SPINNER_SECRET_PASSPHRASE"); p != "" {
 		return p, nil
+	}
+
+	if cachedPassphrase != "" {
+		return cachedPassphrase, nil
 	}
 
 	fmt.Fprint(os.Stderr, "Enter passphrase: ")
@@ -235,6 +243,8 @@ func passphraseFromEnvOrPrompt() (string, error) {
 	if p == "" {
 		return "", fmt.Errorf("passphrase must not be empty")
 	}
+
+	cachedPassphrase = p
 
 	return p, nil
 }
