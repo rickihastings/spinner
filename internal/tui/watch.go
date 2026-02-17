@@ -462,6 +462,7 @@ func (ui *WatchUI) appendLog(event agent.Event) {
 			if ui.agent == "" && initData.Model != "" {
 				ui.agent = initData.Model
 			}
+
 			ui.mu.Unlock()
 			// Trigger header update
 			ui.app.QueueUpdateDraw(func() {
@@ -496,6 +497,7 @@ func (ui *WatchUI) updateMetrics(m provider.ContainerMetrics) {
 	if m.Iteration > 0 {
 		ui.currentIter = m.Iteration
 	}
+
 	ui.mu.Unlock()
 
 	ui.app.QueueUpdateDraw(func() {
