@@ -36,9 +36,9 @@
 
 ## 5.0 Startup Script Refactor
 
-- [ ] 5.1 Modify `templates/scripts/startup.sh`: remove `GITHUB_TOKEN` env var check; use `spinner secret inject -- sh -c '...'` to wrap `gh auth setup-git`, credential cache config, and `git clone`/fetch; keep branch checkout and `spinner exec`/`tail -f` outside the inject wrapper (git credentials are cached)
-- [ ] 5.2 Add error handling for missing secrets blob in startup.sh
-- [ ] 5.3 Verify build and all tests pass
+- [x] 5.1 Modify `templates/scripts/startup.sh`: remove `GITHUB_TOKEN` env var check; use `spinner secret inject -- sh -c '...'` to wrap `gh auth setup-git`, credential cache config, and `git clone`/fetch; keep branch checkout and `spinner exec`/`tail -f` outside the inject wrapper (git credentials are cached)
+- [x] 5.2 Add error handling for missing secrets blob in startup.sh
+- [x] 5.3 Verify build and all tests pass
 
 ## 6.0 Spinner Exec Secret Injection
 

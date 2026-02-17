@@ -42,6 +42,7 @@ func NewEncryptedFileStore(path string, passphrase PassphraseFunc) *EncryptedFil
 	if path == "" {
 		path = DefaultStorePath()
 	}
+
 	return &EncryptedFileStore{
 		path:       path,
 		passphrase: passphrase,
@@ -54,10 +55,12 @@ func DefaultStorePath() string {
 	if p := os.Getenv(envStorePath); p != "" {
 		return p
 	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return filepath.Join(".", ".spinner", "secrets.enc")
 	}
+
 	return filepath.Join(home, ".spinner", "secrets.enc")
 }
 
@@ -67,7 +70,9 @@ func (s *EncryptedFileStore) Set(key, value string) error {
 	if err != nil {
 		return err
 	}
+
 	secrets[key] = value
+
 	return s.save(secrets)
 }
 
@@ -77,10 +82,12 @@ func (s *EncryptedFileStore) Get(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	val, ok := secrets[key]
 	if !ok {
 		return "", fmt.Errorf("%w: %s", ErrNotFound, key)
 	}
+
 	return val, nil
 }
 
@@ -90,10 +97,13 @@ func (s *EncryptedFileStore) Delete(key string) error {
 	if err != nil {
 		return err
 	}
+
 	if _, ok := secrets[key]; !ok {
 		return fmt.Errorf("%w: %s", ErrNotFound, key)
 	}
+
 	delete(secrets, key)
+
 	return s.save(secrets)
 }
 
@@ -103,11 +113,14 @@ func (s *EncryptedFileStore) List() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	keys := make([]string, 0, len(secrets))
 	for k := range secrets {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
+
 	return keys, nil
 }
 
@@ -119,6 +132,7 @@ func (s *EncryptedFileStore) load() (map[string]string, error) {
 		if errors.Is(err, os.ErrNotExist) {
 			return make(map[string]string), nil
 		}
+
 		return nil, fmt.Errorf("reading secret store: %w", err)
 	}
 
@@ -136,6 +150,7 @@ func (s *EncryptedFileStore) load() (map[string]string, error) {
 	if err := json.Unmarshal(plaintext, &secrets); err != nil {
 		return nil, fmt.Errorf("parsing secret store: %w", err)
 	}
+
 	return secrets, nil
 }
 
@@ -166,10 +181,12 @@ func (s *EncryptedFileStore) save(secrets map[string]string) error {
 	if err := os.WriteFile(tmpFile, ciphertext, fileMode); err != nil {
 		return fmt.Errorf("writing secret store: %w", err)
 	}
+
 	if err := os.Rename(tmpFile, s.path); err != nil {
-		os.Remove(tmpFile) // best-effort cleanup
+		_ = os.Remove(tmpFile) // best-effort cleanup
 		return fmt.Errorf("saving secret store: %w", err)
 	}
+
 	return nil
 }
 
@@ -187,6 +204,7 @@ func encrypt(plaintext []byte, passphrase string) ([]byte, error) {
 	}
 
 	key := deriveKey(passphrase, salt)
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("creating cipher: %w", err)
@@ -209,6 +227,7 @@ func encrypt(plaintext []byte, passphrase string) ([]byte, error) {
 	result = append(result, salt...)
 	result = append(result, nonce...)
 	result = append(result, ciphertext...)
+
 	return result, nil
 }
 
@@ -225,6 +244,7 @@ func decrypt(data []byte, passphrase string) ([]byte, error) {
 	ciphertext := data[saltLen+nonceLen:]
 
 	key := deriveKey(passphrase, salt)
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("creating cipher: %w", err)
@@ -239,5 +259,6 @@ func decrypt(data []byte, passphrase string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.New("decryption failed: wrong passphrase or corrupted data")
 	}
+
 	return plaintext, nil
 }

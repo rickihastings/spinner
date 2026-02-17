@@ -49,6 +49,7 @@ func TestSecretSetCommand_EmptyValue(t *testing.T) {
 	readPassword = func(fd int) ([]byte, error) {
 		return []byte(""), nil
 	}
+
 	defer func() { readPassword = origReadPassword }()
 
 	err := cmd.Execute()
@@ -66,6 +67,7 @@ func TestSecretSetCommand_WithPromptedValue(t *testing.T) {
 	readPassword = func(fd int) ([]byte, error) {
 		return []byte("prompted-value"), nil
 	}
+
 	defer func() { readPassword = origReadPassword }()
 
 	cmd := newSecretCommand(testStoreFactory(mockStore))

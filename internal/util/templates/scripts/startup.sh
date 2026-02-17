@@ -1,19 +1,40 @@
 #!/bin/bash
 set -e
 
-# Check if GITHUB_TOKEN is set
-if [ -z "$GITHUB_TOKEN" ]; then
-  echo "Error: GITHUB_TOKEN environment variable is not set"
-  echo "Please set GITHUB_TOKEN before running spin"
+# Check if REPO_URL is set
+if [ -z "$REPO_URL" ]; then
+  echo "Error: REPO_URL environment variable is not set"
   exit 1
 fi
 
-# Configure GitHub authentication
-echo "Configuring GitHub authentication..."
-gh auth setup-git
+# Check for encrypted secrets blob
+if [ ! -f "/run/spinner/secrets.enc" ]; then
+  echo "Error: Encrypted secrets blob not found at /run/spinner/secrets.enc"
+  echo "Secrets must be configured via 'spinner secret set' before spinning"
+  exit 1
+fi
 
-# Configure git credential cache with 1-year timeout
-git config --global credential.helper 'cache --timeout=31536000'
+# Decrypt secrets and run git auth setup + clone in one shot.
+# gh auth setup-git configures git credential helper.
+# Credential cache (1-year timeout) persists auth after this block exits.
+# After this, GITHUB_TOKEN is no longer needed as an env var for git operations.
+spinner secret inject -- sh -c '
+  gh auth setup-git
+  git config --global credential.helper "cache --timeout=31536000"
+  if [ -d ".git" ]; then
+    CURRENT_REMOTE=$(git config --get remote.origin.url || echo "")
+    if [ "$CURRENT_REMOTE" != "'"$REPO_URL"'" ]; then
+      echo "Error: Existing repo URL ($CURRENT_REMOTE) does not match expected ('"$REPO_URL"')"
+      exit 1
+    fi
+    echo "Repository verified. Fetching latest changes..."
+    git fetch origin
+  else
+    echo "Cloning repository: '"$REPO_URL"'"
+    git clone "'"$REPO_URL"'" .
+    echo "Repository cloned to /home/spinner/workspace"
+  fi
+'
 
 # Configure git user identity from host
 if [ -n "$GIT_USER_NAME" ]; then
@@ -22,31 +43,6 @@ fi
 
 if [ -n "$GIT_USER_EMAIL" ]; then
   git config --global user.email "$GIT_USER_EMAIL"
-fi
-
-# Check if REPO_URL is set
-if [ -z "$REPO_URL" ]; then
-  echo "Error: REPO_URL environment variable is not set"
-  exit 1
-fi
-
-# Check if repository is already cloned (e.g., on container restart)
-if [ -d ".git" ]; then
-  echo "Repository already exists, verifying..."
-
-  # Verify it's the correct repository
-  CURRENT_REMOTE=$(git config --get remote.origin.url || echo "")
-  if [ "$CURRENT_REMOTE" != "$REPO_URL" ]; then
-    echo "Error: Existing repository URL ($CURRENT_REMOTE) doesn't match expected URL ($REPO_URL)"
-    exit 1
-  fi
-
-  echo "Repository verified. Fetching latest changes..."
-  git fetch origin
-else
-  echo "Cloning repository: $REPO_URL"
-  git clone "$REPO_URL" .
-  echo "Repository cloned to /home/spinner/workspace"
 fi
 
 echo "Verifying repository..."
@@ -76,7 +72,7 @@ override_from_file "/state/prompt.txt" "PROMPT"
 override_from_file "/state/max-iterations.txt" "MAX_ITERATIONS"
 override_from_file "/state/model.txt" "ANTHROPIC_MODEL"
 
-# If PROMPT is set, run Ralph loop
+# If PROMPT is set, run the iteration loop
 if [ -n "$PROMPT" ]; then
   echo ""
 

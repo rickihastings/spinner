@@ -23,6 +23,7 @@ func TestRoundTripSetGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
+
 	if val != "secret-value" {
 		t.Errorf("got %q, want %q", val, "secret-value")
 	}
@@ -49,6 +50,7 @@ func TestMultipleKeys(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Get(%s): %v", k, err)
 		}
+
 		if got != want {
 			t.Errorf("Get(%s) = %q, want %q", k, got, want)
 		}
@@ -90,6 +92,7 @@ func TestList(t *testing.T) {
 	if err := store.Set("BETA", "b"); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
+
 	if err := store.Set("ALPHA", "a"); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
@@ -118,6 +121,7 @@ func TestWrongPassphrase(t *testing.T) {
 	}
 
 	wrongStore := NewEncryptedFileStore(path, passphraseFunc("wrong-pass"))
+
 	_, err := wrongStore.Get("KEY")
 	if err == nil {
 		t.Fatal("Get with wrong passphrase should fail")
@@ -133,6 +137,7 @@ func TestCorruptedFile(t *testing.T) {
 	}
 
 	store := NewEncryptedFileStore(path, passphraseFunc("test-pass"))
+
 	_, err := store.Get("KEY")
 	if err == nil {
 		t.Fatal("Get on corrupted file should fail")
@@ -147,6 +152,7 @@ func TestMissingFileReturnsEmptyStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+
 	if len(keys) != 0 {
 		t.Errorf("List on missing file returned %d keys, want 0", len(keys))
 	}
@@ -178,6 +184,7 @@ func TestAtomicWriteSafety(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stat: %v", err)
 	}
+
 	if perm := info.Mode().Perm(); perm != 0600 {
 		t.Errorf("file permissions: got %o, want 0600", perm)
 	}
@@ -204,6 +211,7 @@ func TestCustomStorePathViaEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get at custom path: %v", err)
 	}
+
 	if val != "value" {
 		t.Errorf("Get = %q, want %q", val, "value")
 	}
@@ -231,6 +239,7 @@ func TestOverwriteExistingKey(t *testing.T) {
 	if err := store.Set("KEY", "original"); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
+
 	if err := store.Set("KEY", "updated"); err != nil {
 		t.Fatalf("Set overwrite: %v", err)
 	}
@@ -239,6 +248,7 @@ func TestOverwriteExistingKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
+
 	if val != "updated" {
 		t.Errorf("Get = %q, want %q", val, "updated")
 	}
@@ -258,6 +268,7 @@ func TestPassphraseError(t *testing.T) {
 	errStore := NewEncryptedFileStore(path, func() (string, error) {
 		return "", errors.New("passphrase unavailable")
 	})
+
 	_, err := errStore.Get("KEY")
 	if err == nil {
 		t.Fatal("Get with failing passphrase should error")

@@ -25,8 +25,10 @@ func Resolve(store Store, customKeys []string) (map[string]string, error) {
 			if errors.Is(err, ErrNotFound) {
 				return nil, fmt.Errorf("secret %q not found in store — run: spinner secret set %s", key, key)
 			}
+
 			return nil, fmt.Errorf("reading secret %q: %w", key, err)
 		}
+
 		secrets[key] = val
 	}
 
@@ -36,13 +38,16 @@ func Resolve(store Store, customKeys []string) (map[string]string, error) {
 		if _, ok := secrets[key]; ok {
 			continue
 		}
+
 		val, err := store.Get(key)
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
 				return nil, fmt.Errorf("secret %q not found in store — run: spinner secret set %s", key, key)
 			}
+
 			return nil, fmt.Errorf("reading secret %q: %w", key, err)
 		}
+
 		secrets[key] = val
 	}
 

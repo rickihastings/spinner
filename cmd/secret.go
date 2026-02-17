@@ -61,14 +61,15 @@ func newSecretSetCommand(sf storeFactory) *cobra.Command {
 
 			if value == "" {
 				// Prompt for value with hidden input
-				fmt.Fprintf(cmd.OutOrStdout(), "Enter value for %s: ", key)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Enter value for %s: ", key)
 
 				raw, err := readPassword(int(os.Stdin.Fd()))
 				if err != nil {
 					return fmt.Errorf("reading secret value: %w", err)
 				}
 
-				fmt.Fprintln(cmd.OutOrStdout()) // newline after hidden input
+				_, _ = fmt.Fprintln(cmd.OutOrStdout()) // newline after hidden input
+
 				value = strings.TrimSpace(string(raw))
 			}
 
@@ -81,7 +82,7 @@ func newSecretSetCommand(sf storeFactory) *cobra.Command {
 				return fmt.Errorf("storing secret: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "✓ Secret %q stored\n", key)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✓ Secret %q stored\n", key)
 
 			return nil
 		},
@@ -107,12 +108,12 @@ func newSecretListCommand(sf storeFactory) *cobra.Command {
 			}
 
 			if len(keys) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No secrets stored")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No secrets stored")
 				return nil
 			}
 
 			for _, k := range keys {
-				fmt.Fprintln(cmd.OutOrStdout(), k)
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), k)
 			}
 
 			return nil
@@ -134,7 +135,7 @@ func newSecretDeleteCommand(sf storeFactory) *cobra.Command {
 				return fmt.Errorf("deleting secret: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "✓ Secret %q deleted\n", key)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✓ Secret %q deleted\n", key)
 
 			return nil
 		},

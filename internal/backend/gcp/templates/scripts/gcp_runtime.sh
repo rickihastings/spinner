@@ -14,8 +14,6 @@ META_HEADER="Metadata-Flavor: Google"
 
 echo "Reading instance metadata..."
 
-GITHUB_TOKEN=$(curl -sf -H "$META_HEADER" "$META_URL/GITHUB_TOKEN" || echo "")
-CLAUDE_CODE_OAUTH_TOKEN=$(curl -sf -H "$META_HEADER" "$META_URL/CLAUDE_CODE_OAUTH_TOKEN" || echo "")
 REPO_URL=$(curl -sf -H "$META_HEADER" "$META_URL/REPO_URL" || echo "")
 PROMPT=$(curl -sf -H "$META_HEADER" "$META_URL/PROMPT" || echo "")
 BRANCH=$(curl -sf -H "$META_HEADER" "$META_URL/BRANCH" || echo "")
@@ -28,9 +26,22 @@ ANTHROPIC_MODEL=$(curl -sf -H "$META_HEADER" "$META_URL/ANTHROPIC_MODEL" || echo
 GIT_USER_NAME=$(curl -sf -H "$META_HEADER" "$META_URL/GIT_USER_NAME" || echo "")
 GIT_USER_EMAIL=$(curl -sf -H "$META_HEADER" "$META_URL/GIT_USER_EMAIL" || echo "")
 
-export GITHUB_TOKEN CLAUDE_CODE_OAUTH_TOKEN REPO_URL PROMPT BRANCH MAX_ITERATIONS
+# Read encrypted secrets blob and passphrase from metadata.
+# Tokens (GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN) travel via the encrypted blob, not as plaintext metadata.
+SPINNER_SECRET_BLOB_B64=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_SECRET_BLOB" || echo "")
+SPINNER_SECRET_PASSPHRASE=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_SECRET_PASSPHRASE" || echo "")
+
+# Decode the blob and write it to the expected path for startup.sh
+if [ -n "$SPINNER_SECRET_BLOB_B64" ]; then
+    mkdir -p /run/spinner
+    echo "$SPINNER_SECRET_BLOB_B64" | base64 -d > /run/spinner/secrets.enc
+    chmod 600 /run/spinner/secrets.enc
+    echo "Encrypted secrets blob written to /run/spinner/secrets.enc"
+fi
+
+export REPO_URL PROMPT BRANCH MAX_ITERATIONS
 export SPINNER_LOG_BUCKET SPINNER_INSTANCE_NAME SPINNER_STATE_BUCKET ANTHROPIC_MODEL
-export GIT_USER_NAME GIT_USER_EMAIL
+export SPINNER_SECRET_PASSPHRASE GIT_USER_NAME GIT_USER_EMAIL
 
 # Read custom env vars from metadata (SPINNER_ENV_ prefix)
 echo "Reading custom environment variables..."

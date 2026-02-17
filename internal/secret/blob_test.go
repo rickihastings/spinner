@@ -35,6 +35,7 @@ func TestBlobRoundTrip(t *testing.T) {
 			t.Errorf("key %s: got %q, want %q", k, got[k], want)
 		}
 	}
+
 	if len(got) != len(secrets) {
 		t.Errorf("got %d keys, want %d", len(got), len(secrets))
 	}

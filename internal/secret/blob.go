@@ -15,6 +15,7 @@ func EncryptBlob(secrets map[string]string, passphrase string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encoding secrets: %w", err)
 	}
+
 	return encrypt(plaintext, passphrase)
 }
 
@@ -25,6 +26,7 @@ func DecryptBlob(path, passphrase string) (map[string]string, error) {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("secrets blob not found: %s", path)
 		}
+
 		return nil, fmt.Errorf("reading secrets blob: %w", err)
 	}
 
@@ -37,5 +39,6 @@ func DecryptBlob(path, passphrase string) (map[string]string, error) {
 	if err := json.Unmarshal(plaintext, &secrets); err != nil {
 		return nil, fmt.Errorf("parsing secrets blob: %w", err)
 	}
+
 	return secrets, nil
 }
