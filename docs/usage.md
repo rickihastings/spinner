@@ -26,6 +26,118 @@ Install git hooks to run format, lint, and test before each commit:
 make install-hooks
 ```
 
+## Secret Management
+
+Spinner uses an encrypted secret store to manage sensitive tokens like `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN`.
+All secrets are stored in an AES-256-GCM encrypted file at `~/.spinner/secrets.enc` and delivered to containers as an
+encrypted blob — never as environment variables.
+
+**This is a breaking change:** environment variable fallback for tokens has been removed. You must store all tokens in
+the secret store before running `spinner spin`.
+
+### Initial Setup
+
+Store your required tokens:
+
+```bash
+# These are required for spinner spin to work
+spinner secret set GITHUB_TOKEN
+spinner secret set CLAUDE_CODE_OAUTH_TOKEN
+```
+
+Each command prompts for the value with hidden input. Alternatively, pass the value directly:
+
+```bash
+spinner secret set GITHUB_TOKEN --value ghp_xxxxxxxxxxxx
+```
+
+### Managing Secrets
+
+```bash
+# List stored secret key names (values are never shown)
+spinner secret list
+
+# Delete a secret
+spinner secret delete GITHUB_TOKEN
+```
+
+### Using Secrets with `spinner spin`
+
+Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) are resolved automatically from the store. For additional
+secrets, use the `--secret` flag:
+
+```bash
+# Built-in tokens are resolved automatically; add custom secrets with --secret
+spinner spin \
+  --image default \
+  --repo https://github.com/user/repo \
+  --prompt "deploy the app" \
+  --secret NPM_TOKEN \
+  --secret API_KEY
+```
+
+All resolved secrets (built-in + custom) are encrypted into a per-session blob and delivered to the container at
+`/run/spinner/secrets.enc`. The passphrase is passed as the sole secret-related environment variable
+(`SPINNER_SECRET_PASSPHRASE`).
+
+### Passphrase
+
+The store passphrase is sourced from:
+
+1. `SPINNER_SECRET_PASSPHRASE` environment variable (for CI/scripts)
+2. Interactive prompt (for local development)
+
+```bash
+# Non-interactive usage (CI)
+export SPINNER_SECRET_PASSPHRASE=my-passphrase
+spinner spin --image default --repo https://github.com/user/repo --prompt "task"
+```
+
+### In-Container Secret Access
+
+Secrets are never exposed as container environment variables. Inside a container, there are two ways secrets are
+accessed:
+
+**Automatic (`--prompt` mode):** `spinner exec` decrypts the blob at startup and injects secrets into the Claude CLI
+child process via `cmd.Env`. No user action is needed.
+
+**Manual (no `--prompt` / SSH mode):** Use `spinner secret inject` to decrypt the blob and run a command with secrets:
+
+```bash
+# Run a single command with secrets injected
+spinner secret inject -- claude -p "implement feature X"
+
+# Start an interactive shell with secrets available
+spinner secret inject -- bash
+
+# The passphrase is read from SPINNER_SECRET_PASSPHRASE env if available,
+# otherwise prompts interactively
+```
+
+### Inception (Spinner Inside Spinner)
+
+The encrypted blob format matches the store format, so an outer Spinner's blob can serve as the inner Spinner's store.
+The `SPINNER_SECRET_STORE` environment variable controls where the store file is read from:
+
+```bash
+# Inside a container, use the blob as the inner spinner's store
+spinner secret inject -- sh -c '
+  SPINNER_SECRET_STORE=/run/spinner/secrets.enc \
+  spinner spin --backend docker --secret NPM_TOKEN --repo ... --prompt "sub-task"
+'
+```
+
+Each layer decrypts what it needs and re-encrypts for the next. Same passphrase at every layer, separate salts per blob.
+
+### Configurable Store Path
+
+Set `SPINNER_SECRET_STORE` to override the default store location (`~/.spinner/secrets.enc`):
+
+```bash
+export SPINNER_SECRET_STORE=/path/to/custom/secrets.enc
+spinner secret set MY_KEY
+```
+
 ## Environment Variable Configuration
 
 Spinner uses Viper to support environment variable configuration. All command-line flags can be overridden using
@@ -151,9 +263,9 @@ export SPINNER_PROJECT=my-project
 export SPINNER_ZONE=us-central1-a
 export SPINNER_STATE_BUCKET=my-state-bucket
 
-# Standard Spinner variables
-export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
+# Store required tokens in the secret store (one-time setup)
+spinner secret set GITHUB_TOKEN
+spinner secret set CLAUDE_CODE_OAUTH_TOKEN
 
 # Setup and spin (flags optional since env vars are set)
 ./dist/spinner setup --name my-env
@@ -431,7 +543,7 @@ The state file is JSON with the following structure:
 - `completed` - Agent detected completion signal (`~~ FEATURE_COMPLETED ~~` on its own line) and finished successfully
 - `rate_limited` - Hit Claude API rate limit, waiting before retry
 - `error` - General execution error occurred
-- `auth_error` - Claude authentication failed (check `CLAUDE_CODE_OAUTH_TOKEN`)
+- `auth_error` - Claude authentication failed (check `CLAUDE_CODE_OAUTH_TOKEN` in the secret store)
 
 ### Accessing State
 

@@ -53,6 +53,6 @@
 - [x] 7.2 Add tests to `cmd/secret_test.go`: inject decrypts and runs command, passphrase from env, passphrase from prompt, wrong passphrase error, missing blob error, missing command argument error
 - [x] 7.3 Verify build and all tests pass
 
-## 8.0 Documentation
+## ~~8.0 Documentation~~
 
-- [ ] 8.1 Update `docs/usage.md` with secret management workflow: `spinner secret set/list/delete`, `--secret` flag on spin, encrypted blob delivery, `spinner secret inject` for in-container use, inception scenarios, breaking change migration (env vars → store)
+- [x] 8.1 Update `docs/usage.md` with secret management workflow: `spinner secret set/list/delete`, `--secret` flag on spin, encrypted blob delivery, `spinner secret inject` for in-container use, inception scenarios, breaking change migration (env vars → store)
