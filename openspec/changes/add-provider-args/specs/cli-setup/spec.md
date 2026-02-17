@@ -28,6 +28,12 @@ underlying backend provider. Arguments are forwarded verbatim to the backend's e
 - **WHEN** user runs `spinner setup --name my-env` without any `--provider-args` flags
 - **THEN** the CLI SHALL behave identically to the current implementation (no change in behavior)
 
+#### Scenario: Provider args from config file
+
+- **WHEN** `.spinner.json` contains `{"provider-args": ["--no-cache"]}`
+- **AND** user runs `spinner setup --name my-env`
+- **THEN** the CLI SHALL forward `--no-cache` to the backend build command
+
 ### Requirement: Provider Args Conflict Detection for Setup
 
 The CLI SHALL reject `--provider-args` values that conflict with arguments managed by Spinner during setup.
@@ -42,6 +48,35 @@ The CLI SHALL reject `--provider-args` values that conflict with arguments manag
 - **WHEN** user provides `--provider-args="--no-cache"` with the Docker backend setup
 - **THEN** the CLI SHALL accept and forward the argument without error
 
+### Requirement: Deprecated Backend-Specific Setup Flags
+
+The setup command SHALL deprecate backend-specific tuning flags with warnings directing users to `--provider-args`.
+Deprecated flags SHALL continue to work during the deprecation period by being translated to provider-args internally.
+
+#### Scenario: Deprecated base-image flag
+
+- **WHEN** user provides `--base-image=node:20`
+- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--build-arg=BASE_IMAGE=node:20"`
+- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
+
+#### Scenario: Deprecated dockerfile flag
+
+- **WHEN** user provides `--dockerfile=/path/to/Dockerfile`
+- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="-f /path/to/Dockerfile"`
+- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
+
+#### Scenario: Deprecated machine-type flag on setup
+
+- **WHEN** user provides `--machine-type=n2-standard-4` with GCP backend
+- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--machine-type=n2-standard-4"`
+- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
+
+#### Scenario: Deprecated disk-size flag on setup
+
+- **WHEN** user provides `--disk-size=50` with GCP backend
+- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--disk-size-gb=50"`
+- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
+
 ## MODIFIED Requirements
 
 ### Requirement: Cobra Command Structure
@@ -52,5 +87,17 @@ command SHALL be fully testable via dependency injection.
 #### Scenario: Cobra command initialization
 
 - **WHEN** the CLI starts
-- **THEN** the setup command SHALL be registered as a Cobra subcommand with all flags (--name, --backend, --base-image,
-  --dockerfile, --provider-args, and GCP-specific flags)
+- **THEN** the setup command SHALL be registered as a Cobra subcommand with all flags (--name, --backend, --bake-script,
+  --provider-args, and GCP routing flags --project, --zone, --state-bucket)
+- **AND** deprecated flags (--base-image, --dockerfile, --machine-type, --disk-size, --service-account) SHALL be
+  registered with deprecation warnings
+
+### Requirement: Configuration File Support
+
+The setup command SHALL read infrastructure defaults from a `.spinner.json` file, including `provider-args`.
+
+#### Scenario: Config file with provider-args for setup
+
+- **WHEN** `.spinner.json` contains `{"provider-args": ["--no-cache", "--build-arg=NODE_ENV=production"]}`
+- **AND** user runs `spinner setup --name my-env`
+- **THEN** the CLI SHALL forward both args to the `docker build` command

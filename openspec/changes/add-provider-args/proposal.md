@@ -3,8 +3,9 @@
 ## Summary
 
 Add a `--provider-args` repeatable flag to the `spin` and `setup` commands that passes raw arguments directly to the
-underlying backend (Docker or GCP). This enables users to leverage the full power of the underlying tool without
-requiring Spinner to expose every possible option as a first-class flag.
+underlying backend (Docker or GCP). Deprecate existing backend-specific tuning flags (`--machine-type`, `--disk-size`,
+`--service-account`, `--bake-script`, `--base-image`, `--dockerfile`) in favor of `--provider-args`. Add
+`.spinner.json` support for `provider-args` as a JSON string array.
 
 ## Motivation
 
@@ -15,7 +16,8 @@ adds maintenance cost and coupling.
 
 Users often need capabilities that aren't exposed yet - Docker volume mounts (`-v`), hostname overrides, network
 settings, GCP labels, accelerator attachments, etc. A pass-through mechanism lets them self-serve without waiting
-for Spinner to add explicit support.
+for Spinner to add explicit support. By deprecating existing backend-specific flags, we keep the CLI surface area
+small and consistent.
 
 ## What Changes
 
@@ -24,74 +26,95 @@ for Spinner to add explicit support.
    `gcloud compute instances create` / image bake commands.
 3. **Conflict detection** - args that conflict with Spinner-managed flags (e.g. `--name`, `-d`, `--env-file` for
    Docker) are rejected with a clear error.
+4. **`.spinner.json` support** - `"provider-args": ["--machine-type=e2-standard-2", "-v /data:/data"]` in config.
+5. **Deprecation of backend-specific tuning flags** with warnings pointing users to `--provider-args`.
 
 ## What Does NOT Change
 
-- All existing first-class flags remain and work as before. No deprecations in this change.
-- The `Options map[string]string` internal pattern is unaffected.
-- Config file (`.spinner.json`) support is not added for provider-args in this iteration (raw arg lists don't
-  map cleanly to JSON key-value pairs).
+- **Infrastructure routing flags stay**: `--project`, `--zone`, `--state-bucket` remain first-class because they
+  identify *where* to operate, not *how* to configure the backend. They're required flags with validation.
+- The `--backend` flag stays (it's a Spinner routing concern, not a provider argument).
+- The `Options map[string]string` internal pattern is unaffected for the remaining flags.
 
-## Design Discussion Points
+## Decisions
 
-### 1. Flag UX: `--provider-args` vs `--` separator
+### 1. Flag UX: `--provider-args` (decided)
 
-**Option A: `--provider-args` (proposed)**
 ```bash
 spinner spin --image default --repo <url> --provider-args="-v /data:/data" --provider-args="--network=host"
 ```
-Pros: Explicit, self-documenting, works with Cobra's standard flag parsing.
-Cons: Verbose for multiple args.
 
-**Option B: `--` double-dash separator**
-```bash
-spinner spin --image default --repo <url> -- -v /data:/data --network=host
+Explicit, self-documenting, works with Cobra's standard flag parsing. The `--` separator alternative fights with
+Cobra's positional-args parsing.
+
+### 2. Deprecate backend-specific tuning flags (decided)
+
+The smaller the API surface, the better. The following flags will be deprecated with warnings, then removed:
+
+**Flags to deprecate:**
+
+| Flag | Backend | Current Default | Migration |
+|------|---------|-----------------|-----------|
+| `--machine-type` | GCP | `e2-standard-2` | `--provider-args="--machine-type=e2-standard-2"` |
+| `--disk-size` | GCP | `30` GB | `--provider-args="--disk-size-gb=30"` |
+| `--service-account` | GCP | (none) | `--provider-args="--service-account=..."` |
+| `--bake-script` | GCP | (none) | Separate handling (see below) |
+| `--base-image` | Docker | `ubuntu:22.04` | `--provider-args="--build-arg=BASE_IMAGE=..."` |
+| `--dockerfile` | Docker | (none) | `--provider-args="-f /path/to/Dockerfile"` |
+
+**Flags that STAY first-class:**
+
+| Flag | Reason |
+|------|--------|
+| `--project` | Required GCP routing, has validation |
+| `--zone` | Required GCP routing, has validation |
+| `--state-bucket` | Required GCP routing, has validation |
+| `--backend` | Spinner routing, not a provider arg |
+| `--image`, `--repo`, etc. | Core Spinner flags |
+
+**`--bake-script` note:** This flag is special - it provides a file that Spinner reads and injects into the bake
+process, not a raw gcloud argument. It will remain as a Spinner flag since it's Spinner behavior, not a pass-through.
+
+**Deprecation approach:**
+- Phase 1 (this change): Add `--provider-args` with full support. Mark deprecated flags with `cmd.Flags().MarkDeprecated()`.
+  Deprecated flags still work but print a warning with the migration command. Internally, deprecated flags are
+  translated to provider-args before forwarding.
+- Phase 2 (future change): Remove deprecated flags entirely.
+
+### 3. No safety blocklist (decided)
+
+Trust the user. They already have Docker/gcloud access. Managed-flag conflicts (e.g. `--name`, `-d`) are still
+rejected since they'd break Spinner's internal wiring.
+
+### 4. `.spinner.json` support (decided)
+
+```json
+{
+  "backend": "gcp",
+  "project": "my-project",
+  "zone": "us-central1-a",
+  "state-bucket": "my-bucket",
+  "provider-args": [
+    "--machine-type=e2-standard-2",
+    "--disk-size-gb=30",
+    "--service-account=my-sa@project.iam.gserviceaccount.com"
+  ]
+}
 ```
-Pros: Familiar Unix convention, concise.
-Cons: Cobra consumes `--` for its own positional-args parsing, making this harder to implement cleanly. Also
-ambiguous when `spin` takes positional args in the future.
 
-**Recommendation:** Option A. It's explicit about intent and avoids Cobra parsing edge cases.
+Viper natively supports binding a `StringSlice` flag to a JSON array config key. CLI `--provider-args` values are
+**appended** to config file values (not replacing them), allowing the config file to set defaults while the CLI
+adds one-off overrides.
 
-### 2. Should existing flags be replaced?
-
-The user raised the idea of replacing `--machine-type` and similar flags with generic pass-through. There are
-two viable strategies:
-
-**Strategy A: Keep both (proposed for this change)**
-First-class flags provide discoverability (`--help`), validation, defaults, and config-file support.
-`--provider-args` is an escape hatch for advanced use cases. No migration needed.
-
-**Strategy B: Deprecate backend-specific flags over time**
-Move `--machine-type`, `--disk-size`, `--service-account` to `--provider-args` only. Reduces Spinner's flag
-surface area but loses discoverability, defaults, and `.spinner.json` support.
-
-**Recommendation:** Strategy A for now. First-class flags are better UX for common options. If the flag list
-grows unmanageable, we can selectively deprecate rarely-used ones later.
-
-### 3. Safety: should we blocklist dangerous args?
-
-For Docker, args like `--privileged`, `--pid=host`, `--cap-add` can break sandbox isolation.
-
-**Option A: No blocklist** - trust the user, they're already running `docker run` on their machine.
-**Option B: Warn on dangerous args** - print a warning but proceed.
-**Option C: Blocklist dangerous args** - reject known-dangerous args by default, allow override with `--force`.
-
-**Recommendation:** Option A. Spinner users already have Docker access and could run `docker run` directly.
-Adding a blocklist creates a false sense of security and maintenance burden. The `--provider-args` flag name
-itself signals "you're on your own."
-
-### 4. Scope: `spin` only or `spin` + `setup`?
-
-Docker `setup` runs `docker build` - users might want `--build-arg`, `--no-cache`, `--platform`.
-GCP `setup` bakes images - users might want `--labels`, `--network`.
-
-**Recommendation:** Both `spin` and `setup`. The implementation is symmetric and the use cases are real.
+**Precedence:** Config file provides base args, CLI `--provider-args` appends additional args. If the same flag
+appears in both, the backend tool (docker/gcloud) uses its own last-wins semantics.
 
 ## Impact
 
-- **Affected specs**: `cli-spin`, `cli-setup`
+- **Affected specs**: `cli-spin`, `cli-setup`, `gcp-sandbox`, `docker-client`
 - **Affected code**: `cmd/spin.go`, `cmd/setup.go`, `cmd/helpers.go`, `internal/backend/docker/run.go`,
-  `internal/backend/docker/docker_provider.go`, `internal/backend/gcp/gcp_provider.go`
-- **Breaking changes**: None. Purely additive.
-- **Risk**: Low. Pass-through args are appended to existing command construction; existing behavior unchanged.
+  `internal/backend/docker/docker_provider.go`, `internal/backend/gcp/gcp_provider.go`,
+  `internal/provider/provider.go`
+- **Breaking changes**: Deprecation warnings (non-breaking in Phase 1). Phase 2 removal would be breaking.
+- **Risk**: Low. Pass-through args are appended to existing command construction; existing behavior unchanged
+  during Phase 1.
