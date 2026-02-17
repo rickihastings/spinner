@@ -51,16 +51,16 @@ Cobra's positional-args parsing.
 
 The smaller the API surface, the better. The following flags will be deprecated with warnings, then removed:
 
-**Flags to deprecate:**
+**Flags to remove:**
 
-| Flag | Backend | Current Default | Migration |
-|------|---------|-----------------|-----------|
-| `--machine-type` | GCP | `e2-standard-2` | `--provider-args="--machine-type=e2-standard-2"` |
-| `--disk-size` | GCP | `30` GB | `--provider-args="--disk-size-gb=30"` |
-| `--service-account` | GCP | (none) | `--provider-args="--service-account=..."` |
-| `--bake-script` | GCP | (none) | Separate handling (see below) |
-| `--base-image` | Docker | `ubuntu:22.04` | `--provider-args="--build-arg=BASE_IMAGE=..."` |
-| `--dockerfile` | Docker | (none) | `--provider-args="-f /path/to/Dockerfile"` |
+| Flag | Backend | Migration |
+|------|---------|-----------|
+| `--machine-type` | GCP | `--provider-args="--machine-type=e2-standard-2"` |
+| `--disk-size` | GCP | `--provider-args="--disk-size-gb=30"` |
+| `--service-account` | GCP | `--provider-args="--service-account=..."` |
+| `--bake-script` | GCP | `--provider-args` (user passes relevant gcloud flags directly) |
+| `--base-image` | Docker | `--provider-args="--build-arg=BASE_IMAGE=..."` |
+| `--dockerfile` | Docker | `--provider-args="-f /path/to/Dockerfile"` |
 
 **Flags that STAY first-class:**
 
@@ -70,16 +70,11 @@ The smaller the API surface, the better. The following flags will be deprecated 
 | `--zone` | Required GCP routing, has validation |
 | `--state-bucket` | Required GCP routing, has validation |
 | `--backend` | Spinner routing, not a provider arg |
+| `--env`, `--env-file` | Cross-backend Spinner abstractions with custom per-backend logic |
 | `--image`, `--repo`, etc. | Core Spinner flags |
 
-**`--bake-script` note:** This flag is special - it provides a file that Spinner reads and injects into the bake
-process, not a raw gcloud argument. It will remain as a Spinner flag since it's Spinner behavior, not a pass-through.
-
-**Deprecation approach:**
-- Phase 1 (this change): Add `--provider-args` with full support. Mark deprecated flags with `cmd.Flags().MarkDeprecated()`.
-  Deprecated flags still work but print a warning with the migration command. Internally, deprecated flags are
-  translated to provider-args before forwarding.
-- Phase 2 (future change): Remove deprecated flags entirely.
+**Since this is pre-release**, removed flags are dropped outright rather than going through a deprecation
+cycle. No `MarkDeprecated` warnings - just remove the flags and update docs.
 
 ### 3. No safety blocklist (decided)
 
@@ -115,6 +110,6 @@ appears in both, the backend tool (docker/gcloud) uses its own last-wins semanti
 - **Affected code**: `cmd/spin.go`, `cmd/setup.go`, `cmd/helpers.go`, `internal/backend/docker/run.go`,
   `internal/backend/docker/docker_provider.go`, `internal/backend/gcp/gcp_provider.go`,
   `internal/provider/provider.go`
-- **Breaking changes**: Deprecation warnings (non-breaking in Phase 1). Phase 2 removal would be breaking.
-- **Risk**: Low. Pass-through args are appended to existing command construction; existing behavior unchanged
-  during Phase 1.
+- **Breaking changes**: Flags removed (`--machine-type`, `--disk-size`, `--service-account`, `--bake-script`,
+  `--base-image`, `--dockerfile`). Acceptable since pre-release.
+- **Risk**: Low. Pass-through args are appended to existing command construction; remaining behavior unchanged.

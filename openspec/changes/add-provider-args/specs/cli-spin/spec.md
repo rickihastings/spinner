@@ -92,45 +92,15 @@ The spin command help SHALL document the `--provider-args` flag with examples fo
 - **WHEN** user runs `spinner spin --help`
 - **THEN** the output SHALL include the `--provider-args` flag description and at least one example per backend
 
-### Requirement: Deprecated Backend-Specific Spin Flags
+### Requirement: Removed Backend-Specific Spin Flags
 
-The spin command SHALL deprecate backend-specific tuning flags with warnings directing users to `--provider-args`.
-Deprecated flags SHALL continue to work during the deprecation period by being translated to provider-args internally.
+The spin command SHALL NOT accept the following backend-specific flags, which have been replaced by `--provider-args`:
+`--machine-type`, `--disk-size`, `--service-account`, `--bake-script`, `--base-image`, `--dockerfile`.
 
-#### Scenario: Deprecated machine-type flag
+#### Scenario: Removed flag produces error
 
-- **WHEN** user provides `--machine-type=n2-standard-4` with GCP backend
-- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--machine-type=n2-standard-4"`
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
-
-#### Scenario: Deprecated disk-size flag
-
-- **WHEN** user provides `--disk-size=50` with GCP backend
-- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--disk-size-gb=50"`
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
-
-#### Scenario: Deprecated service-account flag
-
-- **WHEN** user provides `--service-account=sa@project.iam.gserviceaccount.com` with GCP backend
-- **THEN** the CLI SHALL print a deprecation warning suggesting the `--provider-args` equivalent
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
-
-#### Scenario: Deprecated base-image flag
-
-- **WHEN** user provides `--base-image=node:20` with `--setup` flag
-- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--build-arg=BASE_IMAGE=node:20"`
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
-
-#### Scenario: Deprecated dockerfile flag
-
-- **WHEN** user provides `--dockerfile=/path/to/Dockerfile` with `--setup` flag
-- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="-f /path/to/Dockerfile"`
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
-
-#### Scenario: Explicit provider-args override deprecated flags
-
-- **WHEN** user provides both `--machine-type=e2-standard-2` and `--provider-args="--machine-type=n2-standard-4"`
-- **THEN** `n2-standard-4` SHALL take effect (provider-args appended after deprecated translations)
+- **WHEN** user provides `--machine-type=n2-standard-4`
+- **THEN** the CLI SHALL print an unknown flag error and exit with non-zero status
 
 ## MODIFIED Requirements
 
@@ -143,8 +113,6 @@ The spin command SHALL use Cobra for flag definition and validation.
 - **WHEN** the spin command initializes
 - **THEN** all flags (--image, --repo, --prompt, --branch, --max-iterations, --recreate, --env, --env-file, --provider-args) SHALL be
   registered with Cobra
-- **AND** deprecated flags (--machine-type, --disk-size, --service-account, --base-image, --dockerfile) SHALL be
-  registered with deprecation warnings
 
 #### Scenario: Optional flag defaults
 

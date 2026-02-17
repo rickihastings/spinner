@@ -48,34 +48,15 @@ The CLI SHALL reject `--provider-args` values that conflict with arguments manag
 - **WHEN** user provides `--provider-args="--no-cache"` with the Docker backend setup
 - **THEN** the CLI SHALL accept and forward the argument without error
 
-### Requirement: Deprecated Backend-Specific Setup Flags
+### Requirement: Removed Backend-Specific Setup Flags
 
-The setup command SHALL deprecate backend-specific tuning flags with warnings directing users to `--provider-args`.
-Deprecated flags SHALL continue to work during the deprecation period by being translated to provider-args internally.
+The setup command SHALL NOT accept the following backend-specific flags, which have been replaced by `--provider-args`:
+`--base-image`, `--dockerfile`, `--machine-type`, `--disk-size`, `--bake-script`.
 
-#### Scenario: Deprecated base-image flag
+#### Scenario: Removed flag produces error
 
 - **WHEN** user provides `--base-image=node:20`
-- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--build-arg=BASE_IMAGE=node:20"`
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
-
-#### Scenario: Deprecated dockerfile flag
-
-- **WHEN** user provides `--dockerfile=/path/to/Dockerfile`
-- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="-f /path/to/Dockerfile"`
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
-
-#### Scenario: Deprecated machine-type flag on setup
-
-- **WHEN** user provides `--machine-type=n2-standard-4` with GCP backend
-- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--machine-type=n2-standard-4"`
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
-
-#### Scenario: Deprecated disk-size flag on setup
-
-- **WHEN** user provides `--disk-size=50` with GCP backend
-- **THEN** the CLI SHALL print a deprecation warning suggesting `--provider-args="--disk-size-gb=50"`
-- **AND** the CLI SHALL translate the flag to a provider arg and forward it to the backend
+- **THEN** the CLI SHALL print an unknown flag error and exit with non-zero status
 
 ## MODIFIED Requirements
 
@@ -87,10 +68,8 @@ command SHALL be fully testable via dependency injection.
 #### Scenario: Cobra command initialization
 
 - **WHEN** the CLI starts
-- **THEN** the setup command SHALL be registered as a Cobra subcommand with all flags (--name, --backend, --bake-script,
+- **THEN** the setup command SHALL be registered as a Cobra subcommand with all flags (--name, --backend,
   --provider-args, and GCP routing flags --project, --zone, --state-bucket)
-- **AND** deprecated flags (--base-image, --dockerfile, --machine-type, --disk-size, --service-account) SHALL be
-  registered with deprecation warnings
 
 ### Requirement: Configuration File Support
 

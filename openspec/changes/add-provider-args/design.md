@@ -67,28 +67,18 @@ var dockerManagedRunFlags = []string{
 The validation function scans the raw args list and rejects any that start with a managed flag prefix. This
 catches `--name=foo`, `--name foo`, and `-d` forms.
 
-**3. Deprecation of existing flags (part of slice 1)**
+**3. Removal of backend-specific flags (part of slice 1)**
 
-Use Cobra's `MarkDeprecated` to emit warnings:
-```go
-cmd.Flags().MarkDeprecated(flagMachineType,
-    "use --provider-args=\"--machine-type=e2-standard-2\" instead")
-```
+Since this is pre-release, remove the flags outright rather than going through a deprecation cycle:
+- Remove `flagMachineType`, `flagDiskSize`, `flagServiceAccount`, `flagBakeScript`, `flagBaseImage`,
+  `flagDockerfile` constants
+- Remove flag registrations from `cmd/spin.go` and `cmd/setup.go`
+- Remove Viper bindings and `gcpOptionsFromViper()` / `dockerOptionsFromViper()` helper logic for these flags
+- Remove the `Options map[string]string` fields that carried these values through `CreateConfig`/`SetupConfig`
+- Clean up GCP provider code that read these from `Options` (including bake-script logic)
+- Clean up Docker provider code that used `BaseImage` / `Dockerfile`
 
-When deprecated flags are set, translate them to provider-args internally before forwarding:
-```go
-func translateDeprecatedFlags(cmd *cobra.Command) []string {
-    var args []string
-    if mt := viper.GetString(flagMachineType); mt != "" {
-        args = append(args, "--machine-type="+mt)
-    }
-    // ... etc
-    return args
-}
-```
-
-These translated args are prepended to the provider-args list so explicit `--provider-args` values win via
-last-wins semantics.
+The `--env` and `--env-file` flags stay (cross-backend Spinner abstractions with non-secret use cases).
 
 **4. Docker integration (vertical slice 2)**
 
@@ -130,11 +120,8 @@ bake VM.
 4. **Args go before the positional argument**: Both `docker run` and `gcloud compute instances create` require
    the positional arg (image name / instance name) to be last. Extra args are inserted before it.
 
-5. **Deprecated flag translation is prepended**: When `--machine-type=X` is used (deprecated), it becomes
-   `--machine-type=X` in the provider-args list, prepended before explicit `--provider-args`. This means
-   explicit provider-args win via last-wins semantics of docker/gcloud.
-
-6. **`--bake-script` stays**: It's Spinner behavior (reads a file and injects contents), not a raw gcloud arg.
+5. **Pre-release flag removal**: Backend-specific flags are removed outright, not deprecated. No translation
+   layer needed.
 
 ### Risks / Trade-offs
 
@@ -142,6 +129,5 @@ bake VM.
   Spinner's lifecycle management. This is acceptable - `--provider-args` is explicitly an escape hatch.
 - **No validation of arg correctness**: We don't check if `-v /foo:/bar` is a valid Docker flag. Docker/gcloud
   will report the error, which is fine.
-- **Deprecation of defaults**: `--machine-type` currently defaults to `e2-standard-2` and `--disk-size` to 30.
-  After deprecation, users who relied on these defaults need to add them to `.spinner.json` or pass them
-  explicitly. The deprecation warning message will include the default value to ease migration.
+- **Removed defaults**: `--machine-type` defaulted to `e2-standard-2` and `--disk-size` to 30. Users now
+  set these via `--provider-args` or `.spinner.json`. Pre-release, so no migration concern.
