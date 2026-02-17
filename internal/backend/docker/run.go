@@ -28,6 +28,8 @@ type spinConfig struct {
 	Model         string
 	EnvVars       map[string]string
 	EnvFile       string
+	SecretBlob    []byte
+	Passphrase    string
 	ExtraArgs     []string
 }
 
@@ -103,7 +105,7 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		return nil, "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	// Create temp file for all environment variables
+	// Create temp file for non-secret environment variables
 	tmpFile, err := os.CreateTemp("", "spinner-env-")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create env file: %w", err)
@@ -119,9 +121,8 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		return nil, "", fmt.Errorf("failed to set env file permissions: %w", err)
 	}
 
-	// Write built-in environment variables
-	_, _ = fmt.Fprintf(tmpFile, "GITHUB_TOKEN=%s\n", os.Getenv("GITHUB_TOKEN"))
-	_, _ = fmt.Fprintf(tmpFile, "CLAUDE_CODE_OAUTH_TOKEN=%s\n", os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"))
+	// Write non-secret built-in environment variables.
+	// Tokens (GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN) travel via the encrypted blob.
 	_, _ = fmt.Fprintf(tmpFile, "REPO_URL=%s\n", config.Repo)
 
 	// Pass host git user config so commits are attributed correctly
@@ -143,7 +144,7 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		_, _ = fmt.Fprintf(tmpFile, "ANTHROPIC_MODEL=%s\n", config.Model)
 	}
 
-	// Add Ralph loop environment variables if prompt is provided
+	// Add exec loop environment variables if prompt is provided
 	if config.Prompt != "" {
 		_, _ = fmt.Fprintf(tmpFile, "PROMPT=%s\n", config.Prompt)
 
@@ -156,6 +157,11 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		_, _ = fmt.Fprintf(tmpFile, "LOG_DIR=/logs\n")
 	}
 
+	// Pass SPINNER_SECRET_PASSPHRASE so startup.sh can decrypt the blob
+	if config.Passphrase != "" {
+		_, _ = fmt.Fprintf(tmpFile, "SPINNER_SECRET_PASSPHRASE=%s\n", config.Passphrase)
+	}
+
 	// Write custom environment variables
 	for key, value := range config.EnvVars {
 		_, _ = fmt.Fprintf(tmpFile, "%s=%s\n", key, value)
@@ -165,6 +171,19 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		_ = os.Remove(tmpFilePath)
 
 		return nil, "", fmt.Errorf("failed to close env file: %w", err)
+	}
+
+	// Write encrypted blob to host-mounted directory for container access
+	if len(config.SecretBlob) > 0 {
+		blobDir := filepath.Join(homeDir, ".spinner", containerName)
+		if err := os.MkdirAll(blobDir, 0700); err != nil {
+			return nil, "", fmt.Errorf("failed to create blob directory: %w", err)
+		}
+
+		blobPath := filepath.Join(blobDir, "secrets.enc")
+		if err := os.WriteFile(blobPath, config.SecretBlob, 0600); err != nil {
+			return nil, "", fmt.Errorf("failed to write secrets blob: %w", err)
+		}
 	}
 
 	dockerArgs := []string{
@@ -180,6 +199,12 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		fmt.Sprintf("%s/.spinner/%s/logs:/logs", homeDir, containerName),
 		"-v",
 		fmt.Sprintf("%s/.spinner/%s/state:/state", homeDir, containerName),
+	}
+
+	// Mount encrypted secrets blob read-only into container
+	if len(config.SecretBlob) > 0 {
+		blobPath := filepath.Join(homeDir, ".spinner", containerName, "secrets.enc")
+		dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/run/spinner/secrets.enc:ro", blobPath))
 	}
 
 	// Add .npmrc mount if it exists

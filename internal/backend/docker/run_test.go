@@ -239,14 +239,6 @@ func TestExtractRepoName(t *testing.T) {
 // TestBuildDockerRunCommand_BasicScenarios tests Docker run command building (7.2)
 func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 	// Set required environment variables
-	_ = os.Setenv("GITHUB_TOKEN", "test-github-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-claude-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	homeDir, _ := os.UserHomeDir()
 
 	tests := []struct {
@@ -370,14 +362,6 @@ func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 
 // TestBuildDockerRunCommand_NpmrcHandling tests npmrc mounting
 func TestBuildDockerRunCommand_NpmrcHandling(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	homeDir, _ := os.UserHomeDir()
 
 	tests := []struct {
@@ -421,14 +405,6 @@ func TestBuildDockerRunCommand_NpmrcHandling(t *testing.T) {
 // TestBuildDockerRunCommand_RepoURLPassthrough tests that the repo URL is written as-is
 // (SSH-to-HTTPS conversion happens upstream in cmd/spin.go before reaching the provider)
 func TestBuildDockerRunCommand_RepoURLPassthrough(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image: "spinner:test",
 		Repo:  "https://github.com/user/repo.git",
@@ -653,14 +629,6 @@ func TestNamingScenarios_TableDriven(t *testing.T) {
 
 // TestBuildDockerRunCommand_EnvFile tests that env vars are written to a temp file
 func TestBuildDockerRunCommand_EnvFile(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-github-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-claude-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image: "spinner:test",
 		Repo:  "https://github.com/user/repo.git",
@@ -696,9 +664,9 @@ func TestBuildDockerRunCommand_EnvFile(t *testing.T) {
 
 	contentStr := string(content)
 
-	// Check built-in vars are present
-	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-github-token\n")
-	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-claude-token\n")
+	// Check built-in vars are present (tokens travel via blob, not env file)
+	assert.NotContains(t, contentStr, "GITHUB_TOKEN=")
+	assert.NotContains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=")
 	assert.Contains(t, contentStr, "REPO_URL=https://github.com/user/repo.git\n")
 
 	// Check custom vars are present
@@ -708,14 +676,6 @@ func TestBuildDockerRunCommand_EnvFile(t *testing.T) {
 
 // TestBuildDockerRunCommand_EnvFileWithPromptAndBranch tests env file with all options
 func TestBuildDockerRunCommand_EnvFileWithPromptAndBranch(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image:         "spinner:test",
 		Repo:          "https://github.com/user/repo.git",
@@ -739,8 +699,8 @@ func TestBuildDockerRunCommand_EnvFileWithPromptAndBranch(t *testing.T) {
 
 	contentStr := string(content)
 
-	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
-	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-token\n")
+	assert.NotContains(t, contentStr, "GITHUB_TOKEN=")
+	assert.NotContains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=")
 	assert.Contains(t, contentStr, "REPO_URL=https://github.com/user/repo.git\n")
 	assert.Contains(t, contentStr, "BRANCH=feature/test\n")
 	assert.Contains(t, contentStr, "PROMPT=fix the bug\n")
@@ -751,14 +711,6 @@ func TestBuildDockerRunCommand_EnvFileWithPromptAndBranch(t *testing.T) {
 
 // TestBuildDockerRunCommand_EnvFileEmptyCustomVars tests with no custom env vars
 func TestBuildDockerRunCommand_EnvFileEmptyCustomVars(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image:   "spinner:test",
 		Repo:    "https://github.com/user/repo.git",
@@ -779,26 +731,19 @@ func TestBuildDockerRunCommand_EnvFileEmptyCustomVars(t *testing.T) {
 
 	assert.Contains(t, argsStr, "--env-file")
 
-	// Verify temp file still contains built-in vars
+	// Verify temp file still contains built-in non-secret vars
 	content, err := os.ReadFile(tmpFile)
 	assert.NoError(t, err)
 
 	contentStr := string(content)
 
-	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
-	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-token\n")
+	assert.NotContains(t, contentStr, "GITHUB_TOKEN=")
+	assert.NotContains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=")
+	assert.Contains(t, contentStr, "REPO_URL=")
 }
 
 // TestBuildDockerRunCommand_EnvFileNilCustomVars tests with nil custom env vars map
 func TestBuildDockerRunCommand_EnvFileNilCustomVars(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image:   "spinner:test",
 		Repo:    "https://github.com/user/repo.git",
@@ -817,20 +762,13 @@ func TestBuildDockerRunCommand_EnvFileNilCustomVars(t *testing.T) {
 
 	contentStr := string(content)
 
-	assert.Contains(t, contentStr, "GITHUB_TOKEN=test-token\n")
-	assert.Contains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=test-token\n")
+	assert.NotContains(t, contentStr, "GITHUB_TOKEN=")
+	assert.NotContains(t, contentStr, "CLAUDE_CODE_OAUTH_TOKEN=")
+	assert.Contains(t, contentStr, "REPO_URL=")
 }
 
 // TestBuildDockerRunCommand_UserEnvFile tests that user's env file is passed through
 func TestBuildDockerRunCommand_UserEnvFile(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	// Create a temporary env file to test with
 	tmpEnvFile, err := os.CreateTemp("", "test-env-*.env")
 	assert.NoError(t, err)
@@ -879,14 +817,6 @@ func TestBuildDockerRunCommand_UserEnvFile(t *testing.T) {
 
 // TestBuildDockerRunCommand_EnvFileWithModel tests that ANTHROPIC_MODEL is written to env file when model is set
 func TestBuildDockerRunCommand_EnvFileWithModel(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image: "spinner:test",
 		Repo:  "https://github.com/user/repo.git",
@@ -909,14 +839,6 @@ func TestBuildDockerRunCommand_EnvFileWithModel(t *testing.T) {
 
 // TestBuildDockerRunCommand_EnvFileWithoutModel tests that ANTHROPIC_MODEL is NOT written when model is empty
 func TestBuildDockerRunCommand_EnvFileWithoutModel(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image: "spinner:test",
 		Repo:  "https://github.com/user/repo.git",
@@ -938,14 +860,6 @@ func TestBuildDockerRunCommand_EnvFileWithoutModel(t *testing.T) {
 
 // TestBuildDockerRunCommand_NoUserEnvFile tests that docker args work correctly without user env file
 func TestBuildDockerRunCommand_NoUserEnvFile(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image:   "spinner:test",
 		Repo:    "https://github.com/user/repo.git",
@@ -981,14 +895,6 @@ func TestBuildDockerRunCommand_NoUserEnvFile(t *testing.T) {
 
 // TestBuildDockerRunCommand_GitUserConfig tests that git user config from host is passed through
 func TestBuildDockerRunCommand_GitUserConfig(t *testing.T) {
-	_ = os.Setenv("GITHUB_TOKEN", "test-token")
-	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-	defer func() {
-		_ = os.Unsetenv("GITHUB_TOKEN")
-		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
-	}()
-
 	config := spinConfig{
 		Image: "spinner:test",
 		Repo:  "https://github.com/user/repo.git",

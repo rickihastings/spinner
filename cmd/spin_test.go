@@ -87,8 +87,7 @@ func TestSpinCommand_MaxIterationsFlagParsing(t *testing.T) {
 
 // TestSpinCommand_RecreateFlagParsing tests that --recreate flag triggers Remove then Create
 func TestSpinCommand_RecreateFlagParsing(t *testing.T) {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	installMockSecretStore(t)
 
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("InstanceName", mock.Anything).Return("test-container")
@@ -113,8 +112,7 @@ func TestSpinCommand_RecreateFlagParsing(t *testing.T) {
 
 // TestSpinCommand_SetupFlagParsing tests that --setup flag is correctly parsed
 func TestSpinCommand_SetupFlagParsing(t *testing.T) {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	installMockSecretStore(t)
 
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("Setup", mock.Anything, mock.Anything).Return(nil)
@@ -176,8 +174,7 @@ func TestSpinCommand_ProviderArgsSingleFlag(t *testing.T) {
 
 // TestSpinCommand_InvalidRepoURL tests that an invalid repo URL is rejected
 func TestSpinCommand_InvalidRepoURL(t *testing.T) {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	installMockSecretStore(t)
 
 	mockProvider := new(provider.MockProvider)
 	cmd := NewSpinCommand(testFactory(mockProvider))
@@ -286,8 +283,7 @@ func TestSpinCommand_GCPFlagsWithDockerBackend(t *testing.T) {
 
 // TestSpinCommand_UnknownBackend tests that an unknown backend produces a clear error
 func TestSpinCommand_UnknownBackend(t *testing.T) {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	installMockSecretStore(t)
 
 	mockProvider := new(provider.MockProvider)
 	cmd := NewSpinCommand(testFactory(mockProvider))
@@ -393,8 +389,7 @@ func TestSpinCommand_MissingRequiredGCPFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("GITHUB_TOKEN", "test-token")
-			t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+			installMockSecretStore(t)
 			// Clear GCP env vars to ensure we're testing CLI validation
 			t.Setenv("SPINNER_PROJECT", "")
 			t.Setenv("SPINNER_ZONE", "")
@@ -418,8 +413,7 @@ func TestSpinCommand_MissingRequiredGCPFlags(t *testing.T) {
 
 // TestSpinCommand_BackendFromEnvVar tests that SPINNER_BACKEND env var is respected
 func TestSpinCommand_BackendFromEnvVar(t *testing.T) {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	installMockSecretStore(t)
 	t.Setenv("SPINNER_BACKEND", "gcp")
 	// Clear GCP config env vars so validation fails
 	t.Setenv("SPINNER_PROJECT", "")
@@ -446,8 +440,7 @@ func TestSpinCommand_BackendFromEnvVar(t *testing.T) {
 
 // TestSpinCommand_CLIFlagOverridesEnvVar tests that CLI flag takes precedence over env var
 func TestSpinCommand_CLIFlagOverridesEnvVar(t *testing.T) {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	installMockSecretStore(t)
 	t.Setenv("SPINNER_BACKEND", "docker")
 	// Clear GCP config env vars so validation fails
 	t.Setenv("SPINNER_PROJECT", "")
@@ -697,8 +690,7 @@ func TestSpinCommand_EnvFileNotFound(t *testing.T) {
 // TestSpinCommand_StartFailsFallbackToCreate tests that when Start() fails on a stopped instance
 // and Status() then reports InstanceStatusNone (TOCTOU race), the command falls through to Create().
 func TestSpinCommand_StartFailsFallbackToCreate(t *testing.T) {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	installMockSecretStore(t)
 
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("InstanceName", mock.Anything).Return("test-container")

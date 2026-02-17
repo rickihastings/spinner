@@ -6,12 +6,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rickihastings/spinner/internal/prerequisites"
 	"github.com/rickihastings/spinner/internal/provider"
+	"github.com/rickihastings/spinner/internal/secret"
 	"github.com/rickihastings/spinner/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+// spinStoreFactory creates the secret store used by spin.
+// Override in tests to inject a mock store.
+var spinStoreFactory = func() secret.Store {
+	return secret.NewEncryptedFileStore("", passphraseFromEnvOrPrompt)
+}
 
 // spinCmd is the production spin command using the default provider factory.
 var spinCmd = NewSpinCommand(defaultFactory)
@@ -35,6 +41,7 @@ func NewSpinCommand(f *provider.Factory) *cobra.Command {
 		spinWatch         bool
 		spinEnvVars       []string
 		spinEnvFile       string
+		spinSecrets       []string
 		spinProviderArgs  []string
 		spinDockerfile    string
 	)
@@ -54,6 +61,7 @@ GENERAL FLAGS:
   --recreate                 Force recreation of existing instance (optional)
   --watch                    Enter watch mode after instance is ready (optional)
   --backend <backend>        Backend provider: docker, gcp (default: docker)
+  --secret <KEY>             Reference a secret from the encrypted store (repeatable)
   --env <KEY=VALUE>          Custom environment variables (repeatable)
   --env-file <path>          Path to env file to pass to instance (optional)
   --provider-args <arg>      Extra arguments passed directly to the backend (repeatable)
@@ -168,9 +176,25 @@ EXAMPLES:
 				return fmt.Errorf("repository must be a valid git URL (https://, http://, or git@)")
 			}
 
-			if err := prerequisites.CheckEnvironmentVariables(); err != nil {
+			// Resolve all secrets from the encrypted store (no env var fallback)
+			store := spinStoreFactory()
+
+			resolved, err := secret.Resolve(store, spinSecrets)
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 				return err
+			}
+
+			// Get the passphrase for blob encryption (already cached from Resolve)
+			passphrase, err := passphraseFromEnvOrPrompt()
+			if err != nil {
+				return fmt.Errorf("getting passphrase: %w", err)
+			}
+
+			// Encrypt resolved secrets into a per-session blob
+			blob, err := secret.EncryptBlob(resolved, passphrase)
+			if err != nil {
+				return fmt.Errorf("encrypting secrets: %w", err)
 			}
 
 			fmt.Println("✓ Prerequisites validated")
@@ -195,6 +219,8 @@ EXAMPLES:
 				Options:       createOptions,
 				EnvVars:       envVars,
 				EnvFile:       spinEnvFile,
+				SecretBlob:    blob,
+				Passphrase:    passphrase,
 				ProviderArgs:  providerArgs,
 			}
 
@@ -303,6 +329,7 @@ EXAMPLES:
 	cmd.Flags().BoolVar(&spinSetup, flagSetup, false, "Build/rebuild the environment before spinning (optional)")
 	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 	cmd.Flags().BoolVar(&spinWatch, flagWatch, false, "Enter watch mode after instance is ready (optional)")
+	cmd.Flags().StringSliceVar(&spinSecrets, flagSecret, []string{}, "Reference a secret from the encrypted store (repeatable)")
 	cmd.Flags().StringSliceVar(&spinEnvVars, flagEnv, []string{}, "Custom environment variables (KEY=VALUE, repeatable)")
 	cmd.Flags().StringVar(&spinEnvFile, flagEnvFile, "", "Path to env file to pass to instance (optional)")
 	cmd.Flags().StringSliceVar(&spinProviderArgs, flagProviderArgs, []string{}, "Extra arguments passed directly to the backend (repeatable)")

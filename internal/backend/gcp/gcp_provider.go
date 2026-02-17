@@ -164,17 +164,26 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	}
 
 	metadata := map[string]string{
-		"startup-script":          runtimeScript,
-		"REPO_URL":                config.Repo,
-		"PROMPT":                  config.Prompt,
-		"BRANCH":                  config.Branch,
-		"MAX_ITERATIONS":          maxIterations,
-		"GITHUB_TOKEN":            os.Getenv("GITHUB_TOKEN"),
-		"CLAUDE_CODE_OAUTH_TOKEN": os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"),
-		"SPINNER_INSTANCE_NAME":   name,
-		"ANTHROPIC_MODEL":         config.Model,
-		"GIT_USER_NAME":           gcpGitConfigValue("user.name"),
-		"GIT_USER_EMAIL":          gcpGitConfigValue("user.email"),
+		"startup-script":        runtimeScript,
+		"REPO_URL":              config.Repo,
+		"PROMPT":                config.Prompt,
+		"BRANCH":                config.Branch,
+		"MAX_ITERATIONS":        maxIterations,
+		"SPINNER_INSTANCE_NAME": name,
+		"ANTHROPIC_MODEL":       config.Model,
+		"GIT_USER_NAME":         gcpGitConfigValue("user.name"),
+		"GIT_USER_EMAIL":        gcpGitConfigValue("user.email"),
+	}
+
+	// Tokens travel via encrypted blob, not as plaintext metadata.
+	// Base64-encode the blob for metadata transport.
+	if len(config.SecretBlob) > 0 {
+		metadata["SPINNER_SECRET_BLOB"] = base64.StdEncoding.EncodeToString(config.SecretBlob)
+	}
+
+	// Pass passphrase so startup.sh can decrypt the blob
+	if config.Passphrase != "" {
+		metadata["SPINNER_SECRET_PASSPHRASE"] = config.Passphrase
 	}
 
 	if p.bucket != "" {
@@ -263,11 +272,19 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 		return nil
 	}
 
-	// Build a map of keys to update
+	// Build a map of keys to update.
+	// Tokens travel via encrypted blob, not as plaintext metadata.
 	updates := map[string]string{
-		"PROMPT":                  config.Prompt,
-		"GITHUB_TOKEN":            os.Getenv("GITHUB_TOKEN"),
-		"CLAUDE_CODE_OAUTH_TOKEN": os.Getenv("CLAUDE_CODE_OAUTH_TOKEN"),
+		"PROMPT": config.Prompt,
+	}
+
+	// Update blob and passphrase if provided (e.g. secrets may have changed)
+	if len(config.SecretBlob) > 0 {
+		updates["SPINNER_SECRET_BLOB"] = base64.StdEncoding.EncodeToString(config.SecretBlob)
+	}
+
+	if config.Passphrase != "" {
+		updates["SPINNER_SECRET_PASSPHRASE"] = config.Passphrase
 	}
 
 	if config.MaxIterations != "" {

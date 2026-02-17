@@ -21,18 +21,18 @@
 - [x] 3.2 Create `internal/secret/blob_test.go` with tests: round-trip encrypt/decrypt, wrong passphrase error, corrupted blob error, empty secrets map
 - [x] 3.3 Verify build and all tests pass
 
-## 4.0 Secret Resolver + Spin Command Integration
+## ~~4.0 Secret Resolver + Spin Command Integration~~
 
-- [ ] 4.1 Create `internal/secret/resolver.go` with `Resolve(store, customKeys)` function: store-only resolution for ALL tokens (built-in + custom), no env fallback, error with "run spinner secret set" suggestion on missing key
-- [ ] 4.2 Create `internal/secret/resolver_test.go` with tests: token from store, missing token error (no env fallback), custom key from store, custom key not found error, error message includes "spinner secret set" suggestion
-- [ ] 4.3 Add `SecretBlob []byte` to `provider.CreateConfig`, remove direct token access patterns
-- [ ] 4.4 Modify `cmd/spin.go`: add `--secret` flag (StringSliceVar), create Store, call Resolve (all tokens from store, no env fallback), generate encrypted blob from ALL resolved secrets, populate `CreateConfig.SecretBlob`
-- [ ] 4.5 Modify `internal/backend/docker/run.go`: remove env-file token writing (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`); write encrypted blob to `~/.spinner/<container>/secrets.enc`; mount blob read-only at `/run/spinner/secrets.enc`; pass `SPINNER_SECRET_PASSPHRASE` as container env var (always, both modes)
-- [ ] 4.6 Modify `internal/backend/docker/docker_provider.go`: pass `SecretBlob` from `CreateConfig` to `spinConfig`
-- [ ] 4.7 Modify `internal/backend/gcp/gcp_provider.go`: remove metadata token writing; base64-encode encrypted blob and pass as `SPINNER_SECRET_BLOB` metadata key; pass `SPINNER_SECRET_PASSPHRASE` as metadata (always, both modes); update startup script to decode blob to `/run/spinner/secrets.enc`
-- [ ] 4.8 Remove `prerequisites.CheckEnvironmentVariables()` function (replaced by resolver)
-- [ ] 4.9 Update all affected tests: `cmd/spin_test.go`, `docker/run_test.go`, `docker/docker_provider_test.go`, `gcp/gcp_provider_test.go`, `prerequisites/prerequisites_test.go`
-- [ ] 4.10 Verify build and all tests pass
+- [x] 4.1 Create `internal/secret/resolver.go` with `Resolve(store, customKeys)` function: store-only resolution for ALL tokens (built-in + custom), no env fallback, error with "run spinner secret set" suggestion on missing key
+- [x] 4.2 Create `internal/secret/resolver_test.go` with tests: token from store, missing token error (no env fallback), custom key from store, custom key not found error, error message includes "spinner secret set" suggestion
+- [x] 4.3 Add `SecretBlob []byte` and `Passphrase string` to `provider.CreateConfig`, remove direct token access patterns
+- [x] 4.4 Modify `cmd/spin.go`: add `--secret` flag (StringSliceVar), create Store via injectable factory, call Resolve (all tokens from store, no env fallback), generate encrypted blob from ALL resolved secrets, populate `CreateConfig.SecretBlob` and `CreateConfig.Passphrase`
+- [x] 4.5 Modify `internal/backend/docker/run.go`: remove env-file token writing (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`); write encrypted blob to `~/.spinner/<container>/secrets.enc`; mount blob read-only at `/run/spinner/secrets.enc`; pass `SPINNER_SECRET_PASSPHRASE` as container env var
+- [x] 4.6 Modify `internal/backend/docker/docker_provider.go`: pass `SecretBlob` and `Passphrase` from `CreateConfig` to `spinConfig`
+- [x] 4.7 Modify `internal/backend/gcp/gcp_provider.go`: remove metadata token writing; base64-encode encrypted blob and pass as `SPINNER_SECRET_BLOB` metadata key; pass `SPINNER_SECRET_PASSPHRASE` as metadata; update `updateMetadata` to refresh blob/passphrase on restart
+- [x] 4.8 Remove `prerequisites.CheckEnvironmentVariables()` function (replaced by resolver)
+- [x] 4.9 Update all affected tests: `cmd/spin_test.go`, `cmd/helpers_test.go`, `docker/run_test.go`, `gcp/gcp_provider_test.go`, `prerequisites/prerequisites_test.go`
+- [x] 4.10 Verify build and all tests pass
 
 ## 5.0 Startup Script Refactor
 

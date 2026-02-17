@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rickihastings/spinner/internal/provider"
+	"github.com/rickihastings/spinner/internal/secret"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -35,11 +36,31 @@ func testGCPFactory(mockProv *provider.MockProvider) *provider.Factory {
 	return f
 }
 
+// installMockSecretStore installs a mock secret store that returns test tokens
+// and sets a test passphrase. It restores the original store factory on cleanup.
+func installMockSecretStore(t *testing.T) {
+	t.Helper()
+
+	// Set passphrase for blob encryption
+	t.Setenv("SPINNER_SECRET_PASSPHRASE", "test-passphrase")
+
+	mockStore := new(secret.MockStore)
+	mockStore.On("Get", "GITHUB_TOKEN").Return("test-token", nil)
+	mockStore.On("Get", "CLAUDE_CODE_OAUTH_TOKEN").Return("test-token", nil)
+	mockStore.On("Get", mock.Anything).Return("test-value", nil)
+
+	origFactory := spinStoreFactory
+	spinStoreFactory = func() secret.Store { return mockStore }
+
+	t.Cleanup(func() {
+		spinStoreFactory = origFactory
+	})
+}
+
 // setupSpinCommandWithMocks creates a spin command with common mock expectations
 // for tests that need a working spin command (valid env, instance creation).
 func setupSpinCommandWithMocks(t *testing.T) *cobra.Command {
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+	installMockSecretStore(t)
 
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("InstanceName", mock.Anything).Return("test-container")
