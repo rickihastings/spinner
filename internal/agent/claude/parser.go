@@ -286,7 +286,16 @@ func isAuthError(event *agent.Event) bool {
 	return strings.Contains(data.Type, errorTypeAuthentication)
 }
 
-// containsText checks if a Claude assistant message contains the specified text.
+// containsText checks if a Claude assistant message contains the specified text
+// on its own line (trimmed). This prevents false positives when the signal is
+// quoted or referenced in surrounding prose (e.g. "Do NOT output ~~ FEATURE_COMPLETED ~~").
 func containsText(event *agent.Event, text string) bool {
-	return strings.Contains(extractText(event), text)
+	fullText := extractText(event)
+	for _, line := range strings.Split(fullText, "\n") {
+		if strings.TrimSpace(line) == text {
+			return true
+		}
+	}
+
+	return false
 }

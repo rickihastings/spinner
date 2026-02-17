@@ -25,14 +25,15 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 Spinner is a CLI tool that runs Claude agents in sandboxed Docker containers for autonomous, unsupervised execution.
 Users run `setup` to build a Docker image, then `spin` to launch a container that clones a repo and runs an iteration
 loop. Each iteration invokes Claude CLI, checks the output for completion/errors/rate-limits, pushes changes to git,
-and persists state. The agent works until it outputs `~~ FEATURE_COMPLETED ~~` or hits the iteration limit.
+and persists state. The agent works until it outputs `~~ FEATURE_COMPLETED ~~` on its own line, or hits the iteration limit.
 
 ## Key Concepts
 
 - **Iteration loop** (`internal/exec/loop.go`) — the core execution cycle. Each iteration: run Claude → check result →
   push to git → save state → repeat. Rate limits trigger a 61-minute wait. Auth errors stop the loop.
-- **Completion signal** — the agent outputs `~~ FEATURE_COMPLETED ~~` in its response to signal it's done. This is
-  detected by the parser in `internal/agent/claude/executor.go`.
+- **Completion signal** — the agent outputs `~~ FEATURE_COMPLETED ~~` on its own line to signal it's done. This is
+  detected by the parser in `internal/agent/claude/executor.go`. The signal must appear as a standalone line to avoid
+  false positives when the signal is quoted or referenced in surrounding text.
 - **Provider abstraction** (`internal/provider/provider.go`) — backend-agnostic interface. Docker is the only provider
   today, but the architecture supports VMs, K8s, etc. Commands depend on the Provider interface, never on Docker
   directly.

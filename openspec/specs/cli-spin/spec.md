@@ -84,7 +84,7 @@ The CLI SHALL execute ralph-loop inside the container when a prompt is provided,
 The CLI SHALL detect when ralph-loop signals feature completion, implemented in Go by monitoring container output.
 
 #### Scenario: Completion signal detected
-- **WHEN** ralph-loop outputs `~~ FEATURE_COMPLETED ~~`
+- **WHEN** ralph-loop outputs `~~ FEATURE_COMPLETED ~~` on its own line
 - **THEN** the CLI SHALL stop following logs and display completion message
 
 #### Scenario: No completion signal

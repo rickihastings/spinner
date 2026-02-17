@@ -350,7 +350,7 @@ The state file is JSON with the following structure:
 ### Status Values
 
 - `running` - Agent is actively working through iterations
-- `completed` - Agent detected completion signal (`~~ FEATURE_COMPLETED ~~`) and finished successfully
+- `completed` - Agent detected completion signal (`~~ FEATURE_COMPLETED ~~` on its own line) and finished successfully
 - `rate_limited` - Hit Claude API rate limit, waiting before retry
 - `error` - General execution error occurred
 - `auth_error` - Claude authentication failed (check `CLAUDE_CODE_OAUTH_TOKEN`)

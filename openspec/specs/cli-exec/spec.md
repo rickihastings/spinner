@@ -97,7 +97,7 @@ The exec command SHALL run Claude CLI in a loop up to MAX_ITERATIONS times.
 
 #### Scenario: Feature completion signal detected
 
-- **WHEN** Claude output contains "~~ FEATURE_COMPLETED ~~"
+- **WHEN** Claude output contains "~~ FEATURE_COMPLETED ~~" on its own line
 - **THEN** exec SHALL print success message and exit with status 0
 
 ### Requirement: Claude CLI Integration

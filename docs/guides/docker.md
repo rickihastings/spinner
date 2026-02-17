@@ -135,7 +135,7 @@ When a prompt is provided, Spinner launches an iteration loop inside the contain
 4. Saves progress to a state file
 5. Repeats until the task is done or the iteration limit is reached
 
-The agent signals completion by outputting `~~ FEATURE_COMPLETED ~~`. At that point, the loop stops and your changes are on the branch.
+The agent signals completion by outputting `~~ FEATURE_COMPLETED ~~` on its own line. At that point, the loop stops and your changes are on the branch.
 
 By default, the loop runs up to **100 iterations**. To change this:
 

@@ -28,8 +28,8 @@ A "slice" is the X.0 header AND ALL its numbered sub-tasks:
 **STOPPING CONDITIONS (read carefully - the completion signal must ONLY appear when every slice is done):**
 
 - After completing a slice → Read tasks.md and check if ANY uncompleted slices remain
-  - **ANY uncompleted slices remain** → HALT immediately. Do NOT output `~~ FEATURE_COMPLETED ~~`. No signal whatsoever.
-  - **ALL slices are complete (zero uncompleted slices in the entire tasks.md)** → Output `~~ FEATURE_COMPLETED ~~`, then HALT
+  - **ANY uncompleted slices remain** → HALT immediately. Do NOT output the completion signal. No signal whatsoever.
+  - **ALL slices are complete (zero uncompleted slices in the entire tasks.md)** → Output `~~ FEATURE_COMPLETED ~~` on its own line, then HALT
 
 ## Implementation Workflow
 

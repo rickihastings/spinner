@@ -486,21 +486,72 @@ func TestIsAuthError(t *testing.T) {
 }
 
 func TestContainsText(t *testing.T) {
-	event := &agent.Event{
-		Type: eventTypeAssistantMessage,
-		Data: assistantMessageData{
-			Content: []contentBlock{
-				{Type: "text", Text: "Task completed ~~ FEATURE_COMPLETED ~~ done"},
-			},
+	tests := []struct {
+		name     string
+		text     string
+		search   string
+		expected bool
+	}{
+		{
+			name:     "signal on own line",
+			text:     "some output\n~~ FEATURE_COMPLETED ~~\nmore output",
+			search:   "~~ FEATURE_COMPLETED ~~",
+			expected: true,
+		},
+		{
+			name:     "signal on own line with whitespace",
+			text:     "some output\n  ~~ FEATURE_COMPLETED ~~  \nmore output",
+			search:   "~~ FEATURE_COMPLETED ~~",
+			expected: true,
+		},
+		{
+			name:     "signal as only content",
+			text:     "~~ FEATURE_COMPLETED ~~",
+			search:   "~~ FEATURE_COMPLETED ~~",
+			expected: true,
+		},
+		{
+			name:     "signal embedded in sentence",
+			text:     "Task completed ~~ FEATURE_COMPLETED ~~ done",
+			search:   "~~ FEATURE_COMPLETED ~~",
+			expected: false,
+		},
+		{
+			name:     "signal quoted in instructions",
+			text:     "Do NOT output `~~ FEATURE_COMPLETED ~~`. No signal whatsoever.",
+			search:   "~~ FEATURE_COMPLETED ~~",
+			expected: false,
+		},
+		{
+			name:     "signal negated in prose",
+			text:     "HALT immediately. Do NOT output  ~~ FEATURE_COMPLETED ~~ .",
+			search:   "~~ FEATURE_COMPLETED ~~",
+			expected: false,
+		},
+		{
+			name:     "text not present",
+			text:     "some output",
+			search:   "not present",
+			expected: false,
 		},
 	}
 
-	if !containsText(event, "~~ FEATURE_COMPLETED ~~") {
-		t.Error("expected to contain completion signal")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event := &agent.Event{
+				Type: eventTypeAssistantMessage,
+				Data: assistantMessageData{
+					Content: []contentBlock{
+						{Type: "text", Text: tt.text},
+					},
+				},
+			}
 
-	if containsText(event, "not present") {
-		t.Error("expected not to contain 'not present'")
+			result := containsText(event, tt.search)
+			if result != tt.expected {
+				t.Errorf("containsText(%q, %q) = %v, want %v", tt.text, tt.search, result, tt.expected)
+			}
+		})
 	}
 }
 

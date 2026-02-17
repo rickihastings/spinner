@@ -242,7 +242,7 @@ When a prompt is provided, Spinner launches an iteration loop inside the VM. Eac
 4. Saves progress to a state file (persisted to GCS)
 5. Repeats until the task is done or the iteration limit is reached
 
-The agent signals completion by outputting `~~ FEATURE_COMPLETED ~~`. At that point, the loop stops, your changes are on
+The agent signals completion by outputting `~~ FEATURE_COMPLETED ~~` on its own line. At that point, the loop stops, your changes are on
 the branch, and the VM automatically shuts down.
 
 By default, the loop runs up to **100 iterations**. To change this:
