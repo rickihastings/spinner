@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/rickihastings/spinner/internal/secret"
 	"github.com/spf13/cobra"
@@ -43,6 +46,7 @@ COMMANDS:
 	cmd.AddCommand(newSecretSetCommand(sf))
 	cmd.AddCommand(newSecretListCommand(sf))
 	cmd.AddCommand(newSecretDeleteCommand(sf))
+	cmd.AddCommand(newSecretInjectCommand())
 
 	return cmd
 }
@@ -140,6 +144,72 @@ func newSecretDeleteCommand(sf storeFactory) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// defaultBlobPath is the default path for the encrypted secrets blob inside containers.
+var defaultBlobPath = "/run/spinner/secrets.enc"
+
+// osExit is a package-level variable for testing.
+var osExit = os.Exit
+
+// newSecretInjectCommand creates the `spinner secret inject -- <command>` subcommand.
+func newSecretInjectCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:                "inject -- <command> [args...]",
+		Short:              "Decrypt secrets blob and run a command with secrets as env vars",
+		DisableFlagParsing: true,
+		SilenceUsage:       true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Strip leading "--" if present
+			if len(args) > 0 && args[0] == "--" {
+				args = args[1:]
+			}
+
+			if len(args) == 0 {
+				return fmt.Errorf("missing command argument: usage: spinner secret inject -- <command> [args...]")
+			}
+
+			passphrase, err := passphraseFromEnvOrPrompt()
+			if err != nil {
+				return fmt.Errorf("getting passphrase: %w", err)
+			}
+
+			secrets, err := secret.DecryptBlob(defaultBlobPath, passphrase)
+			if err != nil {
+				return fmt.Errorf("decrypting secrets blob: %w", err)
+			}
+
+			child := exec.Command(args[0], args[1:]...)
+
+			child.Env = append(os.Environ(), secretsToEnvSlice(secrets)...)
+			child.Stdin = os.Stdin
+			child.Stdout = os.Stdout
+			child.Stderr = os.Stderr
+
+			if err := child.Run(); err != nil {
+				var exitErr *exec.ExitError
+				if ok := errors.As(err, &exitErr); ok {
+					if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+						osExit(status.ExitStatus())
+					}
+				}
+
+				return fmt.Errorf("running command: %w", err)
+			}
+
+			return nil
+		},
+	}
+}
+
+// secretsToEnvSlice converts a secrets map to KEY=VALUE environment variable strings.
+func secretsToEnvSlice(secrets map[string]string) []string {
+	env := make([]string, 0, len(secrets))
+	for k, v := range secrets {
+		env = append(env, k+"="+v)
+	}
+
+	return env
 }
 
 // readPassword is a package-level variable for testing.

@@ -47,11 +47,11 @@
 - [x] 6.3 Add tests to `internal/exec/loop_test.go`: secrets blob decrypted and injected, passphrase forwarded to child env, SPINNER_SECRET_STORE set in child env, blob NOT deleted, passphrase unset from own env, missing blob continues normally, corrupted blob logs warning and continues
 - [x] 6.4 Verify build and all tests pass
 
-## 7.0 Secret Inject Command (In-Container)
+## ~~7.0 Secret Inject Command (In-Container)~~
 
-- [ ] 7.1 Add `spinner secret inject -- <command>` subcommand to `cmd/secret.go`: read passphrase from `SPINNER_SECRET_PASSPHRASE` env first then interactive prompt, decrypt blob at `/run/spinner/secrets.enc`, run command with secrets as env vars, exit with child's exit code
-- [ ] 7.2 Add tests to `cmd/secret_test.go`: inject decrypts and runs command, passphrase from env, passphrase from prompt, wrong passphrase error, missing blob error, missing command argument error
-- [ ] 7.3 Verify build and all tests pass
+- [x] 7.1 Add `spinner secret inject -- <command>` subcommand to `cmd/secret.go`: read passphrase from `SPINNER_SECRET_PASSPHRASE` env first then interactive prompt, decrypt blob at `/run/spinner/secrets.enc`, run command with secrets as env vars, exit with child's exit code
+- [x] 7.2 Add tests to `cmd/secret_test.go`: inject decrypts and runs command, passphrase from env, passphrase from prompt, wrong passphrase error, missing blob error, missing command argument error
+- [x] 7.3 Verify build and all tests pass
 
 ## 8.0 Documentation
 
