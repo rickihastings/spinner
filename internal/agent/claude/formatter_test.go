@@ -647,6 +647,7 @@ func TestFormatter_MarkdownPlainText(t *testing.T) {
 
 	formatted, ok := f.FormatEvent(&event)
 	require.True(t, ok)
+
 	assert.Contains(t, formatted, "This is plain text")
 }
 

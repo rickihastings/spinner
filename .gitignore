@@ -152,3 +152,4 @@ coverage.*
 .spinner.json
 prompt.md
 package-lock.json
+tuipreview

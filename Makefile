@@ -1,4 +1,4 @@
-.PHONY: build test lint format format-check install-hooks clean release snapshot bake-dev
+.PHONY: build test lint format format-check install-hooks clean release snapshot bake-dev tui-preview
 
 # Version information
 VERSION ?= dev
@@ -64,6 +64,11 @@ release:
 # Create a snapshot release (for testing, no tag required)
 snapshot:
 	goreleaser release --snapshot --clean
+
+# Preview TUI formatting by replaying a raw log file
+# Usage: make tui-preview LOG=~/.spinner/<name>/logs/raw.log
+tui-preview:
+	go run ./tools/tuipreview $(LOG)
 
 # Bake GCP dev image with Go, Docker, Tailscale, and golangci-lint
 bake-dev: build
