@@ -51,7 +51,7 @@ The CLI SHALL reject `--provider-args` values that conflict with arguments manag
 ### Requirement: Removed Backend-Specific Setup Flags
 
 The setup command SHALL NOT accept the following backend-specific flags, which have been replaced by `--provider-args`:
-`--base-image`, `--dockerfile`, `--machine-type`, `--disk-size`, `--bake-script`.
+`--base-image`, `--dockerfile`, `--machine-type`, `--disk-size`.
 
 #### Scenario: Removed flag produces error
 
@@ -69,7 +69,7 @@ command SHALL be fully testable via dependency injection.
 
 - **WHEN** the CLI starts
 - **THEN** the setup command SHALL be registered as a Cobra subcommand with all flags (--name, --backend,
-  --provider-args, and GCP routing flags --project, --zone, --state-bucket)
+  --bake-script, --provider-args, and GCP routing flags --project, --zone, --state-bucket)
 
 ### Requirement: Configuration File Support
 

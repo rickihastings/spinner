@@ -70,15 +70,16 @@ catches `--name=foo`, `--name foo`, and `-d` forms.
 **3. Removal of backend-specific flags (part of slice 1)**
 
 Since this is pre-release, remove the flags outright rather than going through a deprecation cycle:
-- Remove `flagMachineType`, `flagDiskSize`, `flagServiceAccount`, `flagBakeScript`, `flagBaseImage`,
+- Remove `flagMachineType`, `flagDiskSize`, `flagServiceAccount`, `flagBaseImage`,
   `flagDockerfile` constants
 - Remove flag registrations from `cmd/spin.go` and `cmd/setup.go`
 - Remove Viper bindings and `gcpOptionsFromViper()` / `dockerOptionsFromViper()` helper logic for these flags
 - Remove the `Options map[string]string` fields that carried these values through `CreateConfig`/`SetupConfig`
-- Clean up GCP provider code that read these from `Options` (including bake-script logic)
+- Clean up GCP provider code that read removed flags from `Options`
 - Clean up Docker provider code that used `BaseImage` / `Dockerfile`
 
-The `--env` and `--env-file` flags stay (cross-backend Spinner abstractions with non-secret use cases).
+The `--env`, `--env-file`, and `--bake-script` flags stay. `--env`/`--env-file` are cross-backend Spinner
+abstractions. `--bake-script` is Spinner-only behavior (reads a file, injects into bake) — not a raw backend arg.
 
 **4. Docker integration (vertical slice 2)**
 

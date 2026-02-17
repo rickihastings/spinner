@@ -95,7 +95,7 @@ The spin command help SHALL document the `--provider-args` flag with examples fo
 ### Requirement: Removed Backend-Specific Spin Flags
 
 The spin command SHALL NOT accept the following backend-specific flags, which have been replaced by `--provider-args`:
-`--machine-type`, `--disk-size`, `--service-account`, `--bake-script`, `--base-image`, `--dockerfile`.
+`--machine-type`, `--disk-size`, `--service-account`, `--base-image`, `--dockerfile`.
 
 #### Scenario: Removed flag produces error
 

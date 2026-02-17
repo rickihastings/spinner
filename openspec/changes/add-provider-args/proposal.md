@@ -3,15 +3,15 @@
 ## Summary
 
 Add a `--provider-args` repeatable flag to the `spin` and `setup` commands that passes raw arguments directly to the
-underlying backend (Docker or GCP). Deprecate existing backend-specific tuning flags (`--machine-type`, `--disk-size`,
-`--service-account`, `--bake-script`, `--base-image`, `--dockerfile`) in favor of `--provider-args`. Add
+underlying backend (Docker or GCP). Remove existing backend-specific tuning flags (`--machine-type`, `--disk-size`,
+`--service-account`, `--base-image`, `--dockerfile`) in favor of `--provider-args`. Add
 `.spinner.json` support for `provider-args` as a JSON string array.
 
 ## Motivation
 
 Today, every backend-specific option requires a dedicated CLI flag, Viper binding, Options-map wiring, and spec
 update. This has led to a growing surface area of GCP-specific flags (`--machine-type`, `--disk-size`,
-`--service-account`, `--bake-script`) and Docker-specific flags (`--base-image`, `--dockerfile`). Each new flag
+`--service-account`) and Docker-specific flags (`--base-image`, `--dockerfile`). Each new flag
 adds maintenance cost and coupling.
 
 Users often need capabilities that aren't exposed yet - Docker volume mounts (`-v`), hostname overrides, network
@@ -58,7 +58,6 @@ The smaller the API surface, the better. The following flags will be deprecated 
 | `--machine-type` | GCP | `--provider-args="--machine-type=e2-standard-2"` |
 | `--disk-size` | GCP | `--provider-args="--disk-size-gb=30"` |
 | `--service-account` | GCP | `--provider-args="--service-account=..."` |
-| `--bake-script` | GCP | `--provider-args` (user passes relevant gcloud flags directly) |
 | `--base-image` | Docker | `--provider-args="--build-arg=BASE_IMAGE=..."` |
 | `--dockerfile` | Docker | `--provider-args="-f /path/to/Dockerfile"` |
 
@@ -71,6 +70,7 @@ The smaller the API surface, the better. The following flags will be deprecated 
 | `--state-bucket` | Required GCP routing, has validation |
 | `--backend` | Spinner routing, not a provider arg |
 | `--env`, `--env-file` | Cross-backend Spinner abstractions with custom per-backend logic |
+| `--bake-script` | Spinner behavior (reads file, injects into bake), not a raw backend arg |
 | `--image`, `--repo`, etc. | Core Spinner flags |
 
 **Since this is pre-release**, removed flags are dropped outright rather than going through a deprecation
@@ -110,6 +110,6 @@ appears in both, the backend tool (docker/gcloud) uses its own last-wins semanti
 - **Affected code**: `cmd/spin.go`, `cmd/setup.go`, `cmd/helpers.go`, `internal/backend/docker/run.go`,
   `internal/backend/docker/docker_provider.go`, `internal/backend/gcp/gcp_provider.go`,
   `internal/provider/provider.go`
-- **Breaking changes**: Flags removed (`--machine-type`, `--disk-size`, `--service-account`, `--bake-script`,
+- **Breaking changes**: Flags removed (`--machine-type`, `--disk-size`, `--service-account`,
   `--base-image`, `--dockerfile`). Acceptable since pre-release.
 - **Risk**: Low. Pass-through args are appended to existing command construction; remaining behavior unchanged.
