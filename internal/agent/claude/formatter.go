@@ -3,11 +3,16 @@ package claude
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
+	"github.com/charmbracelet/glamour/styles"
+	"github.com/muesli/termenv"
 	"github.com/rickihastings/spinner/internal/agent"
 	"github.com/rivo/tview"
+	"golang.org/x/term"
 )
 
 const (
@@ -25,10 +30,34 @@ type Formatter struct {
 	renderer  *glamour.TermRenderer // reused across calls
 }
 
+// autoStyleNoMargin replicates glamour.WithAutoStyle() but sets the
+// document and code block margins to zero so we control indentation ourselves.
+func autoStyleNoMargin() ansi.StyleConfig {
+	var style ansi.StyleConfig
+
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		style = styles.NoTTYStyleConfig
+	} else if termenv.HasDarkBackground() {
+		style = styles.DarkStyleConfig
+	} else {
+		style = styles.LightStyleConfig
+	}
+
+	zero := uint(0)
+	style.Document.Margin = &zero
+	style.CodeBlock.Margin = &zero
+
+	// Remove extra spaces glamour adds around inline code spans
+	style.Code.Prefix = ""
+	style.Code.Suffix = ""
+
+	return style
+}
+
 // NewFormatter creates a new RichFormatter.
 func NewFormatter() *Formatter {
 	renderer, _ := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
+		glamour.WithStyles(autoStyleNoMargin()),
 		glamour.WithWordWrap(0),
 	)
 
@@ -94,7 +123,17 @@ func (f *Formatter) formatAssistantRich(event *agent.Event) (string, bool) {
 
 	if len(textParts) > 0 {
 		rendered := f.renderMarkdown(strings.Join(textParts, "\n\n"))
-		parts = append(parts, "[dodgerblue]⏺[-] "+rendered)
+		// Indent continuation lines to align with text after "⏺ "
+		lines := strings.Split(rendered, "\n")
+		for i, line := range lines {
+			if i == 0 {
+				lines[i] = "[gray]⏺[-] " + line
+			} else {
+				lines[i] = "  " + line
+			}
+		}
+
+		parts = append(parts, strings.Join(lines, "\n"))
 	}
 
 	parts = append(parts, toolParts...)
@@ -135,7 +174,7 @@ func (f *Formatter) formatToolResult(event *agent.Event) (string, bool) {
 
 		// Build the header line: "⏺ ToolName ⎯⎯⎯⎯⎯⎯"
 		separator := strings.Repeat("⎯", 30)
-		header := fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-] [darkgray]%s[-]", toolName, separator)
+		header := fmt.Sprintf("[gray]⏺[-] [cyan]%s[-] [darkgray]%s[-]", toolName, separator)
 
 		// Extract text content and build summary line
 		text := extractToolResultText(block)
@@ -246,10 +285,10 @@ func (f *Formatter) formatToolUse(block contentBlock) string {
 
 	summary := extractToolSummary(block.Name, block.Input)
 	if summary != "" {
-		return fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-](%s)", block.Name, summary)
+		return fmt.Sprintf("[gray]⏺[-] [cyan]%s[-](%s)", block.Name, summary)
 	}
 
-	return fmt.Sprintf("[dodgerblue]⏺[-] [cyan]%s[-]", block.Name)
+	return fmt.Sprintf("[gray]⏺[-] [cyan]%s[-]", block.Name)
 }
 
 // formatTodoWrite renders TodoWrite input as a formatted task checklist.
