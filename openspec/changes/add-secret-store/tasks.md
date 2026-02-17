@@ -40,12 +40,12 @@
 - [x] 5.2 Add error handling for missing secrets blob in startup.sh
 - [x] 5.3 Verify build and all tests pass
 
-## 6.0 Spinner Exec Secret Injection
+## ~~6.0 Spinner Exec Secret Injection~~
 
-- [ ] 6.1 Modify `internal/exec/loop.go`: at startup, check for `/run/spinner/secrets.enc` + `SPINNER_SECRET_PASSPHRASE`; decrypt blob into memory; DO NOT delete blob (retained for inception); unset passphrase from own env; inject decrypted secrets + `SPINNER_SECRET_PASSPHRASE` + `SPINNER_SECRET_STORE=/run/spinner/secrets.enc` into executor config Env
-- [ ] 6.2 Verify `internal/agent/claude/executor.go` already injects `config.Env` via `cmd.Env` (no change needed)
-- [ ] 6.3 Add tests to `internal/exec/loop_test.go`: secrets blob decrypted and injected, passphrase forwarded to child env, SPINNER_SECRET_STORE set in child env, blob NOT deleted, passphrase unset from own env, missing blob continues normally, corrupted blob logs warning and continues
-- [ ] 6.4 Verify build and all tests pass
+- [x] 6.1 Modify `internal/exec/loop.go`: at startup, check for `/run/spinner/secrets.enc` + `SPINNER_SECRET_PASSPHRASE`; decrypt blob into memory; DO NOT delete blob (retained for inception); unset passphrase from own env; inject decrypted secrets + `SPINNER_SECRET_PASSPHRASE` + `SPINNER_SECRET_STORE=/run/spinner/secrets.enc` into executor config Env
+- [x] 6.2 Verify `internal/agent/claude/executor.go` already injects `config.Env` via `cmd.Env` (no change needed)
+- [x] 6.3 Add tests to `internal/exec/loop_test.go`: secrets blob decrypted and injected, passphrase forwarded to child env, SPINNER_SECRET_STORE set in child env, blob NOT deleted, passphrase unset from own env, missing blob continues normally, corrupted blob logs warning and continues
+- [x] 6.4 Verify build and all tests pass
 
 ## 7.0 Secret Inject Command (In-Container)
 

@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/rickihastings/spinner/internal/agent"
+	"github.com/rickihastings/spinner/internal/secret"
 )
 
 // mockExecutor is a test helper that implements agent.Executor interface
@@ -80,7 +83,7 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
 		return &mockExecutor{
 			result: &agent.Result{
 				Completed:   false,
@@ -151,7 +154,7 @@ func TestRunner_Run_Completion(t *testing.T) {
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
 		return &mockExecutor{
 			result: &agent.Result{
 				Completed: true,
@@ -206,7 +209,7 @@ func TestRunner_Run_AuthError(t *testing.T) {
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
 		return &mockExecutor{
 			result: &agent.Result{
 				AuthError:    true,
@@ -268,7 +271,7 @@ func TestRunner_Run_RateLimit(t *testing.T) {
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
 		callCount++
 		if callCount == 1 {
 			return &mockExecutor{
@@ -330,7 +333,7 @@ func TestRunner_Run_ContextCancellation(t *testing.T) {
 
 	defer func() { executorFactory = oldExecutorFactory }()
 
-	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
 		return &mockExecutor{
 			result: &agent.Result{},
 			err:    nil,
@@ -389,7 +392,7 @@ func TestRunner_Run_ConsecutiveErrors(t *testing.T) {
 
 	callCount := 0
 
-	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
 		callCount++
 
 		return &mockExecutor{
@@ -455,7 +458,7 @@ func TestRunner_Run_ConsecutiveErrorsReset(t *testing.T) {
 
 	callCount := 0
 
-	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
 		callCount++
 		// Alternate: error, error, success, error, error, success, ...
 		if callCount%3 != 0 {
@@ -497,6 +500,406 @@ func TestRunner_Run_ConsecutiveErrorsReset(t *testing.T) {
 	// Should have run all 10 iterations
 	if callCount != 10 {
 		t.Errorf("Expected 10 calls (all iterations), got %d", callCount)
+	}
+}
+
+// createTestBlob creates an encrypted secrets blob in a temp directory and returns
+// the blob path and passphrase. It also sets the secretsBlobPath package var to
+// point to this temp file for the duration of the test.
+func createTestBlob(t *testing.T, secrets map[string]string, passphrase string) string {
+	t.Helper()
+
+	blob, err := secret.EncryptBlob(secrets, passphrase)
+	if err != nil {
+		t.Fatalf("Failed to encrypt blob: %v", err)
+	}
+
+	blobPath := filepath.Join(t.TempDir(), "secrets.enc")
+	if err := os.WriteFile(blobPath, blob, 0600); err != nil {
+		t.Fatalf("Failed to write blob: %v", err)
+	}
+
+	return blobPath
+}
+
+func TestRunner_Run_SecretsDecryptedAndInjected(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	// Create encrypted blob
+	testSecrets := map[string]string{
+		"GITHUB_TOKEN":            "gh-token-123",
+		"CLAUDE_CODE_OAUTH_TOKEN": "claude-token-456",
+	}
+	passphrase := "test-passphrase"
+	blobPath := createTestBlob(t, testSecrets, passphrase)
+
+	// Override blob path and decryptBlobFunc
+	oldBlobPath := secretsBlobPath
+
+	defer func() { secretsBlobPath = oldBlobPath }()
+
+	secretsBlobPath = blobPath
+
+	oldDecryptBlob := decryptBlobFunc
+
+	defer func() { decryptBlobFunc = oldDecryptBlob }()
+
+	// Override osUnsetenv to track calls
+	var unsetKeys []string
+
+	oldOsUnsetenv := osUnsetenv
+
+	defer func() { osUnsetenv = oldOsUnsetenv }()
+
+	osUnsetenv = func(key string) error {
+		unsetKeys = append(unsetKeys, key)
+		return nil
+	}
+
+	// Set passphrase in env
+	t.Setenv("SPINNER_SECRET_PASSPHRASE", passphrase)
+
+	config := &Config{
+		Prompt:        "test prompt",
+		MaxIterations: 1,
+		Branch:        "main",
+		LogDir:        tmpDir,
+	}
+
+	state := &State{}
+
+	runner := NewRunner(config, state, statePath)
+
+	var capturedEnv []string
+
+	oldExecutorFactory := executorFactory
+
+	defer func() { executorFactory = oldExecutorFactory }()
+
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
+		capturedEnv = env
+
+		return &mockExecutor{
+			result: &agent.Result{Completed: true},
+		}
+	}
+
+	oldPushChanges := pushChangesFunc
+
+	defer func() { pushChangesFunc = oldPushChanges }()
+
+	pushChangesFunc = func(ctx context.Context, branch string) error { return nil }
+
+	ctx := context.Background()
+	exitCode := runner.Run(ctx)
+
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", exitCode)
+	}
+
+	// Check that secrets were injected into env
+	envMap := make(map[string]string)
+
+	for _, e := range capturedEnv {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	if envMap["GITHUB_TOKEN"] != "gh-token-123" {
+		t.Errorf("Expected GITHUB_TOKEN=gh-token-123, got %q", envMap["GITHUB_TOKEN"])
+	}
+
+	if envMap["CLAUDE_CODE_OAUTH_TOKEN"] != "claude-token-456" {
+		t.Errorf("Expected CLAUDE_CODE_OAUTH_TOKEN=claude-token-456, got %q", envMap["CLAUDE_CODE_OAUTH_TOKEN"])
+	}
+
+	// Check passphrase forwarded for inception
+	if envMap["SPINNER_SECRET_PASSPHRASE"] != passphrase {
+		t.Errorf("Expected SPINNER_SECRET_PASSPHRASE=%s, got %q", passphrase, envMap["SPINNER_SECRET_PASSPHRASE"])
+	}
+
+	// Check SPINNER_SECRET_STORE set for inception
+	if envMap["SPINNER_SECRET_STORE"] != secretsBlobPath {
+		t.Errorf("Expected SPINNER_SECRET_STORE=%s, got %q", secretsBlobPath, envMap["SPINNER_SECRET_STORE"])
+	}
+
+	// Check passphrase was unset from own env
+	if len(unsetKeys) != 1 || unsetKeys[0] != "SPINNER_SECRET_PASSPHRASE" {
+		t.Errorf("Expected SPINNER_SECRET_PASSPHRASE to be unset, got %v", unsetKeys)
+	}
+}
+
+func TestRunner_Run_MissingBlobContinuesNormally(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	// Set passphrase but don't create a blob file
+	t.Setenv("SPINNER_SECRET_PASSPHRASE", "some-passphrase")
+
+	config := &Config{
+		Prompt:        "test prompt",
+		MaxIterations: 1,
+		Branch:        "main",
+		LogDir:        tmpDir,
+	}
+
+	state := &State{}
+	runner := NewRunner(config, state, statePath)
+
+	var capturedEnv []string
+
+	oldExecutorFactory := executorFactory
+
+	defer func() { executorFactory = oldExecutorFactory }()
+
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
+		capturedEnv = env
+
+		return &mockExecutor{
+			result: &agent.Result{Completed: true},
+		}
+	}
+
+	oldPushChanges := pushChangesFunc
+
+	defer func() { pushChangesFunc = oldPushChanges }()
+
+	pushChangesFunc = func(ctx context.Context, branch string) error { return nil }
+
+	ctx := context.Background()
+	exitCode := runner.Run(ctx)
+
+	// Should complete normally without secrets
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", exitCode)
+	}
+
+	// No secrets should be injected
+	if len(capturedEnv) != 0 {
+		t.Errorf("Expected no env vars, got %v", capturedEnv)
+	}
+}
+
+func TestRunner_Run_CorruptedBlobLogsWarningAndContinues(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	t.Setenv("SPINNER_SECRET_PASSPHRASE", "test-passphrase")
+
+	// Create a dummy file at the blob path so os.Stat succeeds
+	corruptBlobPath := filepath.Join(tmpDir, "corrupt.enc")
+	if err := os.WriteFile(corruptBlobPath, []byte("corrupt"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	oldBlobPath := secretsBlobPath
+
+	defer func() { secretsBlobPath = oldBlobPath }()
+
+	secretsBlobPath = corruptBlobPath
+
+	// Override decryptBlobFunc to simulate corruption
+	oldDecryptBlob := decryptBlobFunc
+
+	defer func() { decryptBlobFunc = oldDecryptBlob }()
+
+	decryptBlobFunc = func(path, passphrase string) (map[string]string, error) {
+		return nil, fmt.Errorf("decrypting secrets blob: cipher: message authentication failed")
+	}
+
+	// Override osUnsetenv to track it's NOT called on failure
+	var unsetCalled bool
+
+	oldOsUnsetenv := osUnsetenv
+
+	defer func() { osUnsetenv = oldOsUnsetenv }()
+
+	osUnsetenv = func(key string) error {
+		unsetCalled = true
+		return nil
+	}
+
+	config := &Config{
+		Prompt:        "test prompt",
+		MaxIterations: 1,
+		Branch:        "main",
+		LogDir:        tmpDir,
+	}
+
+	state := &State{}
+	runner := NewRunner(config, state, statePath)
+
+	var capturedEnv []string
+
+	oldExecutorFactory := executorFactory
+
+	defer func() { executorFactory = oldExecutorFactory }()
+
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
+		capturedEnv = env
+
+		return &mockExecutor{
+			result: &agent.Result{Completed: true},
+		}
+	}
+
+	oldPushChanges := pushChangesFunc
+
+	defer func() { pushChangesFunc = oldPushChanges }()
+
+	pushChangesFunc = func(ctx context.Context, branch string) error { return nil }
+
+	ctx := context.Background()
+	exitCode := runner.Run(ctx)
+
+	// Should complete normally despite corrupted blob
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", exitCode)
+	}
+
+	// No secrets injected
+	if len(capturedEnv) != 0 {
+		t.Errorf("Expected no env vars, got %v", capturedEnv)
+	}
+
+	// Passphrase should NOT be unset (decryption failed, so we don't touch env)
+	if unsetCalled {
+		t.Error("Expected osUnsetenv NOT to be called on decryption failure")
+	}
+}
+
+func TestRunner_Run_BlobNotDeletedAfterDecryption(t *testing.T) {
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	testSecrets := map[string]string{"MY_SECRET": "value"}
+	passphrase := "test-passphrase"
+	blobPath := createTestBlob(t, testSecrets, passphrase)
+
+	oldBlobPath := secretsBlobPath
+
+	defer func() { secretsBlobPath = oldBlobPath }()
+
+	secretsBlobPath = blobPath
+
+	oldOsUnsetenv := osUnsetenv
+
+	defer func() { osUnsetenv = oldOsUnsetenv }()
+
+	osUnsetenv = func(key string) error { return nil }
+
+	t.Setenv("SPINNER_SECRET_PASSPHRASE", passphrase)
+
+	config := &Config{
+		Prompt:        "test prompt",
+		MaxIterations: 1,
+		Branch:        "main",
+		LogDir:        tmpDir,
+	}
+
+	state := &State{}
+	runner := NewRunner(config, state, statePath)
+
+	oldExecutorFactory := executorFactory
+
+	defer func() { executorFactory = oldExecutorFactory }()
+
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
+		return &mockExecutor{
+			result: &agent.Result{Completed: true},
+		}
+	}
+
+	oldPushChanges := pushChangesFunc
+
+	defer func() { pushChangesFunc = oldPushChanges }()
+
+	pushChangesFunc = func(ctx context.Context, branch string) error { return nil }
+
+	ctx := context.Background()
+	runner.Run(ctx)
+
+	// Blob file should still exist (not deleted — needed for inception)
+	if _, err := os.Stat(blobPath); os.IsNotExist(err) {
+		t.Error("Expected blob file to still exist after decryption")
+	}
+}
+
+func TestRunner_Run_SecretEnvSorted(t *testing.T) {
+	// Verify that env vars are consistently ordered (map iteration is random)
+	tmpDir := t.TempDir()
+	statePath := filepath.Join(tmpDir, "state.json")
+
+	testSecrets := map[string]string{
+		"Z_SECRET": "z-val",
+		"A_SECRET": "a-val",
+		"M_SECRET": "m-val",
+	}
+	passphrase := "test-passphrase"
+	blobPath := createTestBlob(t, testSecrets, passphrase)
+
+	oldBlobPath := secretsBlobPath
+
+	defer func() { secretsBlobPath = oldBlobPath }()
+
+	secretsBlobPath = blobPath
+
+	oldOsUnsetenv := osUnsetenv
+
+	defer func() { osUnsetenv = oldOsUnsetenv }()
+
+	osUnsetenv = func(key string) error { return nil }
+
+	t.Setenv("SPINNER_SECRET_PASSPHRASE", passphrase)
+
+	config := &Config{
+		Prompt:        "test prompt",
+		MaxIterations: 1,
+		Branch:        "main",
+		LogDir:        tmpDir,
+	}
+
+	state := &State{}
+	runner := NewRunner(config, state, statePath)
+
+	var capturedEnv []string
+
+	oldExecutorFactory := executorFactory
+
+	defer func() { executorFactory = oldExecutorFactory }()
+
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
+		capturedEnv = env
+
+		return &mockExecutor{
+			result: &agent.Result{Completed: true},
+		}
+	}
+
+	oldPushChanges := pushChangesFunc
+
+	defer func() { pushChangesFunc = oldPushChanges }()
+
+	pushChangesFunc = func(ctx context.Context, branch string) error { return nil }
+
+	ctx := context.Background()
+	runner.Run(ctx)
+
+	// Extract just the secret keys (not SPINNER_SECRET_PASSPHRASE or SPINNER_SECRET_STORE)
+	var secretKeys []string
+
+	for _, e := range capturedEnv {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 && !strings.HasPrefix(parts[0], "SPINNER_SECRET_") {
+			secretKeys = append(secretKeys, parts[0])
+		}
+	}
+
+	if !sort.StringsAreSorted(secretKeys) {
+		t.Errorf("Expected secret env keys to be sorted, got %v", secretKeys)
 	}
 }
 

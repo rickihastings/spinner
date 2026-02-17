@@ -6,10 +6,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/rickihastings/spinner/internal/agent"
 	"github.com/rickihastings/spinner/internal/agent/claude"
+	"github.com/rickihastings/spinner/internal/secret"
 )
 
 const (
@@ -20,6 +22,10 @@ const (
 	// stops. This prevents burning through all iterations when Claude CLI is
 	// broken (e.g., not installed, crashing immediately).
 	maxConsecutiveErrors = 3
+
+	// defaultSecretsBlobPath is the path where the encrypted secrets blob is
+	// mounted inside the container.
+	defaultSecretsBlobPath = "/run/spinner/secrets.enc"
 )
 
 // StateSyncFunc is called after each local state save to sync state to a
@@ -38,13 +44,17 @@ type StateSyncFactory func(ctx context.Context) StateSyncFunc
 
 // Function variables for testing
 var (
-	executorFactory = func(logPath string, additionalWriter io.Writer) agent.Executor {
+	executorFactory = func(logPath string, additionalWriter io.Writer, env []string) agent.Executor {
 		return claude.NewExecutor(&claude.ExecutorConfig{
 			LogPath:          logPath,
 			AdditionalWriter: additionalWriter,
+			Env:              env,
 		})
 	}
 	pushChangesFunc = pushChanges
+	decryptBlobFunc = secret.DecryptBlob
+	osUnsetenv      = os.Unsetenv
+	secretsBlobPath = defaultSecretsBlobPath
 )
 
 // Runner executes the main iteration loop.
@@ -107,6 +117,38 @@ func (r *Runner) saveState() error {
 func (r *Runner) Run(ctx context.Context) int {
 	fmt.Printf("Starting Ralph loop with prompt: %s\n", r.config.Prompt)
 	fmt.Printf("Max iterations: %d\n", r.config.MaxIterations)
+
+	// Decrypt secrets blob and build env for child processes
+	var secretEnv []string
+
+	passphrase := os.Getenv("SPINNER_SECRET_PASSPHRASE")
+	if passphrase != "" {
+		if _, err := os.Stat(secretsBlobPath); err == nil {
+			secrets, err := decryptBlobFunc(secretsBlobPath, passphrase)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to decrypt secrets blob: %v\n", err)
+			} else {
+				// Unset passphrase from own process env
+				_ = osUnsetenv("SPINNER_SECRET_PASSPHRASE")
+
+				// Build env slice with all secrets + inception support
+				// Sort keys for deterministic ordering
+				keys := make([]string, 0, len(secrets))
+				for k := range secrets {
+					keys = append(keys, k)
+				}
+
+				sort.Strings(keys)
+
+				for _, k := range keys {
+					secretEnv = append(secretEnv, k+"="+secrets[k])
+				}
+
+				secretEnv = append(secretEnv, "SPINNER_SECRET_PASSPHRASE="+passphrase)
+				secretEnv = append(secretEnv, "SPINNER_SECRET_STORE="+secretsBlobPath)
+			}
+		}
+	}
 
 	// Set initial state
 	r.state.Branch = r.config.Branch
@@ -174,7 +216,7 @@ func (r *Runner) Run(ctx context.Context) int {
 		}
 
 		// Run Claude
-		executor := executorFactory(logPath, additionalWriter)
+		executor := executorFactory(logPath, additionalWriter, secretEnv)
 
 		result, err := executor.ExecuteAndCollect(ctx, r.config.Prompt)
 		if err != nil {
