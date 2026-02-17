@@ -286,13 +286,20 @@ func isAuthError(event *agent.Event) bool {
 	return strings.Contains(data.Type, errorTypeAuthentication)
 }
 
-// containsText checks if a Claude assistant message contains the specified text
-// on its own line (trimmed). This prevents false positives when the signal is
-// quoted or referenced in surrounding prose (e.g. "Do NOT output ~~ FEATURE_COMPLETED ~~").
-func containsText(event *agent.Event, text string) bool {
+// containsCompletionSignal checks if a Claude assistant message contains the
+// completion signal on its own line. The line is trimmed of whitespace and
+// common punctuation before comparison. This prevents false positives when the
+// signal is quoted or referenced in surrounding prose
+// (e.g. "Do NOT output ~~ FEATURE_COMPLETED ~~").
+func containsCompletionSignal(event *agent.Event, signal string) bool {
 	fullText := extractText(event)
 	for _, line := range strings.Split(fullText, "\n") {
-		if strings.TrimSpace(line) == text {
+		cleaned := strings.TrimSpace(line)
+		// Strip backticks and surrounding punctuation that Claude might add
+		cleaned = strings.Trim(cleaned, "`.,;:!?\"'")
+		cleaned = strings.TrimSpace(cleaned)
+
+		if cleaned == signal {
 			return true
 		}
 	}

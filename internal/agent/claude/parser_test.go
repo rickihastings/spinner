@@ -485,53 +485,55 @@ func TestIsAuthError(t *testing.T) {
 	}
 }
 
-func TestContainsText(t *testing.T) {
+func TestContainsCompletionSignal(t *testing.T) {
 	tests := []struct {
 		name     string
 		text     string
-		search   string
 		expected bool
 	}{
 		{
 			name:     "signal on own line",
 			text:     "some output\n~~ FEATURE_COMPLETED ~~\nmore output",
-			search:   "~~ FEATURE_COMPLETED ~~",
 			expected: true,
 		},
 		{
 			name:     "signal on own line with whitespace",
 			text:     "some output\n  ~~ FEATURE_COMPLETED ~~  \nmore output",
-			search:   "~~ FEATURE_COMPLETED ~~",
 			expected: true,
 		},
 		{
 			name:     "signal as only content",
 			text:     "~~ FEATURE_COMPLETED ~~",
-			search:   "~~ FEATURE_COMPLETED ~~",
+			expected: true,
+		},
+		{
+			name:     "signal wrapped in backticks",
+			text:     "some output\n`~~ FEATURE_COMPLETED ~~`\nmore output",
+			expected: true,
+		},
+		{
+			name:     "signal with trailing period",
+			text:     "some output\n~~ FEATURE_COMPLETED ~~.\nmore output",
 			expected: true,
 		},
 		{
 			name:     "signal embedded in sentence",
 			text:     "Task completed ~~ FEATURE_COMPLETED ~~ done",
-			search:   "~~ FEATURE_COMPLETED ~~",
 			expected: false,
 		},
 		{
 			name:     "signal quoted in instructions",
 			text:     "Do NOT output `~~ FEATURE_COMPLETED ~~`. No signal whatsoever.",
-			search:   "~~ FEATURE_COMPLETED ~~",
 			expected: false,
 		},
 		{
 			name:     "signal negated in prose",
 			text:     "HALT immediately. Do NOT output  ~~ FEATURE_COMPLETED ~~ .",
-			search:   "~~ FEATURE_COMPLETED ~~",
 			expected: false,
 		},
 		{
-			name:     "text not present",
+			name:     "signal not present",
 			text:     "some output",
-			search:   "not present",
 			expected: false,
 		},
 	}
@@ -547,9 +549,9 @@ func TestContainsText(t *testing.T) {
 				},
 			}
 
-			result := containsText(event, tt.search)
+			result := containsCompletionSignal(event, completionSignal)
 			if result != tt.expected {
-				t.Errorf("containsText(%q, %q) = %v, want %v", tt.text, tt.search, result, tt.expected)
+				t.Errorf("containsCompletionSignal(%q) = %v, want %v", tt.text, result, tt.expected)
 			}
 		})
 	}

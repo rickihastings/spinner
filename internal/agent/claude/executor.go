@@ -218,7 +218,7 @@ func (e *Executor) ExecuteAndCollect(ctx context.Context, prompt string) (*agent
 			}
 
 		case eventTypeAssistantMessage:
-			if containsText(&event, e.completionSignal) {
+			if containsCompletionSignal(&event, e.completionSignal) {
 				result.Completed = true
 			}
 		}
