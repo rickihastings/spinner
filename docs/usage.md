@@ -311,6 +311,88 @@ These are tested, working examples for future reference:
 - Default `max-iterations` is 100 if not specified
 - The `--watch` flag can be combined with any spin flags
 
+## Writing Effective Prompts
+
+### The Prompt as a Living Document
+
+Unlike a one-shot chat message, your prompt (or prompt file) is the agent's persistent memory. The agent reads it at the
+start of each iteration, so it can track what has already been done and what remains. Design your prompt accordingly:
+write it as a living spec that the agent updates as it works, not as a set of instructions it reads once and discards.
+
+A static, one-liner prompt generally will not cause the agent to stop cleanly — the agent must emit `~~ FEATURE_COMPLETED ~~`
+on its own line for Spinner to detect completion. Without a clear signal of doneness baked into the prompt, the agent
+may keep iterating or exit with an error.
+
+### Task Lists Are the Core Pattern
+
+Structure your prompt as an ordered task list. Each iteration the agent:
+
+1. Reads the prompt/spec to find the next unchecked task
+2. Does the work
+3. Marks the task complete in the file (or a separate checklist)
+4. Commits and pushes
+5. Moves on to the next task
+
+When all tasks are done the agent emits the completion signal. The commit history gives you a clean record of each
+incremental step, and if the run is interrupted mid-way the next iteration picks up exactly where it left off because
+the state is in the file itself, not in the agent's memory.
+
+**Example prompt structure (`prompt.md`):**
+
+```markdown
+# Feature: Add user authentication
+
+## Tasks
+- [x] Scaffold the login route and handler
+- [x] Add session middleware
+- [ ] Write unit tests for the auth module
+- [ ] Update the README with setup instructions
+- [ ] Emit ~~ FEATURE_COMPLETED ~~ when all tasks are done
+
+## Notes
+- Use the existing `db` package for queries
+- JWT secret is in `.env` as `JWT_SECRET`
+```
+
+Pass this file as your prompt:
+
+```bash
+./dist/spinner spin \
+  --image my-env \
+  --repo https://github.com/user/repo \
+  --prompt "$(cat prompt.md)"
+```
+
+Or commit `prompt.md` to the repo and instruct the agent to read and update it each iteration, so the file itself
+becomes the source of truth that survives restarts.
+
+### Single-Iteration / One-Shot Prompts
+
+`--max-iterations 1` is a fully supported mode for tasks that are self-contained and don't need multiple rounds. This
+is useful when you want to run a single sandboxed command and not have the agent loop:
+
+```bash
+./dist/spinner spin \
+  --image my-env \
+  --repo https://github.com/user/repo \
+  --prompt "run the test suite and paste the output into test-results.txt" \
+  --max-iterations 1
+```
+
+The agent runs once, does the work, and the container exits regardless of whether the completion signal was emitted.
+Use this for tasks where you know one iteration is enough and you don't need the loop logic.
+
+### Prompt Tips
+
+- **Be explicit about completion.** Tell the agent to emit `~~ FEATURE_COMPLETED ~~` when all tasks are done, or
+  structure the task list so it naturally ends with a "emit completion signal" step.
+- **Keep context in the file.** Anything the agent needs to remember between iterations should be written to a file in
+  the repo — agent memory does not persist across iterations.
+- **Prefer small, concrete tasks.** "Add login endpoint" is better than "implement authentication". Smaller tasks mean
+  cleaner commits and easier recovery if something goes wrong.
+- **Include constraints up front.** Style guides, libraries to use, files to avoid — put them in the prompt so the
+  agent doesn't have to guess.
+
 ## State Management
 
 Spinner maintains persistent state for each running container to track iteration progress and status. This state
