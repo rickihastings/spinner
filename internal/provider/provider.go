@@ -55,9 +55,9 @@ type ContainerMetrics struct {
 }
 
 // SetupConfig holds configuration for provisioning a named environment.
-// Name is universal. Options carries backend-specific keys: e.g. "base-image"
-// and "dockerfile" for Docker, "machine-type" and "zone" for GCP.
-// ProviderArgs carries raw pass-through arguments for the backend.
+// Name is universal. Options carries backend-specific routing keys (e.g.
+// "project", "zone" for GCP). ProviderArgs carries raw pass-through
+// arguments for the backend (e.g. --build-arg for Docker, --machine-type for GCP).
 type SetupConfig struct {
 	Name         string
 	Options      map[string]string

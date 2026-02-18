@@ -20,7 +20,10 @@ func init() {
 // NewSetupCommand creates a new setup command with the given Factory.
 // This constructor enables dependency injection for testing.
 func NewSetupCommand(f *provider.Factory) *cobra.Command {
-	var setupName string
+	var (
+		setupName         string
+		setupProviderArgs []string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "setup",
@@ -30,29 +33,29 @@ func NewSetupCommand(f *provider.Factory) *cobra.Command {
 GENERAL FLAGS:
   --name <name>              Name for the environment (required)
   --backend <backend>        Backend provider: docker, gcp (default: docker)
-
-DOCKER BACKEND FLAGS:
-  --base-image <image>       Base Docker image (optional, default: ubuntu:22.04)
-  --dockerfile <path>        Path to custom Dockerfile (optional, mutually exclusive with --base-image)
+  --provider-args <arg>      Extra arguments passed directly to the backend (repeatable)
 
 GCP BACKEND FLAGS:
   --project <project>        GCP project ID (required for GCP)
   --zone <zone>              GCP zone (required for GCP)
-  --machine-type <type>      VM machine type (default: e2-standard-2)
-  --disk-size <gb>           Boot disk size in GB (default: 30)
   --state-bucket <bucket>    GCS bucket for state persistence (required for GCP)
   --bake-script <path>       Path to custom bake script run during image creation (GCP backend)
 
 EXAMPLES:
   # Docker (default)
   spinner setup --name my-sandbox
-  spinner setup --name my-sandbox --base-image node:20-bullseye
+  spinner setup --name my-sandbox --provider-args="--build-arg=BASE_IMAGE=node:20-bullseye"
+
+  # Docker with custom Dockerfile
+  spinner setup --name my-sandbox --provider-args="-f /path/to/Dockerfile"
 
   # GCP
-  spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket`,
+  spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket
+  spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket \
+    --provider-args="--machine-type=e2-standard-4" --provider-args="--disk-size-gb=50"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind general flags to Viper
-			bindFlags(cmd, flagName, flagBaseImage, flagDockerfile)
+			bindFlags(cmd, flagName)
 
 			// Resolve and validate backend
 			backend, err := resolveAndValidateBackend(cmd)
@@ -74,20 +77,22 @@ EXAMPLES:
 				return err
 			}
 
-			return runSetup(context.Background(), p, backend, setupName, nil)
+			// Merge provider args: config file provides base args, CLI appends on top.
+			providerArgs := mergeProviderArgs(setupProviderArgs)
+
+			return runSetup(context.Background(), p, backend, setupName, providerArgs)
 		},
 	}
 
 	// General flags
 	cmd.Flags().StringVar(&setupName, flagName, "", "Name for the environment (required)")
 	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
+	cmd.Flags().StringSliceVar(&setupProviderArgs, flagProviderArgs, []string{}, "Extra arguments passed directly to the backend (repeatable)")
 
-	// Docker backend flags
-	cmd.Flags().String(flagBaseImage, "", "Base Docker image (optional, default: ubuntu:22.04)")
-	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile (optional)")
-
-	// GCP backend flags
-	addGCPSetupFlags(cmd)
+	// GCP backend flags (routing + bake-script only; machine-type, disk-size, service-account
+	// are now passed via --provider-args)
+	addGCPQueryFlags(cmd)
+	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
 
 	return cmd
 }

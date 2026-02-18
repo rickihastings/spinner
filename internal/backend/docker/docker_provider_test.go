@@ -19,13 +19,30 @@ func TestDockerProvider_Setup(t *testing.T) {
 	ctx := context.Background()
 
 	client.On("BuildImage", ctx, BuildConfig{
-		Name:      "test-env",
-		BaseImage: "ubuntu:22.04",
+		Name: "test-env",
 	}).Return(nil)
 
 	err := p.Setup(ctx, provider.SetupConfig{
-		Name:    "test-env",
-		Options: map[string]string{"base-image": "ubuntu:22.04"},
+		Name: "test-env",
+	})
+
+	assert.NoError(t, err)
+	client.AssertExpectations(t)
+}
+
+func TestDockerProvider_Setup_WithProviderArgs(t *testing.T) {
+	client := new(MockDockerClient)
+	p := NewDockerProvider(client)
+	ctx := context.Background()
+
+	client.On("BuildImage", ctx, BuildConfig{
+		Name:      "test-env",
+		ExtraArgs: []string{"--build-arg=BASE_IMAGE=node:20", "--no-cache"},
+	}).Return(nil)
+
+	err := p.Setup(ctx, provider.SetupConfig{
+		Name:         "test-env",
+		ProviderArgs: []string{"--build-arg=BASE_IMAGE=node:20", "--no-cache"},
 	})
 
 	assert.NoError(t, err)
@@ -40,25 +57,24 @@ func TestDockerProvider_Setup_Error(t *testing.T) {
 	client.On("BuildImage", ctx, mock.Anything).Return(assert.AnError)
 
 	err := p.Setup(ctx, provider.SetupConfig{
-		Name:    "test-env",
-		Options: map[string]string{},
+		Name: "test-env",
 	})
 
 	assert.Error(t, err)
 }
 
-func TestDockerProvider_Setup_NonExistentDockerfile(t *testing.T) {
+func TestDockerProvider_Setup_ConflictingProviderArgs(t *testing.T) {
 	client := new(MockDockerClient)
 	p := NewDockerProvider(client)
 	ctx := context.Background()
 
 	err := p.Setup(ctx, provider.SetupConfig{
-		Name:    "test-env",
-		Options: map[string]string{"dockerfile": "/nonexistent/path/Dockerfile"},
+		Name:         "test-env",
+		ProviderArgs: []string{"-t", "my-custom-tag"},
 	})
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "dockerfile not found at path")
+	assert.Contains(t, err.Error(), "conflicts with Spinner-managed")
 	client.AssertNotCalled(t, "BuildImage")
 }
 

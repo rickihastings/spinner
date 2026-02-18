@@ -86,26 +86,10 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 
 	defer func() { _ = os.RemoveAll(buildContextDir) }()
 
-	// Determine the base image to use
-	baseImage := config.BaseImage
-	if baseImage == "" {
-		baseImage = "ubuntu:22.04"
-	}
-
-	// If user provided a Dockerfile, build it first using CLI
-	if config.Dockerfile != "" {
-		userBaseImageTag := fmt.Sprintf("spinner-base:%s", config.Name)
-		if err := c.buildUserDockerfile(ctx, config.Dockerfile, userBaseImageTag); err != nil {
-			return fmt.Errorf("failed to build user Dockerfile: %w", err)
-		}
-
-		baseImage = userBaseImageTag
-	}
-
 	// Generate the final Dockerfile
 	dockerfilePath := filepath.Join(buildContextDir, "Dockerfile")
 
-	dockerfileContent, err := generateDockerfile(dockerfileConfig{BaseImage: baseImage})
+	dockerfileContent, err := generateDockerfile(dockerfileConfig{BaseImage: "ubuntu:22.04"})
 	if err != nil {
 		return fmt.Errorf("failed to generate Dockerfile: %w", err)
 	}
@@ -164,24 +148,16 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 
 	// Build the final image using CLI
 	imageName := fmt.Sprintf("spinner:%s", config.Name)
-	if err := c.buildWithCLI(ctx, buildContextDir, "Dockerfile", imageName, baseImage); err != nil {
+	if err := c.buildWithCLI(ctx, buildContextDir, "Dockerfile", imageName, config.ExtraArgs); err != nil {
 		return fmt.Errorf("failed to build Docker image: %w", err)
 	}
 
 	return nil
 }
 
-// buildUserDockerfile builds a user-provided Dockerfile using the Docker CLI.
-func (c *RealDockerClient) buildUserDockerfile(ctx context.Context, dockerfilePath, tag string) error {
-	contextDir := filepath.Dir(dockerfilePath)
-	dockerfileName := filepath.Base(dockerfilePath)
-
-	// User dockerfiles don't need baseImage since they define their own FROM
-	return c.buildWithCLI(ctx, contextDir, dockerfileName, tag, "")
-}
-
 // buildWithCLI builds a Docker image using the docker build CLI command.
-func (c *RealDockerClient) buildWithCLI(ctx context.Context, contextDir, dockerfileName, tag, baseImage string) error {
+// ExtraArgs are injected before the context directory argument.
+func (c *RealDockerClient) buildWithCLI(ctx context.Context, contextDir, dockerfileName, tag string, extraArgs []string) error {
 	args := []string{"build", "-t", tag, "-f", filepath.Join(contextDir, dockerfileName)}
 
 	// Add build args
@@ -196,9 +172,8 @@ func (c *RealDockerClient) buildWithCLI(ctx context.Context, contextDir, dockerf
 		args = append(args, "--build-arg", fmt.Sprintf("SPINNER_VERSION=%s", version.Tag()))
 	}
 
-	if baseImage != "" {
-		args = append(args, "--build-arg", fmt.Sprintf("BASE_IMAGE=%s", baseImage))
-	}
+	// Append provider pass-through args before the context directory
+	args = append(args, extraArgs...)
 
 	args = append(args, contextDir)
 

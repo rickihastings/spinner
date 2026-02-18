@@ -2,8 +2,6 @@ package docker
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -107,15 +105,13 @@ func TestParseContainerListOutput(t *testing.T) {
 	}
 }
 
-// TestBuildImage_DefaultBaseImage tests building with default base image
-func TestBuildImage_DefaultBaseImage(t *testing.T) {
+// TestBuildImage_DefaultConfig tests building with default configuration
+func TestBuildImage_DefaultConfig(t *testing.T) {
 	mockClient := new(MockDockerClient)
 	ctx := context.Background()
 
 	config := BuildConfig{
-		Name:       "test-env",
-		BaseImage:  "",
-		Dockerfile: "",
+		Name: "test-env",
 	}
 
 	// Mock the BuildImage call to succeed
@@ -127,44 +123,14 @@ func TestBuildImage_DefaultBaseImage(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-// TestBuildImage_CustomBaseImage tests building with custom base image
-func TestBuildImage_CustomBaseImage(t *testing.T) {
+// TestBuildImage_WithExtraArgs tests building with extra provider args
+func TestBuildImage_WithExtraArgs(t *testing.T) {
 	mockClient := new(MockDockerClient)
 	ctx := context.Background()
 
 	config := BuildConfig{
 		Name:      "test-env",
-		BaseImage: "node:20",
-	}
-
-	// Mock the BuildImage call to succeed
-	mockClient.On("BuildImage", ctx, config).Return(nil)
-
-	err := mockClient.BuildImage(ctx, config)
-
-	assert.NoError(t, err)
-	mockClient.AssertExpectations(t)
-}
-
-// TestBuildImage_WithDockerfile tests building with custom Dockerfile
-func TestBuildImage_WithDockerfile(t *testing.T) {
-	mockClient := new(MockDockerClient)
-	ctx := context.Background()
-
-	// Create a temporary Dockerfile
-	tempDir := t.TempDir()
-	dockerfilePath := filepath.Join(tempDir, "Dockerfile")
-
-	dockerfileContent := `FROM ubuntu:22.04
-RUN apt-get update
-`
-	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	config := BuildConfig{
-		Name:       "test-env",
-		Dockerfile: dockerfilePath,
+		ExtraArgs: []string{"--build-arg=BASE_IMAGE=node:20", "--no-cache"},
 	}
 
 	// Mock the BuildImage call to succeed
@@ -212,18 +178,10 @@ func TestBuildConfig_Variations(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "valid config with name and base image",
+			name: "valid config with name and extra args",
 			config: BuildConfig{
 				Name:      "test-env",
-				BaseImage: "ubuntu:22.04",
-			},
-			wantError: false,
-		},
-		{
-			name: "valid config with name and dockerfile",
-			config: BuildConfig{
-				Name:       "test-env",
-				Dockerfile: "Dockerfile.custom",
+				ExtraArgs: []string{"--build-arg=BASE_IMAGE=ubuntu:22.04"},
 			},
 			wantError: false,
 		},

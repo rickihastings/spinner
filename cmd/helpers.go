@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/rickihastings/spinner/internal/provider"
@@ -14,35 +13,24 @@ import (
 
 // Flag name constants shared across commands.
 const (
-	flagBackend        = "backend"
-	flagName           = "name"
-	flagImage          = "image"
-	flagRepo           = "repo"
-	flagPrompt         = "prompt"
-	flagBranch         = "branch"
-	flagMaxIterations  = "max-iterations"
-	flagRecreate       = "recreate"
-	flagSetup          = "setup"
-	flagWatch          = "watch"
-	flagBaseImage      = "base-image"
-	flagDockerfile     = "dockerfile"
-	flagProject        = "project"
-	flagZone           = "zone"
-	flagMachineType    = "machine-type"
-	flagDiskSize       = "disk-size"
-	flagStateBucket    = "state-bucket"
-	flagBakeScript     = "bake-script"
-	flagServiceAccount = "service-account"
-	flagEnv            = "env"
-	flagEnvFile        = "env-file"
-	flagModel          = "model"
-	flagProviderArgs   = "provider-args"
-)
-
-// GCP default values.
-const (
-	defaultMachineType = "e2-standard-2"
-	defaultDiskSize    = 30
+	flagBackend       = "backend"
+	flagName          = "name"
+	flagImage         = "image"
+	flagRepo          = "repo"
+	flagPrompt        = "prompt"
+	flagBranch        = "branch"
+	flagMaxIterations = "max-iterations"
+	flagRecreate      = "recreate"
+	flagSetup         = "setup"
+	flagWatch         = "watch"
+	flagProject       = "project"
+	flagZone          = "zone"
+	flagStateBucket   = "state-bucket"
+	flagBakeScript    = "bake-script"
+	flagEnv           = "env"
+	flagEnvFile       = "env-file"
+	flagModel         = "model"
+	flagProviderArgs  = "provider-args"
 )
 
 // performSetup runs the shared setup workflow: environment provisioning.
@@ -69,7 +57,7 @@ func isValidGitURL(url string) bool {
 
 // resolveAndValidateBackend resolves the backend from flags/config/env and runs
 // all backend-specific validation in one call. This replaces the repeated sequence
-// of bindGCPFlags + resolveBackend + validateBackendFlags + validateDockerFlags +
+// of bindGCPFlags + resolveBackend + validateBackendFlags +
 // validateRequiredGCPFlags that was duplicated across setup, spin, and watch.
 func resolveAndValidateBackend(cmd *cobra.Command) (string, error) {
 	bindGCPFlags(cmd)
@@ -85,12 +73,6 @@ func resolveAndValidateBackend(cmd *cobra.Command) (string, error) {
 		return "", err
 	}
 
-	if backend == provider.BackendDocker {
-		if err := validateDockerFlags(cmd); err != nil {
-			return "", err
-		}
-	}
-
 	if backend == provider.BackendGCP {
 		if err := validateRequiredGCPFlags(cmd); err != nil {
 			return "", err
@@ -104,18 +86,16 @@ func resolveAndValidateBackend(cmd *cobra.Command) (string, error) {
 	return backend, nil
 }
 
-// buildSetupOptions builds the merged options map for environment setup,
-// combining Docker and GCP options based on the active backend.
+// buildSetupOptions builds the options map for environment setup.
+// For GCP, this includes routing options (project, zone, state-bucket, bake-script).
+// Docker no longer has dedicated setup options — backend-specific tuning is
+// passed via --provider-args.
 func buildSetupOptions(backend string) map[string]string {
-	options := dockerSetupOptions()
-
 	if backend == provider.BackendGCP {
-		for k, v := range gcpOptionsFromViper() {
-			options[k] = v
-		}
+		return gcpRoutingOptions()
 	}
 
-	return options
+	return map[string]string{}
 }
 
 // runSetup executes the full environment setup workflow for any backend.
@@ -132,8 +112,7 @@ func runSetup(ctx context.Context, p provider.Provider, backend, name string, pr
 // the wrong backend. Only explicitly-set CLI flags trigger errors; values
 // from .spinner.json or env vars are silently ignored.
 func validateBackendFlags(cmd *cobra.Command, backend string) error {
-	gcpOnlyFlags := []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket, flagBakeScript, flagServiceAccount}
-	dockerOnlyFlags := []string{flagBaseImage, flagDockerfile}
+	gcpOnlyFlags := []string{flagProject, flagZone, flagStateBucket, flagBakeScript}
 
 	if backend != provider.BackendGCP {
 		for _, f := range gcpOnlyFlags {
@@ -141,46 +120,6 @@ func validateBackendFlags(cmd *cobra.Command, backend string) error {
 				return fmt.Errorf("--%s requires --backend %s", f, provider.BackendGCP)
 			}
 		}
-	}
-
-	if backend != provider.BackendDocker {
-		for _, f := range dockerOnlyFlags {
-			if cmd.Flags().Lookup(f) != nil && cmd.Flags().Changed(f) {
-				return fmt.Errorf("--%s requires --backend %s (or omit --backend)", f, provider.BackendDocker)
-			}
-		}
-	}
-
-	return nil
-}
-
-// validateDockerFlags checks Docker-specific flag constraints.
-// When the command has a --setup flag (e.g. spin), --base-image and --dockerfile
-// require --setup. In all cases, --base-image and --dockerfile are mutually exclusive.
-func validateDockerFlags(cmd *cobra.Command) error {
-	baseImage := viper.GetString(flagBaseImage)
-	dockerfile := viper.GetString(flagDockerfile)
-
-	// If the command has a --setup flag, build flags require it
-	if setupFlag := cmd.Flags().Lookup(flagSetup); setupFlag != nil {
-		setup, _ := cmd.Flags().GetBool(flagSetup)
-
-		for _, f := range []struct{ name, value string }{
-			{flagBaseImage, baseImage},
-			{flagDockerfile, dockerfile},
-		} {
-			if !setup && f.value != "" {
-				fmt.Fprintf(os.Stderr, "Error: --%s requires --%s flag\n", f.name, flagSetup)
-				return fmt.Errorf("--%s requires --%s flag", f.name, flagSetup)
-			}
-		}
-	}
-
-	if baseImage != "" && dockerfile != "" {
-		fmt.Fprintln(os.Stderr, "Error: --base-image and --dockerfile are mutually exclusive")
-		fmt.Fprintln(os.Stderr, "Please provide only one of these flags")
-
-		return fmt.Errorf("mutually exclusive flags provided")
 	}
 
 	return nil
@@ -243,7 +182,7 @@ func validateBakeScriptFlag(cmd *cobra.Command) error {
 }
 
 // gcpFlags is the list of all GCP-specific flag names.
-var gcpFlags = []string{flagProject, flagZone, flagMachineType, flagDiskSize, flagStateBucket, flagBakeScript, flagServiceAccount}
+var gcpFlags = []string{flagProject, flagZone, flagStateBucket, flagBakeScript}
 
 // bindGCPFlags binds all GCP-specific flags on cmd to Viper.
 // Skips flags that don't exist on the command (e.g. watch doesn't have machine-type).
@@ -266,48 +205,6 @@ func gcpRoutingOptions() map[string]string {
 		flagStateBucket: viper.GetString(flagStateBucket),
 		flagBakeScript:  viper.GetString(flagBakeScript),
 	}
-}
-
-// gcpOptionsFromViper reads GCP flags from Viper and returns an options map
-// with defaults applied for machine-type and disk-size.
-func gcpOptionsFromViper() map[string]string {
-	mt := viper.GetString(flagMachineType)
-	if mt == "" {
-		mt = defaultMachineType
-	}
-
-	ds := viper.GetInt(flagDiskSize)
-	if ds == 0 {
-		ds = defaultDiskSize
-	}
-
-	return map[string]string{
-		flagProject:        viper.GetString(flagProject),
-		flagZone:           viper.GetString(flagZone),
-		flagStateBucket:    viper.GetString(flagStateBucket),
-		flagMachineType:    mt,
-		flagDiskSize:       strconv.Itoa(ds),
-		flagBakeScript:     viper.GetString(flagBakeScript),
-		flagServiceAccount: viper.GetString(flagServiceAccount),
-	}
-}
-
-// dockerSetupOptions returns the Docker-specific options for a setup config.
-func dockerSetupOptions() map[string]string {
-	return map[string]string{
-		flagBaseImage:  viper.GetString(flagBaseImage),
-		flagDockerfile: viper.GetString(flagDockerfile),
-	}
-}
-
-// addGCPSetupFlags registers all GCP-specific flags on a command.
-// Used by setup and spin which need the full set of GCP options.
-func addGCPSetupFlags(cmd *cobra.Command) {
-	addGCPQueryFlags(cmd)
-	cmd.Flags().String(flagMachineType, "", "VM machine type (GCP backend, default: e2-standard-2)")
-	cmd.Flags().Int(flagDiskSize, 0, "Boot disk size in GB (GCP backend, default: 30)")
-	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
-	cmd.Flags().String(flagServiceAccount, "", "GCP service account email (GCP backend)")
 }
 
 // addGCPQueryFlags registers the minimal GCP flags needed for querying instances.

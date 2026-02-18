@@ -23,21 +23,16 @@ func NewDockerProvider(client Client) *Provider {
 }
 
 // Setup provisions a named environment by building a Docker image.
-// Options: "base-image" (Docker base image), "dockerfile" (path to custom Dockerfile).
+// ProviderArgs are forwarded as extra arguments to the docker build command.
 func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error {
-	baseImage := config.Options["base-image"]
-	dockerfile := config.Options["dockerfile"]
-
-	if dockerfile != "" {
-		if _, err := os.Stat(dockerfile); os.IsNotExist(err) {
-			return fmt.Errorf("dockerfile not found at path: %s", dockerfile)
-		}
+	// Validate provider args don't conflict with Spinner-managed flags
+	if err := ValidateDockerBuildArgs(config.ProviderArgs); err != nil {
+		return err
 	}
 
 	return p.client.BuildImage(ctx, BuildConfig{
-		Name:       config.Name,
-		BaseImage:  baseImage,
-		Dockerfile: dockerfile,
+		Name:      config.Name,
+		ExtraArgs: config.ProviderArgs,
 	})
 }
 

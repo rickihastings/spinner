@@ -1129,6 +1129,50 @@ func TestBuildDockerRunCommand_ExtraArgs(t *testing.T) {
 	assert.Greater(t, imageIdx, volumeIdx, "image should come after -v /data:/data")
 }
 
+// TestValidateDockerBuildArgs_NoConflicts tests that valid build args pass validation
+func TestValidateDockerBuildArgs_NoConflicts(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"empty args", []string{}},
+		{"build-arg", []string{"--build-arg=BASE_IMAGE=node:20"}},
+		{"no-cache", []string{"--no-cache"}},
+		{"dockerfile override", []string{"-f", "/path/to/Dockerfile"}},
+		{"multiple valid args", []string{"--build-arg=BASE_IMAGE=node:20", "--no-cache", "--progress=plain"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDockerBuildArgs(tt.args)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// TestValidateDockerBuildArgs_WithConflicts tests that managed build flags are rejected
+func TestValidateDockerBuildArgs_WithConflicts(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		errorMsg string
+	}{
+		{"-t flag", []string{"-t", "my-image"}, "-t"},
+		{"--tag flag", []string{"--tag=my-image"}, "--tag"},
+		{"--tag with space", []string{"--tag", "my-image"}, "--tag"},
+		{"mixed valid and invalid", []string{"--no-cache", "-t", "my-image"}, "-t"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDockerBuildArgs(tt.args)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errorMsg)
+			assert.Contains(t, err.Error(), "conflicts with Spinner-managed")
+		})
+	}
+}
+
 // TestBuildDockerRunCommand_NoExtraArgs tests that empty extra args don't affect the command
 func TestBuildDockerRunCommand_NoExtraArgs(t *testing.T) {
 	_ = os.Setenv("GITHUB_TOKEN", "test-token")

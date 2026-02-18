@@ -27,33 +27,12 @@ func TestSetupCommand_MissingNameFlag(t *testing.T) {
 	mockProvider.AssertNotCalled(t, "Setup")
 }
 
-// TestSetupCommand_MutuallyExclusiveFlags tests that --base-image and --dockerfile are mutually exclusive
-func TestSetupCommand_MutuallyExclusiveFlags(t *testing.T) {
-	mockProvider := new(provider.MockProvider)
-	cmd := NewSetupCommand(testFactory(mockProvider))
-
-	b := new(bytes.Buffer)
-	cmd.SetOut(b)
-	cmd.SetErr(b)
-	cmd.SetArgs([]string{
-		"--name", "test-env",
-		"--base-image", "ubuntu:22.04",
-		"--dockerfile", "Dockerfile.custom",
-	})
-
-	err := cmd.Execute()
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "mutually exclusive")
-	mockProvider.AssertNotCalled(t, "Setup")
-}
-
 // TestSetupCommand_NameOnly tests successful setup with only --name flag
 func TestSetupCommand_NameOnly(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
 
 	mockProvider.On("Setup", mock.Anything, mock.MatchedBy(func(cfg provider.SetupConfig) bool {
-		return cfg.Name == "test-env" && cfg.Options["base-image"] == "" && cfg.Options["dockerfile"] == ""
+		return cfg.Name == "test-env" && len(cfg.ProviderArgs) == 0
 	})).Return(nil)
 
 	cmd := NewSetupCommand(testFactory(mockProvider))
@@ -69,12 +48,15 @@ func TestSetupCommand_NameOnly(t *testing.T) {
 	mockProvider.AssertExpectations(t)
 }
 
-// TestSetupCommand_WithBaseImage tests successful setup with --name and --base-image
-func TestSetupCommand_WithBaseImage(t *testing.T) {
+// TestSetupCommand_WithProviderArgs tests setup with --provider-args
+func TestSetupCommand_WithProviderArgs(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
 
 	mockProvider.On("Setup", mock.Anything, mock.MatchedBy(func(cfg provider.SetupConfig) bool {
-		return cfg.Name == "test-env" && cfg.Options["base-image"] == "node:20" && cfg.Options["dockerfile"] == ""
+		return cfg.Name == "test-env" &&
+			len(cfg.ProviderArgs) == 2 &&
+			cfg.ProviderArgs[0] == "--build-arg=BASE_IMAGE=node:20" &&
+			cfg.ProviderArgs[1] == "--no-cache"
 	})).Return(nil)
 
 	cmd := NewSetupCommand(testFactory(mockProvider))
@@ -84,7 +66,8 @@ func TestSetupCommand_WithBaseImage(t *testing.T) {
 	cmd.SetErr(b)
 	cmd.SetArgs([]string{
 		"--name", "test-env",
-		"--base-image", "node:20",
+		"--provider-args", "--build-arg=BASE_IMAGE=node:20",
+		"--provider-args", "--no-cache",
 	})
 
 	err := cmd.Execute()
@@ -93,46 +76,8 @@ func TestSetupCommand_WithBaseImage(t *testing.T) {
 	mockProvider.AssertExpectations(t)
 }
 
-// TestSetupCommand_WithDockerfile tests successful setup with --name and --dockerfile
-func TestSetupCommand_WithDockerfile(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "Dockerfile.*")
-	assert.NoError(t, err)
-
-	defer func() { _ = os.Remove(tmpfile.Name()) }()
-
-	_ = tmpfile.Close()
-
-	mockProvider := new(provider.MockProvider)
-
-	mockProvider.On("Setup", mock.Anything, mock.MatchedBy(func(cfg provider.SetupConfig) bool {
-		return cfg.Name == "test-env" && cfg.Options["base-image"] == "" && cfg.Options["dockerfile"] == tmpfile.Name()
-	})).Return(nil)
-
-	cmd := NewSetupCommand(testFactory(mockProvider))
-
-	b := new(bytes.Buffer)
-	cmd.SetOut(b)
-	cmd.SetErr(b)
-	cmd.SetArgs([]string{
-		"--name", "test-env",
-		"--dockerfile", tmpfile.Name(),
-	})
-
-	err = cmd.Execute()
-
-	assert.NoError(t, err)
-	mockProvider.AssertExpectations(t)
-}
-
 // TestSetupCommand_FlagCombinations is a table-driven test for various flag combinations
 func TestSetupCommand_FlagCombinations(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "Dockerfile.*")
-	assert.NoError(t, err)
-
-	defer func() { _ = os.Remove(tmpfile.Name()) }()
-
-	_ = tmpfile.Close()
-
 	tests := []struct {
 		name        string
 		args        []string
@@ -156,27 +101,12 @@ func TestSetupCommand_FlagCombinations(t *testing.T) {
 			},
 		},
 		{
-			name:      "name with base-image (valid)",
-			args:      []string{"--name", "test", "--base-image", "ubuntu:22.04"},
+			name:      "name with provider-args (valid)",
+			args:      []string{"--name", "test", "--provider-args", "--build-arg=BASE_IMAGE=ubuntu:22.04"},
 			wantError: false,
 			mockSetup: func(m *provider.MockProvider) {
 				m.On("Setup", mock.Anything, mock.Anything).Return(nil)
 			},
-		},
-		{
-			name:      "name with dockerfile (valid)",
-			args:      []string{"--name", "test", "--dockerfile", tmpfile.Name()},
-			wantError: false,
-			mockSetup: func(m *provider.MockProvider) {
-				m.On("Setup", mock.Anything, mock.Anything).Return(nil)
-			},
-		},
-		{
-			name:        "mutually exclusive flags",
-			args:        []string{"--name", "test", "--base-image", "ubuntu:22.04", "--dockerfile", tmpfile.Name()},
-			wantError:   true,
-			errorString: "mutually exclusive",
-			mockSetup:   func(m *provider.MockProvider) {},
 		},
 	}
 
@@ -223,16 +153,6 @@ func TestSetupCommand_GCPFlagsWithDockerBackend(t *testing.T) {
 			name:     "zone flag with docker backend",
 			args:     []string{"--name", "test", "--zone", "us-central1-a"},
 			errorMsg: "--zone requires --backend gcp",
-		},
-		{
-			name:     "machine-type flag with docker backend",
-			args:     []string{"--name", "test", "--machine-type", "e2-standard-4"},
-			errorMsg: "--machine-type requires --backend gcp",
-		},
-		{
-			name:     "disk-size flag with docker backend",
-			args:     []string{"--name", "test", "--disk-size", "50"},
-			errorMsg: "--disk-size requires --backend gcp",
 		},
 		{
 			name:     "state-bucket flag with docker backend",
@@ -355,57 +275,6 @@ func TestSetupCommand_DockerBackendExplicit(t *testing.T) {
 
 	assert.NoError(t, err)
 	mockProvider.AssertExpectations(t)
-}
-
-// TestSetupCommand_DockerFlagsWithGCPBackend tests that Docker flags error with GCP backend
-func TestSetupCommand_DockerFlagsWithGCPBackend(t *testing.T) {
-	tests := []struct {
-		name     string
-		args     []string
-		errorMsg string
-	}{
-		{
-			name: "base-image flag with GCP backend",
-			args: []string{
-				"--name", "test",
-				"--backend", "gcp",
-				"--project", "p",
-				"--zone", "z",
-				"--state-bucket", "b",
-				"--base-image", "ubuntu:22.04",
-			},
-			errorMsg: "--base-image requires --backend docker",
-		},
-		{
-			name: "dockerfile flag with GCP backend",
-			args: []string{
-				"--name", "test",
-				"--backend", "gcp",
-				"--project", "p",
-				"--zone", "z",
-				"--state-bucket", "b",
-				"--dockerfile", "/tmp/Dockerfile",
-			},
-			errorMsg: "--dockerfile requires --backend docker",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockProvider := new(provider.MockProvider)
-			cmd := NewSetupCommand(testGCPFactory(mockProvider))
-
-			b := new(bytes.Buffer)
-			cmd.SetOut(b)
-			cmd.SetErr(b)
-			cmd.SetArgs(tt.args)
-
-			err := cmd.Execute()
-
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tt.errorMsg)
-		})
-	}
 }
 
 // TestSetupCommand_MissingRequiredGCPFlags tests that required GCP flags produce errors

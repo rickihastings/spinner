@@ -12,15 +12,15 @@
 - [x] 1.8 Add unit tests for flag parsing, conflict detection, and Docker run arg injection
 - [x] 1.9 Build and verify (`go build`, `go test ./...`)
 
-## 2.0 Setup command support and Docker build integration
+## 2.0 Setup command support and Docker build integration ✅
 
-- [ ] 2.1 Add `--provider-args` flag to `cmd/setup.go`, bind to Viper
-- [ ] 2.2 Remove backend-specific flags from setup: `--base-image`, `--dockerfile`, `--machine-type`, `--disk-size`
-- [ ] 2.3 Add `ExtraArgs []string` to `docker.BuildConfig` and forward in `docker_provider.go`
-- [ ] 2.4 Inject extra args into `docker build` command (before context directory)
-- [ ] 2.5 Implement Docker managed-flag conflict detection for `docker build` args
-- [ ] 2.6 Add unit tests for setup flag parsing and build arg injection
-- [ ] 2.7 Build and verify
+- [x] 2.1 Add `--provider-args` flag to `cmd/setup.go`, bind to Viper
+- [x] 2.2 Remove backend-specific flags from setup: `--base-image`, `--dockerfile`, `--machine-type`, `--disk-size`
+- [x] 2.3 Add `ExtraArgs []string` to `docker.BuildConfig` and forward in `docker_provider.go`
+- [x] 2.4 Inject extra args into `docker build` command (before context directory)
+- [x] 2.5 Implement Docker managed-flag conflict detection for `docker build` args
+- [x] 2.6 Add unit tests for setup flag parsing and build arg injection
+- [x] 2.7 Build and verify
 
 ## 3.0 GCP backend support
 

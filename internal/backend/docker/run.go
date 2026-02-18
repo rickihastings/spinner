@@ -231,6 +231,33 @@ func ValidateDockerRunArgs(args []string) error {
 	return nil
 }
 
+// dockerManagedBuildFlags lists flags that Spinner manages in docker build commands.
+// Provider args that conflict with these are rejected to avoid breaking Spinner's
+// internal wiring.
+var dockerManagedBuildFlags = []string{
+	"-t", "--tag",
+}
+
+// ValidateDockerBuildArgs checks that provider args don't conflict with
+// Spinner-managed docker build flags. Returns an error listing all conflicts.
+func ValidateDockerBuildArgs(args []string) error {
+	var conflicts []string
+
+	for _, arg := range args {
+		for _, managed := range dockerManagedBuildFlags {
+			if arg == managed || strings.HasPrefix(arg, managed+"=") {
+				conflicts = append(conflicts, arg)
+			}
+		}
+	}
+
+	if len(conflicts) > 0 {
+		return fmt.Errorf("--provider-args conflicts with Spinner-managed docker build flags: %s", strings.Join(conflicts, ", "))
+	}
+
+	return nil
+}
+
 // gitConfigValue reads a git config value from the host machine.
 // Returns empty string if the value is not set or git is not available.
 func gitConfigValue(key string) string {
