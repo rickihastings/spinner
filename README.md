@@ -82,78 +82,56 @@ export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
 ./dist/spinner spin \
   --image default \
   --repo https://github.com/your-org/your-repo \
-  --prompt "implement the feature described in TASKS.md"
+  --prompt "$(cat prompt.md)"
 ```
 
 The agent will clone the repo, start working, and continue until it signals completion or hits the iteration limit.
 
 ## Writing Effective Prompts
 
-**Spec-driven development works best.** Point the agent at a specification file, design doc, or task list in your repo:
+The prompt isn't a one-shot instruction — it's the agent's persistent memory. The agent reads it at the start of
+every iteration, so design it as a living document the agent updates as it works.
 
-```bash
---prompt "implement the changes described in specs/feature-x.md"
-```
+**A static one-liner won't complete cleanly.** The agent must emit `~~ FEATURE_COMPLETED ~~` on its own line for
+Spinner to detect success. Without a structured prompt that includes a completion step, the agent may keep iterating
+indefinitely or exit with an error.
 
-**Task lists are also effective.** If you don't have a spec, a clear task list in your prompt works well:
-
-```bash
---prompt "1. Add user authentication 2. Create login page 3. Add session management 4. Write tests"
-```
-
-The more context you provide upfront, the better the agent performs autonomously.
-
-## Optimizing Agent Performance
-
-### Minimize Context Window Bloat
-
-Long-running agents accumulate context, leading to degraded performance and hallucinations. Structure your tasks to keep
-context windows fresh:
-
-**Work in vertical slices.** Instruct your agent to complete tasks one at a time:
-
-```
-For each task:
-1. Implement the change
-2. Add tests
-3. Run formatting and linting
-4. Verify tests pass
-5. Commit
-6. Move to next task
-```
-
-This pattern keeps each unit of work small and verifiable.
-
-### Use Back Pressure for Correctness
-
-Configure your project with automated checks that run on each iteration:
-
-- **Formatting** (prettier, gofmt, black)
-- **Linting** (eslint, golangci-lint, ruff)
-- **Type checking** (tsc, mypy)
-- **Tests** (unit → integration → e2e)
-
-When these checks fail, the agent must fix issues before proceeding. This "back pressure" forces correctness and
-naturally segments work into smaller context windows.
-
-Spinner automatically pushes changes after each iteration, so progress is preserved even if the agent needs to restart
-with a fresh context. The iteration loop is implemented in Go, providing robust state management, JSON parsing, and
-error handling for long-running autonomous tasks.
-
-### Example Task Structure
+**The recommended pattern is a task list committed to the repo:**
 
 ```markdown
+# Feature: Add user authentication
+
 ## Tasks
+- [x] Scaffold the login route and handler
+- [ ] Write unit tests for the auth module
+- [ ] Update the README with setup instructions
+- [ ] Emit ~~ FEATURE_COMPLETED ~~ when all tasks are done
 
-Work through each task individually. After completing each one, run the
-test suite, fix any failures, then commit before moving to the next task.
-
-1. Add user model with email validation
-2. Create registration endpoint
-3. Add login endpoint with JWT tokens
-4. Implement session middleware
-5. Add integration tests for auth flow
+## Notes
+- Use the existing `db` package for queries
 ```
+
+```bash
+./dist/spinner spin \
+  --image default \
+  --repo https://github.com/your-org/your-repo \
+  --prompt "$(cat prompt.md)"
+```
+
+Each iteration the agent picks the next unchecked task, does the work, marks it done, commits, and pushes. The file
+is the source of truth — if the run is interrupted, the next iteration picks up where it left off.
+
+**For one-shot tasks** that don't need looping, use `--max-iterations 1`:
+
+```bash
+./dist/spinner spin \
+  --image default \
+  --repo https://github.com/your-org/your-repo \
+  --prompt "run the test suite and save output to test-results.txt" \
+  --max-iterations 1
+```
+
+For the full guide see [docs/usage.md — Writing Effective Prompts](docs/usage.md#writing-effective-prompts).
 
 ## Command Reference
 
