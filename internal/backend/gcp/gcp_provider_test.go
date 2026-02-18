@@ -477,7 +477,7 @@ func TestProviderStartWithoutModelDoesNotUpdateMetadata(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestProviderCreateWithCustomOptions(t *testing.T) {
+func TestProviderCreateWithProviderArgs(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)
 
@@ -485,10 +485,11 @@ func TestProviderCreateWithCustomOptions(t *testing.T) {
 	mockClient.On("GetImage", mock.Anything, "test-project", "my-env").
 		Return(&GCPImage{Name: "my-env"}, nil)
 
-	// CreateInstance with custom machine type and disk size
+	// CreateInstance with extra args forwarded
 	mockClient.On("CreateInstance", mock.Anything, mock.MatchedBy(func(config instanceConfig) bool {
-		return config.MachineType == "n2-standard-4" &&
-			config.DiskSizeGB == 50
+		return len(config.ExtraArgs) == 2 &&
+			config.ExtraArgs[0] == "--machine-type=n2-standard-4" &&
+			config.ExtraArgs[1] == "--boot-disk-size=50GB"
 	})).Return(nil)
 
 	config := provider.CreateConfig{
@@ -497,16 +498,52 @@ func TestProviderCreateWithCustomOptions(t *testing.T) {
 		Branch:        "feature",
 		MaxIterations: "50",
 		Options: map[string]string{
-			"image":        "my-env",
-			"machine-type": "n2-standard-4",
-			"disk-size":    "50",
+			"image": "my-env",
 		},
+		ProviderArgs: []string{"--machine-type=n2-standard-4", "--boot-disk-size=50GB"},
 	}
 
 	instance, err := p.Create(context.Background(), config)
 	assert.NoError(t, err)
 	assert.NotNil(t, instance)
 	mockClient.AssertExpectations(t)
+}
+
+func TestProviderCreateRejectsConflictingArgs(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	config := provider.CreateConfig{
+		Repo:   "https://github.com/user/repo.git",
+		Prompt: "Fix the bug",
+		Options: map[string]string{
+			"image": "my-env",
+		},
+		ProviderArgs: []string{"--project=other-project"},
+	}
+
+	instance, err := p.Create(context.Background(), config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "conflicts with Spinner-managed")
+	assert.Nil(t, instance)
+}
+
+func TestProviderSetupRejectsConflictingArgs(t *testing.T) {
+	mockClient := &MockGCPClient{}
+	p := newTestProvider(mockClient)
+
+	config := provider.SetupConfig{
+		Name: "test-env",
+		Options: map[string]string{
+			"project": "test-project",
+			"zone":    "us-central1-a",
+		},
+		ProviderArgs: []string{"--labels=custom=true"},
+	}
+
+	err := p.Setup(context.Background(), config)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "conflicts with Spinner-managed")
 }
 
 func TestProviderCreateNoBucket(t *testing.T) {

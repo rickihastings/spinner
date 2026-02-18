@@ -43,6 +43,10 @@ func TestRunGcloudJSON_UnmarshalSuccess(t *testing.T) {
 	// Test that runGcloudJSON can unmarshal valid JSON.
 	// Use gcloud version which outputs plain text (not JSON), so this will
 	// test the unmarshal error path.
+	if err := checkGcloudInstalled(); err != nil {
+		t.Skip("gcloud not installed, skipping test")
+	}
+
 	ctx := context.Background()
 
 	var result interface{}

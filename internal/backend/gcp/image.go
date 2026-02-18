@@ -42,6 +42,10 @@ type bakeConfig struct {
 
 	// ServiceAccount is the service account email for the bake VM (optional, uses default).
 	ServiceAccount string
+
+	// ExtraArgs holds raw pass-through arguments appended to the gcloud
+	// compute instances create command for the bake VM.
+	ExtraArgs []string
 }
 
 const (
@@ -117,6 +121,7 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 			"https://www.googleapis.com/auth/devstorage.read_only",
 			"https://www.googleapis.com/auth/logging.write",
 		},
+		ExtraArgs: config.ExtraArgs,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create bake VM: %w", err)

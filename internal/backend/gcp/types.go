@@ -46,6 +46,10 @@ type instanceConfig struct {
 
 	// Scopes is the list of OAuth scopes for the service account.
 	Scopes []string
+
+	// ExtraArgs holds raw pass-through arguments appended to the gcloud
+	// compute instances create command.
+	ExtraArgs []string
 }
 
 // imageConfig holds configuration for creating a GCP Compute Engine image.

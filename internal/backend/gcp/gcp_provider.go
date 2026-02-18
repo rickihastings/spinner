@@ -15,6 +15,16 @@ import (
 	"github.com/rickihastings/spinner/internal/util"
 )
 
+const (
+	// defaultMachineType is the default GCP machine type for instances.
+	// Users can override via --provider-args="--machine-type=n2-standard-4".
+	defaultMachineType = "e2-standard-2"
+
+	// defaultDiskSizeGB is the default boot disk size in GB.
+	// Users can override via --provider-args="--boot-disk-size=50GB".
+	defaultDiskSizeGB int64 = 30
+)
+
 // Provider implements provider.Provider using GCP Compute Engine VMs as the backend.
 type Provider struct {
 	client  Client
@@ -34,23 +44,15 @@ func NewGCPProvider(client Client, project, zone, bucket string) *Provider {
 }
 
 // Setup provisions a named environment by baking a GCP Compute Engine image.
-// Options: "project", "zone", "machine-type", "disk-size", "state-bucket", "bake-script".
+// Options: "project", "zone", "state-bucket", "bake-script".
+// ProviderArgs are forwarded to gcloud compute instances create for the bake VM.
 func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error {
 	project := config.Options["project"]
 	zone := config.Options["zone"]
 
-	machineType := config.Options["machine-type"]
-	if machineType == "" {
-		machineType = "e2-standard-2"
-	}
-
-	var diskSizeGB int64 = 30
-
-	if ds := config.Options["disk-size"]; ds != "" {
-		parsed, err := strconv.ParseInt(ds, 10, 64)
-		if err == nil && parsed > 0 {
-			diskSizeGB = parsed
-		}
+	// Validate provider args don't conflict with Spinner-managed flags
+	if err := ValidateGCPInstanceArgs(config.ProviderArgs); err != nil {
+		return err
 	}
 
 	// Check if image already exists
@@ -113,19 +115,19 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 	configHash := os.Getenv("SPINNER_CONFIG_HASH")
 
 	return bakeImage(ctx, p.client, bakeConfig{
-		ImageName:      config.Name,
-		Project:        project,
-		Zone:           zone,
-		MachineType:    machineType,
-		DiskSizeGB:     diskSizeGB,
-		StartupScript:  bakeScript,
-		StateBucket:    stateBucket,
-		ConfigHash:     configHash,
-		ServiceAccount: config.Options["service-account"],
+		ImageName:     config.Name,
+		Project:       project,
+		Zone:          zone,
+		MachineType:   defaultMachineType,
+		DiskSizeGB:    defaultDiskSizeGB,
+		StartupScript: bakeScript,
+		StateBucket:   stateBucket,
+		ConfigHash:    configHash,
 		ExtraMetadata: map[string]string{
 			"startup-script-runtime": startupScript,
 			"spinner-install-script": installScript,
 		},
+		ExtraArgs: config.ProviderArgs,
 	})
 }
 
@@ -137,8 +139,13 @@ func (p *Provider) InstanceName(config provider.CreateConfig) string {
 }
 
 // Create creates and starts a new VM instance from a baked image.
-// Options: "image", "project", "zone", "machine-type", "disk-size", "state-bucket".
+// Options: "image". ProviderArgs are forwarded to gcloud compute instances create.
 func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*provider.Instance, error) {
+	// Validate provider args don't conflict with Spinner-managed flags
+	if err := ValidateGCPInstanceArgs(config.ProviderArgs); err != nil {
+		return nil, err
+	}
+
 	image := config.Options["image"]
 	name := p.InstanceName(config)
 
@@ -150,20 +157,6 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 
 	// Load runtime startup script
 	runtimeScript := loadRuntimeScript()
-
-	machineType := config.Options["machine-type"]
-	if machineType == "" {
-		machineType = "e2-standard-2"
-	}
-
-	var diskSizeGB int64 = 30
-
-	if ds := config.Options["disk-size"]; ds != "" {
-		parsed, parseErr := strconv.ParseInt(ds, 10, 64)
-		if parseErr == nil && parsed > 0 {
-			diskSizeGB = parsed
-		}
-	}
 
 	maxIterations := config.MaxIterations
 	if maxIterations == "" {
@@ -211,22 +204,22 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	}
 
 	err = p.client.CreateInstance(ctx, instanceConfig{
-		Name:           name,
-		Project:        p.project,
-		Zone:           p.zone,
-		MachineType:    machineType,
-		ImageProject:   p.project,
-		ImageName:      image,
-		DiskSizeGB:     diskSizeGB,
-		Network:        "default",
-		ExternalIP:     true,
-		Metadata:       metadata,
-		Labels:         labels,
-		ServiceAccount: config.Options["service-account"],
+		Name:         name,
+		Project:      p.project,
+		Zone:         p.zone,
+		MachineType:  defaultMachineType,
+		ImageProject: p.project,
+		ImageName:    image,
+		DiskSizeGB:   defaultDiskSizeGB,
+		Network:      "default",
+		ExternalIP:   true,
+		Metadata:     metadata,
+		Labels:       labels,
 		Scopes: []string{
 			"https://www.googleapis.com/auth/devstorage.read_write",
 			"https://www.googleapis.com/auth/logging.write",
 		},
+		ExtraArgs: config.ProviderArgs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create instance: %w", err)

@@ -22,15 +22,15 @@
 - [x] 2.6 Add unit tests for setup flag parsing and build arg injection
 - [x] 2.7 Build and verify
 
-## 3.0 GCP backend support
+## 3.0 GCP backend support ✅
 
-- [ ] 3.1 Forward `ProviderArgs` in GCP provider's `Create` method to instance creation
-- [ ] 3.2 Forward `ProviderArgs` in GCP provider's `Setup` method to image bake
-- [ ] 3.3 Clean up GCP provider code that read removed flags from `Options`
-- [ ] 3.4 Append extra args to `gcloud compute instances create` commands
-- [ ] 3.5 Implement GCP managed-flag conflict detection
-- [ ] 3.6 Add unit tests for GCP arg forwarding and conflict detection
-- [ ] 3.7 Build and verify
+- [x] 3.1 Forward `ProviderArgs` in GCP provider's `Create` method to instance creation
+- [x] 3.2 Forward `ProviderArgs` in GCP provider's `Setup` method to image bake
+- [x] 3.3 Clean up GCP provider code that read removed flags from `Options`
+- [x] 3.4 Append extra args to `gcloud compute instances create` commands
+- [x] 3.5 Implement GCP managed-flag conflict detection
+- [x] 3.6 Add unit tests for GCP arg forwarding and conflict detection
+- [x] 3.7 Build and verify
 
 ## 4.0 Help text and documentation
 

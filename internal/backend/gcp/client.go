@@ -140,6 +140,9 @@ func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfi
 		}
 	}
 
+	// Append provider pass-through args (e.g. --machine-type, --accelerator)
+	args = append(args, config.ExtraArgs...)
+
 	_, err := runGcloud(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("failed to create instance: %w", err)
