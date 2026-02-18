@@ -57,9 +57,11 @@ type ContainerMetrics struct {
 // SetupConfig holds configuration for provisioning a named environment.
 // Name is universal. Options carries backend-specific keys: e.g. "base-image"
 // and "dockerfile" for Docker, "machine-type" and "zone" for GCP.
+// ProviderArgs carries raw pass-through arguments for the backend.
 type SetupConfig struct {
-	Name    string
-	Options map[string]string
+	Name         string
+	Options      map[string]string
+	ProviderArgs []string
 }
 
 // CreateConfig holds configuration for creating an instance from a provisioned
@@ -68,6 +70,7 @@ type SetupConfig struct {
 // backend-specific keys: e.g. "image" for Docker. EnvVars carries custom
 // environment variables from the --env flag. EnvFile carries the path to
 // an env file from the --env-file flag (passed through as-is to backends).
+// ProviderArgs carries raw pass-through arguments for the backend.
 type CreateConfig struct {
 	Repo          string
 	Prompt        string
@@ -77,6 +80,7 @@ type CreateConfig struct {
 	Options       map[string]string
 	EnvVars       map[string]string
 	EnvFile       string
+	ProviderArgs  []string
 }
 
 // Instance represents an execution environment instance.

@@ -74,7 +74,7 @@ EXAMPLES:
 				return err
 			}
 
-			return runSetup(context.Background(), p, backend, setupName)
+			return runSetup(context.Background(), p, backend, setupName, nil)
 		},
 	}
 

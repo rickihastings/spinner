@@ -35,6 +35,7 @@ func NewSpinCommand(f *provider.Factory) *cobra.Command {
 		spinWatch         bool
 		spinEnvVars       []string
 		spinEnvFile       string
+		spinProviderArgs  []string
 	)
 
 	cmd := &cobra.Command{
@@ -54,38 +55,40 @@ GENERAL FLAGS:
   --backend <backend>        Backend provider: docker, gcp (default: docker)
   --env <KEY=VALUE>          Custom environment variables (repeatable)
   --env-file <path>          Path to env file to pass to instance (optional)
+  --provider-args <arg>      Extra arguments passed directly to the backend (repeatable)
 
 SETUP OPTIONS (use with --setup flag):
   --setup                    Build/rebuild the environment before spinning (optional)
-  --base-image <image>       Base Docker image (Docker backend, requires --setup)
-  --dockerfile <path>        Path to custom Dockerfile (Docker backend, requires --setup)
 
 GCP BACKEND FLAGS:
   --project <project>        GCP project ID (required for GCP)
   --zone <zone>              GCP zone (required for GCP)
-  --machine-type <type>      VM machine type (default: e2-standard-2)
-  --disk-size <gb>           Boot disk size in GB (default: 30)
   --state-bucket <bucket>    GCS bucket for state persistence (required for GCP)
   --bake-script <path>       Path to custom bake script run during image creation (GCP backend, requires --setup)
-  --service-account <email>  GCP service account email (default: Compute Engine default SA)
 
 EXAMPLES:
   # Docker (default)
   spinner spin --image spinner:my-env --repo https://github.com/octocat/Hello-World.git
   spinner spin --setup --image my-env --repo https://github.com/octocat/Hello-World.git --prompt "Fix the bug"
 
+  # Docker with provider args
+  spinner spin --image spinner:my-env --repo https://github.com/octocat/Hello-World.git \
+    --provider-args="-v /data:/data" --provider-args="--network=host"
+
   # GCP
   spinner spin --backend gcp --image my-env --repo https://github.com/octocat/Hello-World.git \
     --project my-proj --zone us-central1-a --state-bucket my-bucket --prompt "Fix the bug"
 
-  # With .spinner.json config, GCP flags can be omitted:
-  spinner spin --image my-env --repo https://github.com/octocat/Hello-World.git --prompt "Fix the bug"`,
+  # GCP with provider args
+  spinner spin --backend gcp --image my-env --repo https://github.com/octocat/Hello-World.git \
+    --project my-proj --zone us-central1-a --state-bucket my-bucket \
+    --provider-args="--machine-type=e2-standard-4" --provider-args="--disk-size-gb=50"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind general flags to Viper
 			bindFlags(cmd,
 				flagImage, flagRepo, flagPrompt, flagBranch,
 				flagMaxIterations, flagModel, flagRecreate,
-				flagSetup, flagBaseImage, flagDockerfile, flagWatch,
+				flagSetup, flagWatch,
 			)
 
 			// Resolve and validate backend
@@ -138,11 +141,14 @@ EXAMPLES:
 
 			ctx := context.Background()
 
+			// Merge provider args: config file provides base args, CLI appends on top.
+			providerArgs := mergeProviderArgs(spinProviderArgs)
+
 			// If --setup is provided, provision the environment first
 			if spinSetup {
 				setupName := strings.TrimPrefix(spinImage, "spinner:")
 
-				if err := runSetup(ctx, p, backend, setupName); err != nil {
+				if err := runSetup(ctx, p, backend, setupName, providerArgs); err != nil {
 					return err
 				}
 
@@ -169,7 +175,7 @@ EXAMPLES:
 			createOptions := map[string]string{flagImage: spinImage}
 
 			if backend == provider.BackendGCP {
-				for k, v := range gcpOptionsFromViper() {
+				for k, v := range gcpRoutingOptions() {
 					createOptions[k] = v
 				}
 			}
@@ -186,6 +192,7 @@ EXAMPLES:
 				Options:       createOptions,
 				EnvVars:       envVars,
 				EnvFile:       spinEnvFile,
+				ProviderArgs:  providerArgs,
 			}
 
 			name := p.InstanceName(createConfig)
@@ -295,13 +302,12 @@ EXAMPLES:
 	cmd.Flags().BoolVar(&spinWatch, flagWatch, false, "Enter watch mode after instance is ready (optional)")
 	cmd.Flags().StringSliceVar(&spinEnvVars, flagEnv, []string{}, "Custom environment variables (KEY=VALUE, repeatable)")
 	cmd.Flags().StringVar(&spinEnvFile, flagEnvFile, "", "Path to env file to pass to instance (optional)")
+	cmd.Flags().StringSliceVar(&spinProviderArgs, flagProviderArgs, []string{}, "Extra arguments passed directly to the backend (repeatable)")
 
-	// Docker backend flags
-	cmd.Flags().String(flagBaseImage, "", "Base Docker image (Docker backend, requires --setup)")
-	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile (Docker backend, requires --setup)")
-
-	// GCP backend flags
-	addGCPSetupFlags(cmd)
+	// GCP backend flags (routing + bake-script only; machine-type, disk-size, service-account
+	// are now passed via --provider-args)
+	addGCPQueryFlags(cmd)
+	cmd.Flags().String(flagBakeScript, "", "Path to custom bake script run during image creation (GCP backend)")
 
 	return cmd
 }

@@ -1036,3 +1036,120 @@ func TestGitConfigValue_InvalidKey(t *testing.T) {
 	result := gitConfigValue("nonexistent.key.that.doesnt.exist")
 	assert.Empty(t, result, "should return empty for non-existent git config key")
 }
+
+// TestValidateDockerRunArgs_NoConflicts tests that valid args pass validation
+func TestValidateDockerRunArgs_NoConflicts(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"empty args", []string{}},
+		{"volume mount", []string{"-v", "/data:/data"}},
+		{"network flag", []string{"--network=host"}},
+		{"privileged", []string{"--privileged"}},
+		{"multiple valid args", []string{"-v", "/data:/data", "--network=host", "--privileged"}},
+		{"memory limit", []string{"--memory=2g"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDockerRunArgs(tt.args)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// TestValidateDockerRunArgs_WithConflicts tests that managed flags are rejected
+func TestValidateDockerRunArgs_WithConflicts(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		errorMsg string
+	}{
+		{"--name flag", []string{"--name=my-container"}, "--name"},
+		{"--name with space", []string{"--name", "my-container"}, "--name"},
+		{"-d flag", []string{"-d"}, "-d"},
+		{"--detach flag", []string{"--detach"}, "--detach"},
+		{"--label flag", []string{"--label=foo=bar"}, "--label"},
+		{"--env-file flag", []string{"--env-file=/path/to/env"}, "--env-file"},
+		{"mixed valid and invalid", []string{"-v", "/data:/data", "--name=test"}, "--name"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDockerRunArgs(tt.args)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errorMsg)
+			assert.Contains(t, err.Error(), "conflicts with Spinner-managed")
+		})
+	}
+}
+
+// TestBuildDockerRunCommand_ExtraArgs tests that extra args are injected before the image
+func TestBuildDockerRunCommand_ExtraArgs(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image:     "spinner:test",
+		Repo:      "https://github.com/user/repo.git",
+		ExtraArgs: []string{"-v", "/data:/data", "--network=host"},
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	// Verify the image is the last argument
+	assert.Equal(t, "spinner:test", args[len(args)-1], "image should be the last argument")
+
+	// Verify extra args appear before the image
+	imageIdx := -1
+	networkIdx := -1
+	volumeIdx := -1
+
+	for i, arg := range args {
+		switch {
+		case arg == "spinner:test":
+			imageIdx = i
+		case arg == "--network=host":
+			networkIdx = i
+		case arg == "-v" && i+1 < len(args) && args[i+1] == "/data:/data":
+			volumeIdx = i
+		}
+	}
+
+	assert.Greater(t, imageIdx, networkIdx, "image should come after --network=host")
+	assert.Greater(t, imageIdx, volumeIdx, "image should come after -v /data:/data")
+}
+
+// TestBuildDockerRunCommand_NoExtraArgs tests that empty extra args don't affect the command
+func TestBuildDockerRunCommand_NoExtraArgs(t *testing.T) {
+	_ = os.Setenv("GITHUB_TOKEN", "test-token")
+	_ = os.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
+
+	defer func() {
+		_ = os.Unsetenv("GITHUB_TOKEN")
+		_ = os.Unsetenv("CLAUDE_CODE_OAUTH_TOKEN")
+	}()
+
+	config := spinConfig{
+		Image:     "spinner:test",
+		Repo:      "https://github.com/user/repo.git",
+		ExtraArgs: nil,
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	assert.NoError(t, err)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	// Verify the image is still the last argument
+	assert.Equal(t, "spinner:test", args[len(args)-1], "image should be the last argument")
+}

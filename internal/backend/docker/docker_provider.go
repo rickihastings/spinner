@@ -68,6 +68,11 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 
 	hasNpmrc := p.detectNpmrc()
 
+	// Validate provider args don't conflict with Spinner-managed flags
+	if err := ValidateDockerRunArgs(config.ProviderArgs); err != nil {
+		return nil, err
+	}
+
 	sc := spinConfig{
 		Image:         image,
 		Repo:          config.Repo,
@@ -77,6 +82,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		Model:         config.Model,
 		EnvVars:       config.EnvVars,
 		EnvFile:       config.EnvFile,
+		ExtraArgs:     config.ProviderArgs,
 	}
 
 	args, tmpFile, err := buildDockerRunCommand(sc, containerName, hasNpmrc)

@@ -137,42 +137,41 @@ func TestSpinCommand_SetupFlagParsing(t *testing.T) {
 	mockProvider.AssertCalled(t, "Setup", mock.Anything, mock.Anything)
 }
 
-// TestSpinCommand_SetupWithBaseImageValidation tests that --base-image requires --setup flag
-func TestSpinCommand_SetupWithBaseImageValidation(t *testing.T) {
-	mockProvider := new(provider.MockProvider)
-	cmd := NewSpinCommand(testFactory(mockProvider))
-
-	b := new(bytes.Buffer)
-	cmd.SetOut(b)
-	cmd.SetErr(b)
-	cmd.SetArgs([]string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--base-image", "ubuntu:22.04"})
-
-	err := cmd.Execute()
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "--base-image requires --setup flag")
-}
-
-// TestSpinCommand_SetupMutuallyExclusiveFlags tests that --base-image and --dockerfile are mutually exclusive with --setup
-func TestSpinCommand_SetupMutuallyExclusiveFlags(t *testing.T) {
-	mockProvider := new(provider.MockProvider)
-	cmd := NewSpinCommand(testFactory(mockProvider))
+// TestSpinCommand_ProviderArgsFlagParsing tests that --provider-args flag is correctly parsed
+func TestSpinCommand_ProviderArgsFlagParsing(t *testing.T) {
+	cmd := setupSpinCommandWithMocks(t)
 
 	b := new(bytes.Buffer)
 	cmd.SetOut(b)
 	cmd.SetErr(b)
 	cmd.SetArgs([]string{
-		"--setup",
-		"--image", "test",
+		"--image", "spinner:test",
 		"--repo", "https://github.com/test/repo.git",
-		"--base-image", "ubuntu:22.04",
-		"--dockerfile", "Dockerfile.custom",
+		"--provider-args", "-v /data:/data",
+		"--provider-args", "--network=host",
 	})
 
 	err := cmd.Execute()
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "mutually exclusive")
+	assert.NoError(t, err)
+}
+
+// TestSpinCommand_ProviderArgsSingleFlag tests --provider-args with a single arg
+func TestSpinCommand_ProviderArgsSingleFlag(t *testing.T) {
+	cmd := setupSpinCommandWithMocks(t)
+
+	b := new(bytes.Buffer)
+	cmd.SetOut(b)
+	cmd.SetErr(b)
+	cmd.SetArgs([]string{
+		"--image", "spinner:test",
+		"--repo", "https://github.com/test/repo.git",
+		"--provider-args", "--privileged",
+	})
+
+	err := cmd.Execute()
+
+	assert.NoError(t, err)
 }
 
 // TestSpinCommand_InvalidRepoURL tests that an invalid repo URL is rejected
@@ -213,30 +212,6 @@ func TestSpinCommand_FlagCombinations(t *testing.T) {
 			args:      []string{"--image", "spinner:test"},
 			wantError: true,
 			errorMsg:  "--repo flag is required",
-		},
-		{
-			name:      "base-image without setup",
-			args:      []string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--base-image", "ubuntu:22.04"},
-			wantError: true,
-			errorMsg:  "--base-image requires --setup flag",
-		},
-		{
-			name:      "dockerfile without setup",
-			args:      []string{"--image", "test", "--repo", "https://github.com/test/repo.git", "--dockerfile", "Dockerfile.custom"},
-			wantError: true,
-			errorMsg:  "--dockerfile requires --setup flag",
-		},
-		{
-			name: "setup with base-image and dockerfile (mutually exclusive)",
-			args: []string{
-				"--setup",
-				"--image", "test",
-				"--repo", "https://github.com/test/repo.git",
-				"--base-image", "ubuntu:22.04",
-				"--dockerfile", "Dockerfile.custom",
-			},
-			wantError: true,
-			errorMsg:  "mutually exclusive",
 		},
 	}
 
@@ -372,64 +347,6 @@ func TestSpinCommand_DockerBackendExplicit(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
-}
-
-// TestSpinCommand_DockerFlagsWithGCPBackend tests that Docker flags error with GCP backend
-func TestSpinCommand_DockerFlagsWithGCPBackend(t *testing.T) {
-	tests := []struct {
-		name     string
-		args     []string
-		errorMsg string
-	}{
-		{
-			name: "base-image flag with GCP backend on setup",
-			args: []string{
-				"--setup",
-				"--image", "test",
-				"--repo", "https://github.com/test/repo.git",
-				"--backend", "gcp",
-				"--project", "p",
-				"--zone", "z",
-				"--state-bucket", "b",
-				"--base-image", "ubuntu:22.04",
-			},
-			errorMsg: "--base-image requires --backend docker",
-		},
-		{
-			name: "dockerfile flag with GCP backend on setup",
-			args: []string{
-				"--setup",
-				"--image", "test",
-				"--repo", "https://github.com/test/repo.git",
-				"--backend", "gcp",
-				"--project", "p",
-				"--zone", "z",
-				"--state-bucket", "b",
-				"--dockerfile", "/tmp/Dockerfile",
-			},
-			errorMsg: "--dockerfile requires --backend docker",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("GITHUB_TOKEN", "test-token")
-			t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-token")
-
-			mockProvider := new(provider.MockProvider)
-			cmd := NewSpinCommand(testGCPFactory(mockProvider))
-
-			b := new(bytes.Buffer)
-			cmd.SetOut(b)
-			cmd.SetErr(b)
-			cmd.SetArgs(tt.args)
-
-			err := cmd.Execute()
-
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tt.errorMsg)
-		})
-	}
 }
 
 // TestSpinCommand_MissingRequiredGCPFlags tests that required GCP flags produce errors

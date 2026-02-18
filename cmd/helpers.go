@@ -36,6 +36,7 @@ const (
 	flagEnv            = "env"
 	flagEnvFile        = "env-file"
 	flagModel          = "model"
+	flagProviderArgs   = "provider-args"
 )
 
 // GCP default values.
@@ -119,10 +120,11 @@ func buildSetupOptions(backend string) map[string]string {
 
 // runSetup executes the full environment setup workflow for any backend.
 // Used by both the setup command and spin --setup.
-func runSetup(ctx context.Context, p provider.Provider, backend, name string) error {
+func runSetup(ctx context.Context, p provider.Provider, backend, name string, providerArgs []string) error {
 	return performSetup(ctx, p, provider.SetupConfig{
-		Name:    name,
-		Options: buildSetupOptions(backend),
+		Name:         name,
+		Options:      buildSetupOptions(backend),
+		ProviderArgs: providerArgs,
 	})
 }
 
@@ -253,6 +255,19 @@ func bindGCPFlags(cmd *cobra.Command) {
 	}
 }
 
+// gcpRoutingOptions returns the GCP routing options (project, zone, state-bucket,
+// bake-script) from Viper. These are the flags that remain first-class; tuning
+// flags like machine-type, disk-size, and service-account are now passed via
+// --provider-args.
+func gcpRoutingOptions() map[string]string {
+	return map[string]string{
+		flagProject:     viper.GetString(flagProject),
+		flagZone:        viper.GetString(flagZone),
+		flagStateBucket: viper.GetString(flagStateBucket),
+		flagBakeScript:  viper.GetString(flagBakeScript),
+	}
+}
+
 // gcpOptionsFromViper reads GCP flags from Viper and returns an options map
 // with defaults applied for machine-type and disk-size.
 func gcpOptionsFromViper() map[string]string {
@@ -308,4 +323,27 @@ func bindFlags(cmd *cobra.Command, flags ...string) {
 	for _, f := range flags {
 		_ = viper.BindPFlag(f, cmd.Flags().Lookup(f))
 	}
+}
+
+// mergeProviderArgs combines provider args from .spinner.json (via Viper)
+// with CLI-provided args. Config file args form the base; CLI args are appended.
+// If the same flag appears in both, the backend tool uses its own last-wins semantics.
+//
+// Note: --provider-args is NOT bound to Viper via BindPFlag so that both sources
+// can be read independently. Viper reads config file values; cliArgs comes from Cobra.
+func mergeProviderArgs(cliArgs []string) []string {
+	configArgs := viper.GetStringSlice(flagProviderArgs)
+	if len(cliArgs) == 0 {
+		return configArgs
+	}
+
+	if len(configArgs) == 0 {
+		return cliArgs
+	}
+
+	merged := make([]string, 0, len(configArgs)+len(cliArgs))
+	merged = append(merged, configArgs...)
+	merged = append(merged, cliArgs...)
+
+	return merged
 }
