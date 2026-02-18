@@ -347,6 +347,7 @@ the state is in the file itself, not in the agent's memory.
 - [x] Add session middleware
 - [ ] Write unit tests for the auth module
 - [ ] Update the README with setup instructions
+- [ ] Emit ~~ FEATURE_COMPLETED ~~ when all tasks are done
 
 ## Notes
 - Use the existing `db` package for queries
