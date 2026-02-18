@@ -30,16 +30,6 @@ func TestGCPFlags_WrongBackendFlagsError(t *testing.T) {
 			wantErr: "--zone requires --backend gcp",
 		},
 		{
-			name:    "machine-type flag with docker backend",
-			args:    []string{"setup", "--name", "test", "--machine-type", "e2-standard-4"},
-			wantErr: "--machine-type requires --backend gcp",
-		},
-		{
-			name:    "disk-size flag with docker backend",
-			args:    []string{"setup", "--name", "test", "--disk-size", "50"},
-			wantErr: "--disk-size requires --backend gcp",
-		},
-		{
 			name:    "state-bucket flag with docker backend",
 			args:    []string{"setup", "--name", "test", "--state-bucket", "my-bucket"},
 			wantErr: "--state-bucket requires --backend gcp",
@@ -61,50 +51,6 @@ func TestGCPFlags_WrongBackendFlagsError(t *testing.T) {
 			stdout, stderr, _ := testutil.RunCommandExpectError(t, tt.args...)
 			output := stdout + stderr
 			assert.Contains(t, output, tt.wantErr, "should show error for wrong-backend flag")
-		})
-	}
-}
-
-// TestGCPFlags_DockerFlagsRejectedForGCP tests that Docker-specific flags fail with GCP backend.
-func TestGCPFlags_DockerFlagsRejectedForGCP(t *testing.T) {
-	tests := []struct {
-		name    string
-		args    []string
-		wantErr string
-	}{
-		{
-			name: "base-image with gcp backend on setup",
-			args: []string{
-				"setup",
-				"--backend", "gcp",
-				"--name", "test",
-				"--project", "p",
-				"--zone", "z",
-				"--state-bucket", "b",
-				"--base-image", "ubuntu:22.04",
-			},
-			wantErr: "--base-image requires --backend docker",
-		},
-		{
-			name: "dockerfile with gcp backend on setup",
-			args: []string{
-				"setup",
-				"--backend", "gcp",
-				"--name", "test",
-				"--project", "p",
-				"--zone", "z",
-				"--state-bucket", "b",
-				"--dockerfile", "/tmp/Dockerfile",
-			},
-			wantErr: "--dockerfile requires --backend docker",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stdout, stderr, _ := testutil.RunCommandExpectError(t, tt.args...)
-			output := stdout + stderr
-			assert.Contains(t, output, tt.wantErr, "should reject Docker flags for GCP backend")
 		})
 	}
 }

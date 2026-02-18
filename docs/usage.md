@@ -36,8 +36,6 @@ environment variables with the `SPINNER_` prefix.
 **Setup Command:**
 
 - `SPINNER_NAME` - Override `--name` flag
-- `SPINNER_BASE_IMAGE` - Override `--base-image` flag
-- `SPINNER_DOCKERFILE` - Override `--dockerfile` flag
 
 **Spin Command:**
 
@@ -80,8 +78,8 @@ commit).
   "project": "my-project",
   "zone": "us-central1-a",
   "state-bucket": "my-state-bucket",
-  "machine-type": "e2-standard-2",
-  "image": "my-default-image"
+  "image": "my-default-image",
+  "provider-args": ["--machine-type=e2-standard-2", "--boot-disk-size=30GB"]
 }
 ```
 
@@ -139,8 +137,6 @@ roles). Run the script with `--help` to see available options.
 
 **Optional flags:**
 
-- `SPINNER_MACHINE_TYPE` - VM machine type (default: e2-standard-2)
-- `SPINNER_DISK_SIZE` - Boot disk size in GB (default: 30)
 - `SPINNER_BAKE_SCRIPT` - Path to custom bake script for image creation
 
 **Example:**
@@ -232,7 +228,7 @@ Common things you might want to include:
 
 The mechanism differs by backend:
 
-- **Docker** — use a custom Dockerfile via `--dockerfile` (see the [Docker guide](guides/docker.md#customizing-claude-code-configuration))
+- **Docker** — use a custom Dockerfile via `--provider-args="-f /path/to/Dockerfile"` (see the [Docker guide](guides/docker.md#customizing-claude-code-configuration))
 - **GCP** — use a custom bake script via `--bake-script` (see the [GCP guide](guides/gcp.md#customizing-claude-code-configuration))
 
 ## Working Command Examples
@@ -246,10 +242,10 @@ These are tested, working examples for future reference:
 ./dist/spinner setup --name spinner:default
 
 # Setup with custom base image
-./dist/spinner setup --name ubuntu --base-image ubuntu:22.04
+./dist/spinner setup --name ubuntu --provider-args="--build-arg=BASE_IMAGE=ubuntu:22.04"
 
 # Setup with custom Dockerfile
-./dist/spinner setup --name custom --dockerfile ./path/to/Dockerfile
+./dist/spinner setup --name custom --provider-args="-f ./path/to/Dockerfile"
 ```
 
 ### Spin Command Examples

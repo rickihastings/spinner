@@ -27,16 +27,14 @@ spinner setup --name my-sandbox
 This uses `ubuntu:22.04` as the base. To use a different base image (must be Debian/Ubuntu-based):
 
 ```bash
-spinner setup --name node-env --base-image node:20-bullseye
+spinner setup --name node-env --provider-args="--build-arg=BASE_IMAGE=node:20-bullseye"
 ```
 
 Or use your own Dockerfile:
 
 ```bash
-spinner setup --name custom-env --dockerfile ./Dockerfile.custom
+spinner setup --name custom-env --provider-args="-f ./Dockerfile.custom"
 ```
-
-> **Note:** `--base-image` and `--dockerfile` cannot be used together.
 
 ### Customizing Claude Code Configuration
 
@@ -57,7 +55,7 @@ RUN chown -R 1000:1000 /home/spinner/.claude/
 Then build with:
 
 ```bash
-spinner setup --name my-custom-env --dockerfile ./Dockerfile.custom
+spinner setup --name my-custom-env --provider-args="-f ./Dockerfile.custom"
 ```
 
 Spinner builds your Dockerfile first, then layers its own setup (git, Claude Code, the spinner binary) on top. Files
@@ -161,13 +159,13 @@ spinner spin \
 
 This is equivalent to running `spinner setup --name my-sandbox` followed by `spinner spin --image my-sandbox ...`.
 
-You can also pass `--base-image` or `--dockerfile` when using `--setup`:
+You can also pass `--provider-args` when using `--setup` to customize the Docker build:
 
 ```bash
 spinner spin \
   --setup \
   --image node-env \
-  --base-image node:20-bullseye \
+  --provider-args="--build-arg=BASE_IMAGE=node:20-bullseye" \
   --repo https://github.com/your-org/your-repo.git \
   --prompt "Fix the build pipeline"
 ```

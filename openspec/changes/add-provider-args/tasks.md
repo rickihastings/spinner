@@ -32,9 +32,9 @@
 - [x] 3.6 Add unit tests for GCP arg forwarding and conflict detection
 - [x] 3.7 Build and verify
 
-## 4.0 Help text and documentation
+## 4.0 Help text and documentation ✅
 
-- [ ] 4.1 Update spin command long help to include `--provider-args` examples for both backends
-- [ ] 4.2 Update setup command long help to include `--provider-args` examples
-- [ ] 4.3 Update docs/usage.md `.spinner.json` examples with `provider-args`, remove references to removed flags
-- [ ] 4.4 Verify `--help` output displays correctly
+- [x] 4.1 Update spin command long help to include `--provider-args` examples for both backends
+- [x] 4.2 Update setup command long help to include `--provider-args` examples
+- [x] 4.3 Update docs/usage.md `.spinner.json` examples with `provider-args`, remove references to removed flags
+- [x] 4.4 Verify `--help` output displays correctly

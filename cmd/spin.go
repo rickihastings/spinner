@@ -82,7 +82,7 @@ EXAMPLES:
   # GCP with provider args
   spinner spin --backend gcp --image my-env --repo https://github.com/octocat/Hello-World.git \
     --project my-proj --zone us-central1-a --state-bucket my-bucket \
-    --provider-args="--machine-type=e2-standard-4" --provider-args="--disk-size-gb=50"`,
+    --provider-args="--machine-type=e2-standard-4" --provider-args="--boot-disk-size=50GB"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind general flags to Viper
 			bindFlags(cmd,

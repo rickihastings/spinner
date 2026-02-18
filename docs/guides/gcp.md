@@ -179,19 +179,18 @@ spinner setup --name my-custom-env --bake-script ./custom-install.sh
 
 ### Customizing VM Resources
 
-You can configure the machine type and disk size:
+You can configure the machine type and disk size using `--provider-args`:
 
 ```bash
 spinner setup --name powerful-env \
-  --machine-type e2-standard-8 \
-  --disk-size 50
+  --provider-args="--machine-type=e2-standard-8" \
+  --provider-args="--boot-disk-size=50GB"
 ```
 
-| Flag             | Default         | Description                                              |
-|------------------|-----------------|----------------------------------------------------------|
-| `--machine-type` | `e2-standard-2` | GCP machine type for the bake VM and runtime VMs         |
-| `--disk-size`    | `30`            | Boot disk size in GB                                     |
-| `--bake-script`  | —               | Path to a custom shell script to run during image baking |
+| Flag                | Default | Description                                              |
+|---------------------|---------|----------------------------------------------------------|
+| `--provider-args`   | —       | Extra arguments passed directly to `gcloud` (repeatable) |
+| `--bake-script`     | —       | Path to a custom shell script to run during image baking |
 
 ## Step 2: Spin Up a VM
 
@@ -410,8 +409,7 @@ you run Spinner:
   "project": "my-project",
   "zone": "us-central1-a",
   "state-bucket": "my-project-spinner-state",
-  "machine-type": "e2-standard-4",
-  "disk-size": 50
+  "provider-args": ["--machine-type=e2-standard-4", "--boot-disk-size=50GB"]
 }
 ```
 
