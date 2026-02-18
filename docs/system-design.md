@@ -25,7 +25,6 @@ Setup(ctx context.Context, config SetupConfig) error
 // Lifecycle Management
 Create(ctx context.Context, config CreateConfig) error
 Start(ctx context.Context, name string) error
-Restart(ctx context.Context, name string) error
 Stop(ctx context.Context, name string) error
 Remove(ctx context.Context, name string) error
 

@@ -134,11 +134,6 @@ The GCP provider SHALL manage VM instance lifecycle through the Compute Engine I
 - **WHEN** `Provider.Stop()` is called for a running VM
 - **THEN** the provider SHALL call the Stop API and wait for `TERMINATED` status
 
-#### Scenario: Restart instance
-
-- **WHEN** `Provider.Restart()` is called
-- **THEN** the provider SHALL stop then start the VM
-
 #### Scenario: Remove instance
 
 - **WHEN** `Provider.Remove()` is called

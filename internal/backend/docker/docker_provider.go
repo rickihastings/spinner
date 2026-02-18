@@ -185,15 +185,6 @@ func writeConfigOverrides(containerName string, config provider.CreateConfig) er
 	return nil
 }
 
-// Restart stops then starts a container.
-func (p *Provider) Restart(ctx context.Context, name string) (*provider.Instance, error) {
-	if err := p.Stop(ctx, name); err != nil {
-		return nil, err
-	}
-
-	return p.Start(ctx, name, provider.CreateConfig{})
-}
-
 // Stop stops a running container.
 func (p *Provider) Stop(ctx context.Context, name string) error {
 	return p.client.StopContainer(ctx, name)

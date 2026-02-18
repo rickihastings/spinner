@@ -36,6 +36,7 @@ if [ -n "$SPINNER_SECRET_BLOB_B64" ]; then
     mkdir -p /run/spinner
     echo "$SPINNER_SECRET_BLOB_B64" | base64 -d > /run/spinner/secrets.enc
     chmod 600 /run/spinner/secrets.enc
+    chown spinner:spinner /run/spinner/secrets.enc
     echo "Encrypted secrets blob written to /run/spinner/secrets.enc"
 fi
 

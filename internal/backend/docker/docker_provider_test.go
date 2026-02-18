@@ -230,39 +230,6 @@ func TestDockerProvider_Start_Fails(t *testing.T) {
 	assert.Contains(t, err.Error(), "no such container")
 }
 
-func TestDockerProvider_Restart_Success(t *testing.T) {
-	client := new(MockDockerClient)
-	p := NewDockerProvider(client)
-	ctx := context.Background()
-
-	client.On("StopContainer", ctx, "test-container").Return(nil)
-	client.On("StartContainer", ctx, "test-container").Return(
-		ContainerResult{Success: true, ContainerName: "test-container"}, nil,
-	)
-	client.On("VerifyContainerStatus", ctx, "test-container").Return(
-		ContainerResult{Success: true, ContainerName: "test-container"}, nil,
-	)
-
-	instance, err := p.Restart(ctx, "test-container")
-
-	assert.NoError(t, err)
-	assert.Equal(t, "test-container", instance.Name)
-	assert.Equal(t, provider.InstanceStatusRunning, instance.Status)
-	client.AssertExpectations(t)
-}
-
-func TestDockerProvider_Restart_StopFails(t *testing.T) {
-	client := new(MockDockerClient)
-	p := NewDockerProvider(client)
-	ctx := context.Background()
-
-	client.On("StopContainer", ctx, "test-container").Return(assert.AnError)
-
-	_, err := p.Restart(ctx, "test-container")
-
-	assert.Error(t, err)
-}
-
 func TestDockerProvider_Stop_Success(t *testing.T) {
 	client := new(MockDockerClient)
 	p := NewDockerProvider(client)

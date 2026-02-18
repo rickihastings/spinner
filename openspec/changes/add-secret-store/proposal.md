@@ -69,25 +69,36 @@ New `internal/secret/` package with:
 ### Modified Internal Type: `provider.CreateConfig`
 
 - **ADDED** `SecretBlob []byte` field — carries the encrypted blob for backend mounting/delivery
+- **ADDED** `SecretKey []byte` field — carries the ephemeral 32-byte random key for blob decryption
 - **REMOVED** direct token fields — backends no longer read `GITHUB_TOKEN` from env or config; all
   secrets travel via the encrypted blob
+- **REMOVED** `Passphrase string` field — replaced by `SecretKey`
 
 ### Modified Capability: In-Container Secret Delivery
 
-**No secrets are passed as container environment variables.** All secrets (built-in tokens and custom)
-are delivered as an encrypted blob:
+**No secrets or decryption keys are passed as environment variables or instance metadata.** All
+secrets are delivered as an encrypted blob. The decryption key is delivered via a file-based side
+channel separate from the blob:
 
+- **ADDED** ephemeral key transport — at spin-time, a random 32-byte AES-256-GCM key encrypts the
+  blob directly (no Argon2id — unnecessary for random keys). The key is delivered via file, never
+  as an env var or instance metadata value.
 - **ADDED** encrypted blob delivery — host encrypts all resolved secrets into a per-session blob,
   mounted read-only into the container at `/run/spinner/secrets.enc`
+- **MODIFIED** Docker delivery — ephemeral key written to `~/.spinner/<container>/secrets.key`,
+  mounted read-only at `/run/spinner/secrets.key`. No passphrase in env-file or `docker inspect`.
+- **MODIFIED** GCP delivery — ephemeral key written to GCS at
+  `gs://<state-bucket>/<instance>/secrets.key`. Startup script fetches key from GCS. Key never
+  appears in instance metadata. Key persists in GCS for VM restart support (re-read on each boot).
 - **MODIFIED** `startup.sh` — uses `spinner secret inject` to wrap token-dependent operations
-  (`gh auth setup-git`, `git clone`). After initial setup, `gh` credential cache persists git auth
-  and the token env vars are no longer needed.
-- **MODIFIED** `spinner exec` — reads encrypted blob at startup, decrypts into memory, injects secrets
-  (including `SPINNER_SECRET_PASSPHRASE` for inception) via `cmd.Env` on child processes. Blob is
-  retained on disk for inception scenarios.
-- **ADDED** `spinner secret inject -- <command>` — for no-`--prompt` mode (user SSH). Prompts for
-  passphrase, decrypts blob, runs command with secrets injected. Unattended agents without explicit
-  injection get no secrets at all.
+  (`gh auth setup-git`, `git clone`). Reads key from `/run/spinner/secrets.key`. After initial
+  setup, `gh` credential cache persists git auth and the token env vars are no longer needed.
+- **MODIFIED** `spinner exec` — reads encrypted blob and key file at startup, decrypts into memory,
+  injects secrets via `cmd.Env` on child processes. Key file and blob are retained on disk for
+  inception scenarios.
+- **ADDED** `spinner secret inject -- <command>` — for no-`--prompt` mode (user SSH). Reads key
+  from file (or prompts for passphrase as fallback), decrypts blob, runs command with secrets
+  injected. Unattended agents without explicit injection get no secrets at all.
 
 ### Added Capability: Configurable Store Path
 
@@ -117,10 +128,11 @@ are delivered as an encrypted blob:
 | `cmd/helpers.go` | Modify — add `flagSecret` constant |
 | `cmd/spin.go` | Modify — add `--secret` flag, create Store, resolve all secrets, generate blob |
 | `internal/provider/provider.go` | Modify — add `SecretBlob []byte` to `CreateConfig`, remove direct token access |
-| `internal/backend/docker/run.go` | Modify — mount encrypted blob; remove env-file token writing; pass `SPINNER_SECRET_PASSPHRASE` as sole container env var |
-| `internal/backend/docker/docker_provider.go` | Modify — pass `SecretBlob` from `CreateConfig` to `spinConfig` |
-| `internal/backend/gcp/gcp_provider.go` | Modify — base64-encode blob as `SPINNER_SECRET_BLOB` metadata; pass `SPINNER_SECRET_PASSPHRASE` as metadata |
-| `internal/exec/loop.go` | Modify — decrypt blob at startup, inject into executor config (including passphrase for inception) |
+| `internal/backend/docker/run.go` | Modify — mount encrypted blob + key file; remove env-file token writing; no passphrase in env |
+| `internal/backend/docker/docker_provider.go` | Modify — pass `SecretBlob` + `SecretKey` from `CreateConfig` to `spinConfig` |
+| `internal/backend/gcp/gcp_provider.go` | Modify — base64-encode blob as `SPINNER_SECRET_BLOB` metadata; upload key to GCS (not metadata) |
+| `internal/backend/gcp/templates/scripts/gcp_runtime.sh` | Modify — fetch key from GCS instead of metadata; write to `/run/spinner/secrets.key` |
+| `internal/exec/loop.go` | Modify — decrypt blob using key file at startup, inject into executor config |
 | `internal/agent/claude/executor.go` | No change — already injects `config.Env` via `cmd.Env` |
 | `internal/prerequisites/prerequisites.go` | Modify — remove `CheckEnvironmentVariables()` (replaced by resolver) |
 | `templates/scripts/startup.sh` | Modify — refactor to use `spinner secret inject` for token-dependent work |
@@ -139,17 +151,16 @@ are delivered as an encrypted blob:
 | Risk | Impact | Mitigation |
 |---|---|---|
 | **Breaking change** | Existing env-var workflows stop working | No users yet; clean migration path (`spinner secret set` for each token) |
-| Encrypted file passphrase UX | Interactive prompt blocks CI | `SPINNER_SECRET_PASSPHRASE` env var for non-interactive use on the host |
+| Encrypted file passphrase UX | Interactive prompt blocks CI | `SPINNER_SECRET_PASSPHRASE` env var for non-interactive use on the host (host only — never sent to containers) |
 | Encrypted file corruption | Lost secrets | Clear error message; user can delete file and re-set secrets |
 | Go memory safety | Secret strings cannot be reliably zeroed | Accepted Go limitation; all Go CLI tools share this constraint |
-| Passphrase reuse | Same passphrase encrypts host store and container blob | Container blob uses its own salt; host store file is never inside the container |
-| `SPINNER_SECRET_PASSPHRASE` in container env | Passphrase discoverable via `/proc/1/environ` (Docker) or metadata API (GCP) | Defense in depth — secrets aren't casually visible via `env`; determined access requires knowing to look in /proc or metadata |
-| Blob retained on disk | Encrypted file persists in container filesystem | Encrypted with Argon2id; useless without passphrase; enables inception |
+| Key file on same Docker mount as blob | Key and blob co-located on host volume | Security boundary is Docker isolation; key-as-file eliminates `docker inspect` leak of passphrase |
+| Key in GCS bucket | Accessible to anyone with `storage.objects.get` on bucket | Separate IAM from `compute.instances.get`; key not visible in GCP Console VM details; bucket already exists for logs/state |
+| Blob retained on disk | Encrypted file persists in container filesystem | Encrypted with random AES key; useless without key file; enables inception |
 
 ## Non-Goals
 
 - **macOS Keychain / OS-native backends** — encrypted file is cross-platform and sufficient; no need for platform-specific code paths
-- **GCP Secret Manager integration** — future hardening option for GCP-hosted instances
 - **Docker Swarm secrets** — requires Swarm mode, incompatible with standalone containers
 - **Encrypted env-file support** — `--env-file` is for non-sensitive config; sensitive values go through `--secret`
 - **Key rotation automation** — users rotate by re-running `spinner secret set`

@@ -38,16 +38,6 @@ func (m *MockProvider) Start(ctx context.Context, name string, config CreateConf
 	return args.Get(0).(*Instance), args.Error(1)
 }
 
-// Restart mocks the Restart method.
-func (m *MockProvider) Restart(ctx context.Context, name string) (*Instance, error) {
-	args := m.Called(ctx, name)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-
-	return args.Get(0).(*Instance), args.Error(1)
-}
-
 // Stop mocks the Stop method.
 func (m *MockProvider) Stop(ctx context.Context, name string) error {
 	args := m.Called(ctx, name)

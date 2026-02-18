@@ -193,45 +193,6 @@ func TestProviderStopError(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestProviderRestartSuccess(t *testing.T) {
-	mockClient := &MockGCPClient{}
-	p := newTestProvider(mockClient)
-
-	mockClient.On("StopInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(nil)
-	mockClient.On("GetInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(&GCPInstance{
-			Name: "test-vm",
-			Metadata: &GCPMetadata{
-				Fingerprint: "abc123",
-				Items:       []GCPMetadataItem{},
-			},
-		}, nil)
-	mockClient.On("SetMetadata", mock.Anything, "test-project", "us-central1-a", "test-vm", mock.Anything).
-		Return(nil)
-	mockClient.On("StartInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(nil)
-
-	instance, err := p.Restart(context.Background(), "test-vm")
-	assert.NoError(t, err)
-	assert.Equal(t, "test-vm", instance.Name)
-	assert.Equal(t, provider.InstanceStatusRunning, instance.Status)
-	mockClient.AssertExpectations(t)
-}
-
-func TestProviderRestartStopError(t *testing.T) {
-	mockClient := &MockGCPClient{}
-	p := newTestProvider(mockClient)
-
-	mockClient.On("StopInstance", mock.Anything, "test-project", "us-central1-a", "test-vm").
-		Return(fmt.Errorf("stop failed"))
-
-	instance, err := p.Restart(context.Background(), "test-vm")
-	assert.Error(t, err)
-	assert.Nil(t, instance)
-	mockClient.AssertExpectations(t)
-}
-
 func TestProviderRemoveSuccess(t *testing.T) {
 	mockClient := &MockGCPClient{}
 	p := newTestProvider(mockClient)

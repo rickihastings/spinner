@@ -182,9 +182,6 @@ type Provider interface {
 	// from the provided CreateConfig before starting.
 	Start(ctx context.Context, name string, config CreateConfig) (*Instance, error)
 
-	// Restart restarts a running instance (stop then start).
-	Restart(ctx context.Context, name string) (*Instance, error)
-
 	// Stop stops a running instance without removing it.
 	Stop(ctx context.Context, name string) error
 

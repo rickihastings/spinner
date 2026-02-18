@@ -57,12 +57,13 @@ Rationale:
 | `cmd/helpers.go` | **modify** | Add `flagSecret` constant |
 | `cmd/spin.go` | **modify** | Add `--secret` flag, create Store, resolve all secrets, generate blob |
 | `cmd/spin_test.go` | **modify** | Test `--secret` flag parsing and validation |
-| `internal/provider/provider.go` | **modify** | Add `SecretBlob []byte` to `CreateConfig`, remove direct token access |
-| `internal/backend/docker/run.go` | **modify** | Mount blob; remove env-file token writing; pass `SPINNER_SECRET_PASSPHRASE` as sole env var |
-| `internal/backend/docker/run_test.go` | **modify** | Update for blob-based delivery |
-| `internal/backend/docker/docker_provider.go` | **modify** | Map `CreateConfig.SecretBlob` → `spinConfig` |
-| `internal/backend/gcp/gcp_provider.go` | **modify** | Base64-encode blob as `SPINNER_SECRET_BLOB` metadata; pass `SPINNER_SECRET_PASSPHRASE` as metadata |
-| `internal/exec/loop.go` | **modify** | Decrypt blob at startup, inject into executor config (including passphrase for inception) |
+| `internal/provider/provider.go` | **modify** | Add `SecretBlob []byte` + `SecretKey []byte` to `CreateConfig`, remove `Passphrase` and direct token access |
+| `internal/backend/docker/run.go` | **modify** | Mount blob + key file; remove env-file token writing; no passphrase in env |
+| `internal/backend/docker/run_test.go` | **modify** | Update for blob + key file delivery |
+| `internal/backend/docker/docker_provider.go` | **modify** | Map `CreateConfig.SecretBlob` + `SecretKey` → `spinConfig` |
+| `internal/backend/gcp/gcp_provider.go` | **modify** | Base64-encode blob as metadata; upload key to GCS (not metadata) |
+| `internal/backend/gcp/templates/scripts/gcp_runtime.sh` | **modify** | Fetch key from GCS; write to `/run/spinner/secrets.key` |
+| `internal/exec/loop.go` | **modify** | Decrypt blob using key file at startup, inject into executor config |
 | `internal/prerequisites/prerequisites.go` | **modify** | Remove `CheckEnvironmentVariables()` (replaced by resolver) |
 | `templates/scripts/startup.sh` | **modify** | Refactor to use `spinner secret inject` for token-dependent work |
 | `docs/usage.md` | **modify** | Document `spinner secret` workflow and `--secret` flag |
@@ -142,47 +143,54 @@ Resolved values are encrypted into a blob. Backends receive the blob for mountin
 // In cmd/spin.go RunE:
 store := secret.NewEncryptedFileStore(defaultStorePath(), passphraseFunc)
 resolved, err := secret.Resolve(store, spinSecrets)  // spinSecrets from --secret flags
-blob, err := secret.EncryptBlob(resolved, passphrase)
+key, blob, err := secret.EncryptBlobWithKey(resolved)
 createConfig := provider.CreateConfig{
     // ...existing fields...
     SecretBlob: blob,
+    SecretKey:  key,
 }
 ```
 
-#### Container Delivery (Encrypted Blob)
+#### Container Delivery (Encrypted Blob + Ephemeral Key)
 
-**No secrets are passed as container environment variables.** All secrets (built-in tokens and
-custom) are delivered as an encrypted blob that requires explicit decryption inside the container.
-The only env var/metadata passed is `SPINNER_SECRET_PASSPHRASE` — the decryption key.
+**No secrets or decryption keys are passed as environment variables or instance metadata.** All
+secrets are delivered as an encrypted blob. The decryption key is delivered via a file-based side
+channel, never through env vars, Docker env-files, or GCP instance metadata.
 
 **Blob Generation (host side, at spin-time):**
 
 ```go
 // In cmd/spin.go RunE, after Resolve():
-blob, err := secret.EncryptBlob(resolved, passphrase)
-createConfig.SecretBlob = blob  // backends mount/upload this
+key, blob, err := secret.EncryptBlobWithKey(resolved)
+createConfig.SecretBlob = blob  // backends mount/upload the blob
+createConfig.SecretKey = key    // backends deliver key via file side-channel
 ```
 
-The blob uses the same AES-256-GCM + Argon2id scheme as the host store but with a fresh salt.
-The user's store passphrase encrypts the blob — same passphrase, different salt, separate file.
+The blob uses AES-256-GCM with a random 32-byte key (no Argon2id — key derivation is unnecessary
+for random keys). A fresh key and nonce are generated per `spin` invocation.
 
 **Docker Backend:**
 
 1. Host writes encrypted blob to `~/.spinner/<container>/secrets.enc` (alongside existing state dir)
-2. Mounted read-only into container at `/run/spinner/secrets.enc` via `-v` flag
-3. `SPINNER_SECRET_PASSPHRASE` passed as container env var (both modes — startup.sh needs it)
+2. Host writes ephemeral key to `~/.spinner/<container>/secrets.key`
+3. Both mounted read-only into container at `/run/spinner/secrets.enc` and `/run/spinner/secrets.key`
+4. No passphrase or key in env-file — nothing secret in `docker inspect`
 
 **GCP Backend:**
 
 1. Host base64-encodes the encrypted blob and passes it as instance metadata key `SPINNER_SECRET_BLOB`
-2. Startup script decodes the metadata value and writes it to `/run/spinner/secrets.enc`
-3. `SPINNER_SECRET_PASSPHRASE` passed as instance metadata key (both modes — startup script needs it)
-4. Blob is destroyed when the VM is deleted — no orphaned files in GCS
+2. Host uploads the ephemeral key to GCS: `gs://<state-bucket>/<instance>/secrets.key`
+3. Startup script decodes blob from metadata, writes to `/run/spinner/secrets.enc`
+4. Startup script fetches key from GCS via `gcloud storage cp`, writes to `/run/spinner/secrets.key`
+5. Key never appears in instance metadata — not visible in GCP Console or metadata API
+6. Key persists in GCS for VM restart support (startup script re-reads on each boot)
+7. Blob + VM are destroyed on `Remove()` — key in GCS should be cleaned up too
 
-**Passphrase in container env:** `SPINNER_SECRET_PASSPHRASE` is always passed to the container because
-`startup.sh` needs it to decrypt the blob for initial git auth and clone. It remains discoverable via
-`/proc/1/environ` (Docker) or metadata API (GCP). This is defense in depth — secrets are not casually
-visible via `env` but a determined process can find the passphrase. This is an accepted tradeoff.
+**Why GCS for the key (not metadata):** Instance metadata is visible to anyone with
+`compute.instances.get` permission — including the GCP Console VM details page (as seen in the
+screenshot that motivated this change). GCS objects require separate `storage.objects.get`
+permission and are not surfaced in the VM details UI. The state bucket already exists for logs
+and state, so no new infrastructure is needed.
 
 #### `startup.sh` Refactor
 
@@ -193,7 +201,7 @@ variables. Instead it uses `spinner secret inject` to decrypt the blob for token
 #!/bin/bash
 set -e
 
-# SPINNER_SECRET_PASSPHRASE is set in container env / instance metadata.
+# Ephemeral key at /run/spinner/secrets.key (mounted file or fetched from GCS).
 # All secrets are in the encrypted blob at /run/spinner/secrets.enc.
 # Use `spinner secret inject` to decrypt and run token-dependent commands.
 
@@ -262,41 +270,38 @@ When `spinner exec` starts inside the container:
 ```go
 // In internal/exec/loop.go, before entering iteration loop:
 blobPath := "/run/spinner/secrets.enc"
-passphrase := os.Getenv("SPINNER_SECRET_PASSPHRASE")
-if passphrase != "" && fileExists(blobPath) {
-    secrets, err := secret.DecryptBlob(blobPath, passphrase)
-    // DO NOT delete the blob — needed for inception scenarios
-    os.Unsetenv("SPINNER_SECRET_PASSPHRASE")     // remove passphrase from own env
-    // Inject all secrets + passphrase into child process env for inception
+keyPath := "/run/spinner/secrets.key"
+if fileExists(blobPath) && fileExists(keyPath) {
+    secrets, err := secret.DecryptBlobWithKeyFile(blobPath, keyPath)
+    // DO NOT delete blob or key — needed for inception scenarios
+    // Inject all secrets + key/blob paths into child process env for inception
     envSlice := secretsToEnvSlice(secrets)
-    envSlice = append(envSlice, "SPINNER_SECRET_PASSPHRASE="+passphrase)
     envSlice = append(envSlice, "SPINNER_SECRET_STORE=/run/spinner/secrets.enc")
+    envSlice = append(envSlice, "SPINNER_SECRET_KEY=/run/spinner/secrets.key")
     executorConfig.Env = append(executorConfig.Env, envSlice...)
 }
 ```
 
 1. Read blob from `/run/spinner/secrets.enc`
-2. Read passphrase from `SPINNER_SECRET_PASSPHRASE` env var
+2. Read key from `/run/spinner/secrets.key`
 3. Decrypt secrets into memory
-4. **Keep blob on disk** — needed for inception (inner `spinner spin`)
-5. Unset `SPINNER_SECRET_PASSPHRASE` from own process environment
-6. Inject secrets + `SPINNER_SECRET_PASSPHRASE` + `SPINNER_SECRET_STORE` via `cmd.Env` when spawning
+4. **Keep blob and key on disk** — needed for inception (inner `spinner spin`)
+5. Inject secrets + `SPINNER_SECRET_STORE` + `SPINNER_SECRET_KEY` via `cmd.Env` when spawning
    Claude CLI (existing mechanism at `executor.go:83-85`)
 
-The passphrase is included in child process env because it's **redundant information** — the agent
-already has every decrypted secret value. But including it enables the agent to run inception
-(`spinner spin --secret ...`) without user intervention. The blob stays on disk so the inner spinner
-can read from it via `SPINNER_SECRET_STORE`.
+The key file path is included in child process env because it's **redundant information** — the
+agent already has every decrypted secret value. But including it enables the agent to run inception
+(`spinner spin --secret ...`) without user intervention. The blob and key stay on disk so the inner
+spinner can read from them via `SPINNER_SECRET_STORE` + `SPINNER_SECRET_KEY`.
 
 #### No-`--prompt` Mode: `spinner secret inject`
 
 When user SSHs into the container:
 
-1. Blob exists at `/run/spinner/secrets.enc` (encrypted, unreadable without passphrase)
-2. `SPINNER_SECRET_PASSPHRASE` is in the container env (Docker `/proc/1/environ`, GCP metadata) —
-   used by startup.sh and discoverable by determined processes, but not casually visible via `env`
-   in an SSH session
-3. User runs `spinner secret inject -- <command>` to access secrets:
+1. Blob exists at `/run/spinner/secrets.enc` (encrypted, unreadable without key)
+2. Key exists at `/run/spinner/secrets.key` (mounted file, `0600` permissions)
+3. No passphrase in container env — nothing in `docker inspect` or instance metadata
+4. User runs `spinner secret inject -- <command>` to access secrets:
 
 ```bash
 # Decrypt and inject for a specific command
@@ -308,6 +313,7 @@ spinner secret inject -- bash
 # Inception: run inner spinner with secrets from outer blob
 spinner secret inject -- sh -c '
   SPINNER_SECRET_STORE=/run/spinner/secrets.enc \
+  SPINNER_SECRET_KEY=/run/spinner/secrets.key \
   spinner spin --backend docker --secret NPM_TOKEN --repo ... --prompt "task"
 '
 ```
@@ -317,8 +323,8 @@ spinner secret inject -- sh -c '
 ```go
 // In cmd/secret.go:
 func runSecretInject(cmd *cobra.Command, args []string) error {
-    passphrase := getPassphrase()  // SPINNER_SECRET_PASSPHRASE env, then interactive prompt
-    secrets, err := secret.DecryptBlob(blobPath, passphrase)
+    keyPath := keyPathFromEnvOrDefault()  // SPINNER_SECRET_KEY env, or /run/spinner/secrets.key
+    secrets, err := secret.DecryptBlobWithKeyFile(blobPath, keyPath)
     // Run the command with secrets injected
     child := exec.Command(args[0], args[1:]...)
     child.Env = append(os.Environ(), secretsToEnvSlice(secrets)...)
@@ -329,10 +335,10 @@ func runSecretInject(cmd *cobra.Command, args []string) error {
 }
 ```
 
-**Note:** `inject` reads the passphrase from `SPINNER_SECRET_PASSPHRASE` env var first, then falls
-back to interactive prompt. In Docker, the container env var is set (from `--env-file` at creation),
-so `inject` can decrypt non-interactively. In GCP, the startup script can write it to a restricted
-file. In both cases, the user CAN also type it manually.
+**Note:** `inject` reads the key from `SPINNER_SECRET_KEY` path (env var pointing to file), falling
+back to `/run/spinner/secrets.key`. Both Docker and GCP place the key file at that default path.
+If the key file is missing (e.g., user SSHed into a container created before this change), `inject`
+falls back to prompting for a passphrase and using the Argon2id path for backward compatibility.
 
 ### Key Decisions
 
@@ -342,14 +348,17 @@ file. In both cases, the user CAN also type it manually.
 | **No env var fallback (breaking change)** | Eliminates plaintext `.envrc` workflow entirely. No users yet, clean migration |
 | **All tokens in blob (no split)** | GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, and custom secrets all travel the same way. No special-casing |
 | `--secret` separate from `--env` | `--env KEY=VALUE` exposes value on CLI. `--secret KEY` references store only. Different security semantics |
-| Argon2id + AES-256-GCM | Current best practice for password-based key derivation + authenticated encryption |
+| Argon2id + AES-256-GCM for host store | Current best practice for password-based key derivation + authenticated encryption |
+| **Random key + raw AES-256-GCM for transport blob** | No Argon2id needed — random 32-byte key is already full entropy. Faster, simpler. |
+| **Key via file, not env/metadata** | Passphrase in GCP metadata was visible in Console UI. Key-as-file eliminates env var and metadata leaks entirely. |
+| **GCS for GCP key delivery** | State bucket already exists. GCS IAM is separate from `compute.instances.get`. Key not visible in VM details page. |
+| **Key persists (not deleted after read)** | VM restarts re-run startup script. Key must be re-readable. GCS persistence mirrors metadata persistence model. |
 | `~/.spinner/secrets.enc` location | Consistent with existing `~/.spinner/` config directory |
-| `SPINNER_SECRET_PASSPHRASE` env var | Standard CI escape hatch on the host. Also used inside containers for startup.sh blob decryption |
-| **Passphrase always in container env** | startup.sh needs it for initial git auth. Defense in depth — not casually visible but discoverable |
+| `SPINNER_SECRET_PASSPHRASE` env var (host only) | Standard CI escape hatch for unlocking the host store. Never sent to containers. |
 | Encrypted blob (not env vars) for ALL secrets | No secret values in container env, `ps aux`, or Docker env-file |
-| Same passphrase for host store and container blob | Single passphrase UX. Container blob has its own salt. Host store file never enters the container |
-| **Blob retained on disk (not deleted)** | Enables inception scenarios — inner spinner reads from outer blob |
-| **Passphrase forwarded to child processes** | Redundant info (agent has all secrets). Enables inception without user intervention |
+| **Separate key for transport blob** | Host store uses user passphrase + Argon2id. Transport blob uses random key. Passphrase never leaves host. |
+| **Blob + key retained on disk (not deleted)** | Enables inception scenarios and VM restarts — inner spinner reads from outer blob + key |
+| **Key file path forwarded to child processes** | Via `SPINNER_SECRET_KEY` env var. Redundant info (agent has all secrets). Enables inception without user intervention. |
 | `spinner secret inject` wrapper (not global export) | Limits secret exposure to explicit command trees. User controls which processes get secrets |
 | **startup.sh uses `spinner secret inject`** | Git credential cache persists auth. Tokens as env vars are redundant after initial setup |
 
@@ -358,42 +367,47 @@ file. In both cases, the user CAN also type it manually.
 A common pattern is: local machine → GCP VM → Docker containers inside the VM. Each layer needs
 access to secrets without the user's host store being available.
 
-The encrypted blob solves this because **blob format = store format**. The store path is configurable
-via `SPINNER_SECRET_STORE` environment variable (default: `~/.spinner/secrets.enc`). At each layer:
+The encrypted blob solves this because **blob format = store format**. The store path and key path
+are configurable via `SPINNER_SECRET_STORE` and `SPINNER_SECRET_KEY` environment variables. At each
+layer:
 
 ```
 Layer 0 (local machine):
   spinner spin --backend gcp --secret NPM_TOKEN --secret API_KEY --prompt "task"
-  → reads from ~/.spinner/secrets.enc (host store)
-  → generates encrypted blob → passes as instance metadata
-  → VM gets /run/spinner/secrets.enc
+  → reads from ~/.spinner/secrets.enc (host store, passphrase-protected)
+  → generates random key + encrypted blob
+  → blob → instance metadata, key → GCS
+  → VM gets /run/spinner/secrets.enc + /run/spinner/secrets.key
 
 Layer 1 (GCP VM, --prompt mode):
-  spinner exec reads blob → decrypts → injects into Claude CLI
+  spinner exec reads blob + key → decrypts → injects into Claude CLI
   → child process has: NPM_TOKEN, API_KEY, GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN,
-    SPINNER_SECRET_PASSPHRASE, SPINNER_SECRET_STORE=/run/spinner/secrets.enc
+    SPINNER_SECRET_STORE=/run/spinner/secrets.enc,
+    SPINNER_SECRET_KEY=/run/spinner/secrets.key
   → if agent runs: spinner spin --backend docker --secret NPM_TOKEN --prompt "sub-task"
-    → inner spinner reads from /run/spinner/secrets.enc (blob = store)
-    → generates new blob → mounts into Docker container
+    → inner spinner reads from /run/spinner/secrets.enc (blob = store, key = key)
+    → generates new random key + blob → mounts into Docker container
 
 Layer 1 (GCP VM, user SSHs in):
   spinner secret inject -- sh -c '
     SPINNER_SECRET_STORE=/run/spinner/secrets.enc \
+    SPINNER_SECRET_KEY=/run/spinner/secrets.key \
     spinner spin --backend docker --secret NPM_TOKEN --prompt "task"
   '
-  → user provides passphrase (or it's read from SPINNER_SECRET_PASSPHRASE in env)
-  → inner spinner reads from blob, generates new blob for inner container
+  → key file exists at /run/spinner/secrets.key, no passphrase needed
+  → inner spinner reads from blob, generates new key + blob for inner container
 
 Layer 2 (Docker container, --prompt mode):
-  spinner exec reads inner blob → decrypts → injects into Claude CLI
+  spinner exec reads inner blob + key → decrypts → injects into Claude CLI
 ```
 
-Same passphrase at every layer. The encrypted file travels downward, each layer decrypting what it
-needs and re-encrypting for the next. No store setup required inside VMs or containers — the blob
-IS the store.
+Same pattern at every layer — key file + blob file. The passphrase never leaves the host. Each
+layer decrypts with its key, re-encrypts with a fresh random key for the next. No store setup
+required inside VMs or containers — the blob IS the store.
 
-**Implementation:** `EncryptedFileStore` already takes a configurable `path`. The only addition is
-checking `SPINNER_SECRET_STORE` env var before defaulting to `~/.spinner/secrets.enc`:
+**Implementation:** `EncryptedFileStore` already takes a configurable `path`. The additions are
+`SPINNER_SECRET_KEY` for the key file path and `EncryptBlobWithKey`/`DecryptBlobWithKeyFile` for
+raw-key operations:
 
 ```go
 func defaultStorePath() string {
@@ -401,6 +415,13 @@ func defaultStorePath() string {
         return p
     }
     return filepath.Join(home, ".spinner", "secrets.enc")
+}
+
+func defaultKeyPath() string {
+    if p := os.Getenv("SPINNER_SECRET_KEY"); p != "" {
+        return p
+    }
+    return "/run/spinner/secrets.key"
 }
 ```
 

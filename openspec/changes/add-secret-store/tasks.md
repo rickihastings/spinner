@@ -56,3 +56,21 @@
 ## ~~8.0 Documentation~~
 
 - [x] 8.1 Update `docs/usage.md` with secret management workflow: `spinner secret set/list/delete`, `--secret` flag on spin, encrypted blob delivery, `spinner secret inject` for in-container use, inception scenarios, breaking change migration (env vars → store)
+
+## ~~9.0 Raw-Key Blob Encryption Functions~~
+
+- [x] 9.1 Add `EncryptBlobWithKey(secrets) (key, blob, error)` and `DecryptBlobWithKeyFile(blobPath, keyPath) (secrets, error)` to `internal/secret/blob.go` — random 32-byte AES-256-GCM key (no Argon2id), nonce + ciphertext format
+- [x] 9.2 Add tests to `internal/secret/blob_test.go`: round-trip with key file, wrong key error, missing key file error, fresh key per call
+- [x] 9.3 Verify build and all tests pass
+
+## 10.0 Switch Transport from Passphrase to Key-File
+
+- [ ] 10.1 Replace `Passphrase string` with `SecretKey []byte` in `provider.CreateConfig` and update doc comment; update `spinConfig` in Docker backend
+- [ ] 10.2 Update `cmd/spin.go`: use `EncryptBlobWithKey` instead of `EncryptBlob`, populate `SecretKey` instead of `Passphrase`, remove passphrase retrieval for blob
+- [ ] 10.3 Update Docker backend `run.go`: write key file to `~/.spinner/<container>/secrets.key`, mount at `/run/spinner/secrets.key:ro`, remove `SPINNER_SECRET_PASSPHRASE` from env-file; update `docker_provider.go` to pass `SecretKey`
+- [ ] 10.4 Update GCP backend `gcp_provider.go`: upload key to GCS at `gs://<bucket>/<instance>/secrets.key` via `UploadObject`, remove `SPINNER_SECRET_PASSPHRASE` from metadata; update `updateMetadata` to re-upload key on Start; update `gcp_runtime.sh` to fetch key from GCS
+- [ ] 10.5 Update `internal/exec/loop.go`: use key file (`/run/spinner/secrets.key`) instead of `SPINNER_SECRET_PASSPHRASE` env; inject `SPINNER_SECRET_KEY` instead of `SPINNER_SECRET_PASSPHRASE` into child env; remove `osUnsetenv` call
+- [ ] 10.6 Update `cmd/secret.go` inject command: read key from `SPINNER_SECRET_KEY` env or `/run/spinner/secrets.key` default; fall back to passphrase prompt if no key file
+- [ ] 10.7 Add `SPINNER_SECRET_PASSPHRASE` and `SPINNER_SECRET_KEY` to reserved env vars in `cmd/spin.go`
+- [ ] 10.8 Update all affected tests: `blob_test.go`, `run_test.go`, `gcp_provider_test.go`, `loop_test.go`, `secret_test.go`, `spin_test.go`
+- [ ] 10.9 Verify build and all tests pass

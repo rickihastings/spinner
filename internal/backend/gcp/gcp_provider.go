@@ -316,15 +316,6 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 	return p.client.SetMetadata(ctx, p.project, p.zone, name, metadata)
 }
 
-// Restart stops then starts a VM instance.
-func (p *Provider) Restart(ctx context.Context, name string) (*provider.Instance, error) {
-	if err := p.Stop(ctx, name); err != nil {
-		return nil, err
-	}
-
-	return p.Start(ctx, name, provider.CreateConfig{})
-}
-
 // Stop stops a running VM instance.
 func (p *Provider) Stop(ctx context.Context, name string) error {
 	return p.client.StopInstance(ctx, p.project, p.zone, name)
