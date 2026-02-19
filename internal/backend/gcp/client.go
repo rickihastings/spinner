@@ -242,7 +242,7 @@ func (c *RealGCPClient) ResetInstance(ctx context.Context, project, zone, name s
 	return nil
 }
 
-// DeleteInstance deletes a VM instance.
+// DeleteInstance deletes a VM instance. Returns nil if the instance does not exist.
 func (c *RealGCPClient) DeleteInstance(ctx context.Context, project, zone, name string) error {
 	_, err := runGcloud(ctx,
 		"compute", "instances", "delete", name,
@@ -251,6 +251,10 @@ func (c *RealGCPClient) DeleteInstance(ctx context.Context, project, zone, name 
 		"--quiet",
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "was not found") {
+			return nil
+		}
+
 		return fmt.Errorf("failed to delete instance: %w", err)
 	}
 
