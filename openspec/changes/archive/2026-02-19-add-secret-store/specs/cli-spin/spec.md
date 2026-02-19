@@ -302,7 +302,7 @@ outer Spinner layer serves as the store for an inner layer.
 
 ## MODIFIED Requirements
 
-### Requirement: Token Resolution (Breaking Change)
+### Requirement: GitHub Token Environment Variable
 
 The CLI SHALL resolve `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` from the encrypted secret store
 only. **Environment variable fallback is removed.** Both tokens MUST be stored in the secret store
