@@ -11,13 +11,13 @@ import (
 )
 
 func TestLoadBakeScript(t *testing.T) {
-	script, err := loadBakeScript("")
+	script, err := loadBakeScript("", "")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, script)
 }
 
 func TestLoadBakeScriptContent(t *testing.T) {
-	script, err := loadBakeScript("")
+	script, err := loadBakeScript("", "")
 	assert.NoError(t, err)
 
 	// Script should start with a shebang
@@ -31,7 +31,7 @@ func TestLoadBakeScriptContent(t *testing.T) {
 }
 
 func TestLoadBakeScriptIsExecutable(t *testing.T) {
-	script, err := loadBakeScript("")
+	script, err := loadBakeScript("", "")
 	assert.NoError(t, err)
 
 	// Should have set -e for fail-fast behavior
@@ -39,7 +39,7 @@ func TestLoadBakeScriptIsExecutable(t *testing.T) {
 }
 
 func TestLoadBakeScriptWithoutCustomScript(t *testing.T) {
-	script, err := loadBakeScript("")
+	script, err := loadBakeScript("", "")
 	assert.NoError(t, err)
 
 	// Without a custom script, should NOT contain the custom bake script markers
@@ -51,7 +51,7 @@ func TestLoadBakeScriptWithCustomScript(t *testing.T) {
 	customScript := `apt-get install -y nodejs
 npm install -g typescript`
 
-	script, err := loadBakeScript(customScript)
+	script, err := loadBakeScript(customScript, "")
 	assert.NoError(t, err)
 
 	// Should contain the custom script content inline
@@ -76,7 +76,7 @@ func TestLoadBakeScriptPreservesShellStructure(t *testing.T) {
 	customScript := `echo "installing custom tools"
 curl -fsSL https://example.com/install.sh | bash`
 
-	script, err := loadBakeScript(customScript)
+	script, err := loadBakeScript(customScript, "")
 	assert.NoError(t, err)
 
 	// Should still start with shebang

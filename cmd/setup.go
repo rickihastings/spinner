@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/rickihastings/spinner/internal/provider"
+	"github.com/rickihastings/spinner/internal/secret"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -22,6 +23,7 @@ func init() {
 func NewSetupCommand(f *provider.Factory) *cobra.Command {
 	var (
 		setupName         string
+		setupSecrets      []string
 		setupProviderArgs []string
 	)
 
@@ -80,16 +82,38 @@ EXAMPLES:
 				return err
 			}
 
+			var blob, key []byte
+
+			// Only resolve secrets if --secret flags were provided.
+			// setup doesn't need the built-in tokens (GITHUB_TOKEN etc.) — those
+			// are only required at runtime (spin). Secrets here are purely for
+			// custom bake script use via `spinner secret inject`.
+			if len(setupSecrets) > 0 {
+				store := spinStoreFactory()
+
+				resolved, err := secret.Resolve(store, setupSecrets)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
+					return err
+				}
+
+				key, blob, err = secret.EncryptBlobWithKey(resolved)
+				if err != nil {
+					return fmt.Errorf("encrypting secrets: %w", err)
+				}
+			}
+
 			// Merge provider args: config file provides base args, CLI appends on top.
 			providerArgs := mergeProviderArgs(configSetupProviderArgs, setupProviderArgs)
 
-			return runSetup(context.Background(), p, backend, setupName, providerArgs)
+			return runSetup(context.Background(), p, backend, setupName, blob, key, providerArgs)
 		},
 	}
 
 	// General flags
 	cmd.Flags().StringVar(&setupName, flagName, "", "Name for the environment (required)")
 	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
+	cmd.Flags().StringSliceVar(&setupSecrets, flagSecret, []string{}, "Reference a secret from the encrypted store (repeatable, GCP backend)")
 	cmd.Flags().StringSliceVar(&setupProviderArgs, flagProviderArgs, []string{}, "Extra arguments passed directly to the backend (repeatable)")
 
 	// Docker backend flags

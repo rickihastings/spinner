@@ -71,8 +71,8 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 		return err
 	}
 
-	// Load and render bake script template with custom script
-	bakeScript, err := loadBakeScript(customBakeScript)
+	// Load and render bake script template with custom script and image name
+	bakeScript, err := loadBakeScript(customBakeScript, config.Name)
 	if err != nil {
 		return fmt.Errorf("failed to load bake script: %w", err)
 	}
@@ -114,21 +114,35 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 	// Read config hash from environment if provided (used by integration tests)
 	configHash := os.Getenv("SPINNER_CONFIG_HASH")
 
-	return bakeImage(ctx, p.client, bakeConfig{
-		ImageName:     config.Name,
-		Project:       project,
-		Zone:          zone,
-		MachineType:   defaultMachineType,
-		DiskSizeGB:    defaultDiskSizeGB,
-		StartupScript: bakeScript,
-		StateBucket:   stateBucket,
-		ConfigHash:    configHash,
+	bakeErr := bakeImage(ctx, p.client, bakeConfig{
+		ImageName:      config.Name,
+		Project:        project,
+		Zone:           zone,
+		MachineType:    defaultMachineType,
+		DiskSizeGB:     defaultDiskSizeGB,
+		StartupScript:  bakeScript,
+		StateBucket:    stateBucket,
+		ConfigHash:     configHash,
+		ServiceAccount: config.Options["service-account"],
+		SecretBlob:     config.SecretBlob,
+		SecretKey:      config.SecretKey,
 		ExtraMetadata: map[string]string{
 			"startup-script-runtime": startupScript,
 			"spinner-install-script": installScript,
 		},
 		ExtraArgs: config.ProviderArgs,
 	})
+
+	// Clean up the ephemeral bake key from GCS regardless of bake success/failure.
+	// The bake VM is gone by the time bakeImage returns, so the key is no longer useful.
+	if len(config.SecretKey) > 0 && stateBucket != "" {
+		keyPrefix := config.Name + "-bake/secrets.key"
+		if deleteErr := p.client.DeleteObjectsWithPrefix(ctx, stateBucket, keyPrefix); deleteErr != nil {
+			fmt.Printf("Warning: failed to delete bake secrets key from GCS: %s\n", deleteErr)
+		}
+	}
+
+	return bakeErr
 }
 
 // InstanceName returns the deterministic VM instance name for the given config.

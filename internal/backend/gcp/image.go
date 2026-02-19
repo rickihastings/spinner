@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"time"
@@ -42,6 +43,14 @@ type bakeConfig struct {
 
 	// ServiceAccount is the service account email for the bake VM (optional, uses default).
 	ServiceAccount string
+
+	// SecretBlob is the encrypted secrets blob delivered via instance metadata.
+	// Present only when --secret flags were passed to `spinner setup`.
+	SecretBlob []byte
+
+	// SecretKey is the ephemeral AES-256-GCM key for decrypting SecretBlob.
+	// Written to GCS before bake starts; deleted by the host after bakeImage returns.
+	SecretKey []byte
 
 	// ExtraArgs holds raw pass-through arguments appended to the gcloud
 	// compute instances create command for the bake VM.
@@ -100,6 +109,19 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 		metadata[k] = v
 	}
 
+	// Upload ephemeral key to GCS so the bake VM can fetch it via gsutil.
+	if len(config.SecretKey) > 0 && config.StateBucket != "" {
+		keyObject := config.ImageName + "-bake/secrets.key"
+		if err := client.WriteObject(ctx, config.StateBucket, keyObject, config.SecretKey); err != nil {
+			return fmt.Errorf("failed to upload secrets key to GCS: %w", err)
+		}
+	}
+
+	// Deliver the encrypted blob via instance metadata (base64-encoded).
+	if len(config.SecretBlob) > 0 {
+		metadata["SPINNER_SECRET_BLOB"] = base64.StdEncoding.EncodeToString(config.SecretBlob)
+	}
+
 	err := client.CreateInstance(ctx, instanceConfig{
 		Name:           bakeVMName,
 		Project:        config.Project,
@@ -118,7 +140,7 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 			"spinner-image":   config.ImageName,
 		},
 		Scopes: []string{
-			"https://www.googleapis.com/auth/devstorage.read_only",
+			"https://www.googleapis.com/auth/devstorage.read_write",
 			"https://www.googleapis.com/auth/logging.write",
 		},
 		ExtraArgs: config.ExtraArgs,

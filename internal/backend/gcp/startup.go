@@ -19,13 +19,17 @@ type bakeTemplateData struct {
 	// BakeScript is the contents of the user's custom bake script (if any).
 	// Injected inline after core tooling is installed, before shutdown.
 	BakeScript string
+
+	// ImageName is the name of the image being baked.
+	// Used to construct the GCS path for the ephemeral secrets key.
+	ImageName string
 }
 
 // loadBakeScript reads the GCP bake startup script template from
 // templates/scripts/gcp_bake.sh and renders it with the given custom
 // bake script contents. If customBakeScript is empty, the template block
 // is omitted and the default bake runs unchanged.
-func loadBakeScript(customBakeScript string) (string, error) {
+func loadBakeScript(customBakeScript, imageName string) (string, error) {
 	tmpl, err := template.New("gcp_bake").Parse(bakeScript)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse bake script template: %w", err)
@@ -35,6 +39,7 @@ func loadBakeScript(customBakeScript string) (string, error) {
 
 	err = tmpl.Execute(&buf, bakeTemplateData{
 		BakeScript: customBakeScript,
+		ImageName:  imageName,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to render bake script template: %w", err)

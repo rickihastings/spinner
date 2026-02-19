@@ -31,6 +31,17 @@ var (
 // This runs once before any tests start and once after all tests complete.
 // For GCP tests, it builds the CLI once and creates a shared base image.
 func TestMain(m *testing.M) {
+	// Set up a temporary secret store with test tokens so that all integration
+	// tests that invoke `spinner spin` can resolve GITHUB_TOKEN and CLAUDE_CODE_OAUTH_TOKEN
+	// without a real secret store or interactive passphrase prompt.
+	storeCleanup, err := testutil.SetupTestSecretStore()
+	if err != nil {
+		fmt.Printf("Failed to set up test secret store: %v\n", err)
+		os.Exit(1)
+	}
+
+	defer storeCleanup()
+
 	var cleanupSharedImage func()
 
 	// Setup shared GCP resources if available

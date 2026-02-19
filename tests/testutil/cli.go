@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -63,14 +64,28 @@ func RunCommandWithEnv(t *testing.T, env map[string]string, args ...string) (std
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 
+	// allowedSpinnerVars are SPINNER_* env vars that must pass through to subprocesses.
+	// SPINNER_SECRET_STORE and SPINNER_SECRET_PASSPHRASE are set by SetupTestSecretStore
+	// so that all integration test subprocesses can access the temporary test store.
+	// SPINNER_CONFIG_FILE is set by SetupTestSecretStore to point to an empty config file,
+	// preventing subprocesses from picking up the developer's ~/.spinner.json defaults.
+	// All other SPINNER_* vars are filtered to ensure test isolation.
+	allowedSpinnerVars := map[string]bool{
+		"SPINNER_SECRET_STORE":      true,
+		"SPINNER_SECRET_PASSPHRASE": true,
+		"SPINNER_CONFIG_FILE":       true,
+	}
+
 	// Start with current environment, but filter out SPINNER_* vars
-	// to ensure tests run in isolation unless explicitly set
+	// to ensure tests run in isolation unless explicitly set.
 	var filteredEnv []string
 
 	for _, e := range os.Environ() {
-		// Skip SPINNER_* variables unless they're being explicitly set
 		if len(e) >= 8 && e[:8] == "SPINNER_" {
-			continue
+			key, _, _ := strings.Cut(e, "=")
+			if !allowedSpinnerVars[key] {
+				continue
+			}
 		}
 
 		filteredEnv = append(filteredEnv, e)

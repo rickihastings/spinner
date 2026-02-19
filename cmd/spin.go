@@ -159,7 +159,7 @@ EXAMPLES:
 			if spinSetup {
 				setupName := strings.TrimPrefix(spinImage, "spinner:")
 
-				if err := runSetup(ctx, p, backend, setupName, providerArgs); err != nil {
+				if err := runSetup(ctx, p, backend, setupName, nil, nil, providerArgs); err != nil {
 					return err
 				}
 

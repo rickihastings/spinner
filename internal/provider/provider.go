@@ -58,9 +58,14 @@ type ContainerMetrics struct {
 // Name is universal. Options carries backend-specific routing keys (e.g.
 // "project", "zone" for GCP). ProviderArgs carries raw pass-through
 // arguments for the backend (e.g. --build-arg for Docker, --machine-type for GCP).
+// SecretBlob carries the encrypted secrets blob for delivery into the bake VM.
+// SecretKey carries the ephemeral 32-byte AES-256-GCM key for blob decryption,
+// uploaded to GCS and deleted after bake completes.
 type SetupConfig struct {
 	Name         string
 	Options      map[string]string
+	SecretBlob   []byte
+	SecretKey    []byte
 	ProviderArgs []string
 }
 

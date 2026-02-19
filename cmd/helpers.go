@@ -109,10 +109,14 @@ func buildSetupOptions(backend string) map[string]string {
 
 // runSetup executes the full environment setup workflow for any backend.
 // Used by both the setup command and spin --setup.
-func runSetup(ctx context.Context, p provider.Provider, backend, name string, providerArgs []string) error {
+// secretBlob and secretKey carry the encrypted secret material for GCP bake VMs;
+// pass nil for both when secrets are not needed (e.g. spin --setup, Docker).
+func runSetup(ctx context.Context, p provider.Provider, backend, name string, secretBlob, secretKey []byte,  providerArgs []string) error {
 	return performSetup(ctx, p, provider.SetupConfig{
 		Name:         name,
 		Options:      buildSetupOptions(backend),
+		SecretBlob:   secretBlob,
+		SecretKey:    secretKey,
 		ProviderArgs: providerArgs,
 	})
 }

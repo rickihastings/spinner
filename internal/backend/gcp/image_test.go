@@ -64,7 +64,7 @@ func TestBakeImageSuccess(t *testing.T) {
 			"spinner-image":   "test-image",
 		},
 		Scopes: []string{
-			"https://www.googleapis.com/auth/devstorage.read_only",
+			"https://www.googleapis.com/auth/devstorage.read_write",
 			"https://www.googleapis.com/auth/logging.write",
 		},
 	}).Return(nil)

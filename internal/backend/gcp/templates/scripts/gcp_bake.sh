@@ -41,6 +41,23 @@ export LOCAL_BUILD=$(curl -sf -H "Metadata-Flavor: Google" \
     "http://metadata.google.internal/computeMetadata/v1/instance/attributes/LOCAL_BUILD" || echo "")
 export STATE_BUCKET=$(curl -sf -H "Metadata-Flavor: Google" \
     "http://metadata.google.internal/computeMetadata/v1/instance/attributes/STATE_BUCKET" || echo "")
+
+# Read encrypted secrets blob and key (if provided via --secret on setup)
+META_URL="http://metadata.google.internal/computeMetadata/v1/instance/attributes"
+SPINNER_SECRET_BLOB_B64=$(curl -sf -H "Metadata-Flavor: Google" \
+    "$META_URL/SPINNER_SECRET_BLOB" 2>/dev/null || echo "")
+if [ -n "$SPINNER_SECRET_BLOB_B64" ] && [ -n "$STATE_BUCKET" ]; then
+    mkdir -p /run/spinner
+    echo "$SPINNER_SECRET_BLOB_B64" | base64 -d > /run/spinner/secrets.enc
+    chmod 600 /run/spinner/secrets.enc
+    KEY_PATH="gs://${STATE_BUCKET}/{{.ImageName}}-bake/secrets.key"
+    if gsutil -q stat "$KEY_PATH" 2>/dev/null; then
+        gsutil cp "$KEY_PATH" /run/spinner/secrets.key
+        chmod 600 /run/spinner/secrets.key
+        echo "Secrets available for bake script via: spinner secret inject"
+    fi
+fi
+
 export SPINNER_VERSION=$(curl -sf -H "Metadata-Flavor: Google" \
     "http://metadata.google.internal/computeMetadata/v1/instance/attributes/SPINNER_VERSION" || echo "")
 
