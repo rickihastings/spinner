@@ -279,21 +279,56 @@ spinner spin \
 
 ### Passing Secrets and Environment Variables
 
-Use the `--env` flag to inject custom environment variables (API keys, tokens, config values) into the VM at runtime:
+#### Encrypted secrets (`--secret`)
+
+Sensitive values (API keys, auth tokens) should be stored in Spinner's encrypted secret store and passed via `--secret`:
+
+```bash
+# Store a secret once (prompted for value)
+spinner secret set NPM_TOKEN
+
+# Reference it at spin time
+spinner spin \
+  --image my-sandbox \
+  --repo https://github.com/your-org/your-repo.git \
+  --prompt "Publish the package" \
+  --secret NPM_TOKEN
+```
+
+The built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) are always resolved automatically — you never need to
+pass `--secret` for them. Only custom secrets require an explicit `--secret` flag.
+
+All resolved secrets are encrypted into a per-session blob using a random AES-256 key and delivered to the VM. The
+decryption key is stored separately in GCS and never appears in instance metadata. Inside the VM, use
+`spinner secret inject -- <command>` to run a command with secrets available as environment variables.
+
+The `--secret` flag is repeatable:
+
+```bash
+spinner spin \
+  --image my-sandbox \
+  --repo https://github.com/your-org/your-repo.git \
+  --secret NPM_TOKEN \
+  --secret SENTRY_AUTH_TOKEN
+```
+
+#### Plaintext environment variables (`--env`)
+
+Use `--env` for non-sensitive configuration values:
 
 ```bash
 spinner spin \
   --image my-sandbox \
   --repo https://github.com/your-org/your-repo.git \
   --prompt "Publish the package" \
-  --env NPM_TOKEN=npm_abc123 \
-  --env MY_API_KEY=sk-xyz
+  --env NODE_ENV=production \
+  --env MY_CONFIG_FLAG=true
 ```
 
 The flag is repeatable — pass `--env` once per variable. Values are split on the first `=`, so values containing `=` are
 handled correctly (e.g., `--env "DATABASE_URL=postgres://host/db?ssl=true"`).
 
-On GCP, custom env vars are passed as instance metadata with a `SPINNER_ENV_` prefix (e.g., `SPINNER_ENV_NPM_TOKEN`).
+On GCP, custom env vars are passed as instance metadata with a `SPINNER_ENV_` prefix (e.g., `SPINNER_ENV_NODE_ENV`).
 The VM's runtime script automatically strips the prefix and exports the variables into the execution environment.
 
 > **Note:** You cannot override reserved variables (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `REPO_URL`, `PROMPT`,
@@ -450,7 +485,8 @@ state).
 | Autonomous agent        | `spinner spin --image my-sandbox --repo <url> --prompt "task"`                     |
 | Watch live              | `spinner spin --image my-sandbox --repo <url> --prompt "task" --watch`             |
 | Watch existing          | `spinner watch <instance-name>`                                                    |
-| Pass secrets            | `spinner spin --image my-sandbox --repo <url> --env NPM_TOKEN=abc`                 |
+| Pass secret             | `spinner spin --image my-sandbox --repo <url> --secret NPM_TOKEN`                  |
+| Pass env var            | `spinner spin --image my-sandbox --repo <url> --env KEY=value`                     |
 | Recreate VM             | `spinner spin --image my-sandbox --repo <url> --recreate`                          |
 | Check state             | `gsutil cat gs://<bucket>/<instance-name>/state.json`                              |
 | SSH into VM             | `gcloud compute ssh <instance-name> --zone <zone> --project <project>`             |

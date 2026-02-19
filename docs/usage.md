@@ -76,9 +76,9 @@ spinner spin \
   --secret API_KEY
 ```
 
-All resolved secrets (built-in + custom) are encrypted into a per-session blob and delivered to the container at
-`/run/spinner/secrets.enc`. The passphrase is passed as the sole secret-related environment variable
-(`SPINNER_SECRET_PASSPHRASE`).
+All resolved secrets (built-in + custom) are encrypted into a per-session blob using a random AES-256 key and
+delivered to the container at `/run/spinner/secrets.enc`. The decryption key is stored separately (in GCS for GCP,
+or written directly for Docker) and never exposed as a plaintext environment variable.
 
 ### Passphrase
 

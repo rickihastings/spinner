@@ -55,32 +55,52 @@ apt-get install -y tailscale
 
 systemctl enable tailscaled
 
-# Create a oneshot service that reads TAILSCALE_AUTHKEY from GCE instance metadata
-# and authenticates on boot. If the key is absent, it does nothing.
+# Helper script: runs as ExecStart — decrypts secrets and connects Tailscale.
+# Using a separate script avoids systemd ExecStart quoting complexity.
+cat > /usr/local/bin/tailscale-auth.sh << 'TSEOF'
+#!/bin/bash
+set -e
+spinner secret inject -- sh -c '
+    if [ -n "$TAILSCALE_AUTH_KEY" ]; then
+        echo "Tailscale auth key found, connecting..."
+        tailscale up --authkey="$TAILSCALE_AUTH_KEY" --ssh
+    else
+        echo "TAILSCALE_AUTH_KEY not set in spinner secrets, skipping"
+    fi
+'
+TSEOF
+chmod +x /usr/local/bin/tailscale-auth.sh
+
+# Oneshot service that runs the helper once secrets are available.
 cat > /etc/systemd/system/tailscale-auth.service << 'TSEOF'
 [Unit]
-Description=Tailscale auto-auth from GCE metadata
+Description=Tailscale auto-auth from spinner secret store
 After=tailscaled.service
 Wants=tailscaled.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c '\
-    KEY=$(curl -sf -H "Metadata-Flavor: Google" \
-        "http://metadata.google.internal/computeMetadata/v1/instance/attributes/TAILSCALE_AUTHKEY" || true); \
-    if [ -n "$KEY" ]; then \
-        echo "Tailscale auth key found, connecting..."; \
-        tailscale up --authkey="$KEY" --ssh; \
-    else \
-        echo "No TAILSCALE_AUTHKEY in metadata, skipping auto-auth"; \
-    fi'
+ExecStart=/usr/local/bin/tailscale-auth.sh
 RemainAfterExit=yes
+TSEOF
+
+# Watch for the ephemeral decryption key written by gcp_runtime.sh.
+# When /run/spinner/secrets.key appears, systemd fires tailscale-auth.service automatically.
+# This avoids any dependency on google-startup-scripts.service (which blocks until the
+# agent loop finishes), while still guaranteeing secrets are available before auth runs.
+cat > /etc/systemd/system/tailscale-auth.path << 'TSEOF'
+[Unit]
+Description=Watch for spinner secrets key
+
+[Path]
+PathExists=/run/spinner/secrets.key
+Unit=tailscale-auth.service
 
 [Install]
 WantedBy=multi-user.target
 TSEOF
 
-systemctl enable tailscale-auth.service
+systemctl enable tailscale-auth.path
 
 echo "=== Installing Node.js 22.x LTS ==="
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
