@@ -151,19 +151,15 @@ The CLI SHALL be built as a standalone Go binary using `go build` command.
 - **THEN** the CLI SHALL support cross-compilation for different platforms (Linux, macOS, Windows)
 
 ### Requirement: Cobra Command Structure
-The CLI SHALL use Cobra for command routing and flag parsing.
 
-#### Scenario: Root command
-- **WHEN** user runs `spinner --help`
-- **THEN** Cobra SHALL display help text matching the format from src/App.tsx
+The setup command SHALL use Cobra and Viper for flag definition and configuration management, implemented in Go. The
+command SHALL be fully testable via dependency injection.
 
-#### Scenario: Subcommand registration
-- **WHEN** the CLI initializes
-- **THEN** setup and spin commands SHALL be registered with Cobra's AddCommand
+#### Scenario: Cobra command initialization
 
-#### Scenario: Flag validation
-- **WHEN** user provides invalid flags
-- **THEN** Cobra SHALL display appropriate error messages and usage information
+- **WHEN** the CLI starts
+- **THEN** the setup command SHALL be registered as a Cobra subcommand with all flags (--name, --backend,
+  --bake-script, --provider-args, and GCP routing flags --project, --zone, --state-bucket)
 
 ### Requirement: Viper Configuration Support
 The CLI SHALL use Viper for environment variable configuration (future-proofing).
@@ -366,58 +362,13 @@ The setup command SHALL accept GCP-specific flags when `--backend gcp` is select
 
 ### Requirement: Configuration File Support
 
-The setup command SHALL read infrastructure defaults from a `.spinner.json` file discovered by searching from the current working directory upward through ancestor directories, with a fallback to `$HOME/.spinner.json`.
+The setup command SHALL read infrastructure defaults from a `.spinner.json` file, including `provider-args`.
 
-#### Scenario: Config file in current directory
+#### Scenario: Config file with provider-args for setup
 
-- **WHEN** `.spinner.json` exists in the current working directory
-- **THEN** the CLI SHALL load that file as the configuration source
-
-#### Scenario: Config file in ancestor directory
-
-- **WHEN** no `.spinner.json` exists in the current working directory
-- **AND** a `.spinner.json` exists in an ancestor directory (e.g., `$HOME/.spinner.json` when cwd is `$HOME/projects/repo`)
-- **THEN** the CLI SHALL traverse upward from cwd and load the nearest `.spinner.json` found
-
-#### Scenario: Config file in home directory as fallback
-
-- **WHEN** no `.spinner.json` exists in the current directory or any ancestor directory
-- **AND** `$HOME/.spinner.json` exists
-- **THEN** the CLI SHALL load `$HOME/.spinner.json` as a fallback
-
-#### Scenario: First config file wins (no merging)
-
-- **WHEN** `.spinner.json` exists in both the current directory and `$HOME`
-- **THEN** the CLI SHALL load only the nearest file (current directory)
-- **AND** the home directory file SHALL be ignored entirely (no merging)
-
-#### Scenario: Config file provides backend default
-
-- **WHEN** `.spinner.json` contains `{"backend": "gcp", "project": "my-proj", "zone": "us-central1-a", "state-bucket": "my-bucket"}`
+- **WHEN** `.spinner.json` contains `{"provider-args": ["--no-cache", "--build-arg=NODE_ENV=production"]}`
 - **AND** user runs `spinner setup --name my-env`
-- **THEN** the CLI SHALL use the GCP backend with values from the config file
-
-#### Scenario: CLI flags override config file
-
-- **WHEN** `.spinner.json` contains `{"zone": "us-central1-a"}`
-- **AND** user runs `spinner setup --backend gcp --name my-env --zone us-east1-b`
-- **THEN** the CLI SHALL use `us-east1-b` (CLI flag takes precedence)
-
-#### Scenario: Environment variables override config file
-
-- **WHEN** `.spinner.json` contains `{"project": "file-project"}`
-- **AND** `SPINNER_PROJECT=env-project` is set
-- **THEN** the CLI SHALL use `env-project` (env var takes precedence over config file)
-
-#### Scenario: No config file present
-
-- **WHEN** no `.spinner.json` exists in the current directory, any ancestor directory, or `$HOME`
-- **THEN** the CLI SHALL continue normally using CLI flags, env vars, and defaults
-
-#### Scenario: Invalid config file
-
-- **WHEN** `.spinner.json` exists but contains invalid JSON
-- **THEN** the CLI SHALL print a warning and continue using CLI flags and defaults
+- **THEN** the CLI SHALL forward both args to the `docker build` command
 
 ### Requirement: Grouped Help Output
 
@@ -427,4 +378,60 @@ The setup command help SHALL organize flags into backend-specific groups for cla
 
 - **WHEN** user runs `spinner setup --help`
 - **THEN** flags SHALL be organized into labeled sections: General, Docker Backend, GCP Backend
+
+### Requirement: Provider Pass-Through Arguments for Setup
+
+The setup command SHALL accept an optional repeatable `--provider-args` flag that passes raw arguments directly to the
+underlying backend provider. Arguments are forwarded verbatim to the backend's environment provisioning command
+(`docker build` for Docker, `gcloud compute instances create` for GCP image bake).
+
+#### Scenario: Provider arg for Docker build
+
+- **WHEN** user runs `spinner setup --name my-env --provider-args="--build-arg=MY_ARG=value"`
+- **THEN** the CLI SHALL append `--build-arg=MY_ARG=value` to the `docker build` command before the context directory
+
+#### Scenario: Provider arg for Docker no-cache
+
+- **WHEN** user runs `spinner setup --name my-env --provider-args="--no-cache"`
+- **THEN** the CLI SHALL append `--no-cache` to the `docker build` command
+
+#### Scenario: Provider arg for GCP setup
+
+- **WHEN** user runs `spinner setup --backend gcp --name my-env --project p --zone z --state-bucket b --provider-args="--labels=env=staging"`
+- **THEN** the CLI SHALL append `--labels=env=staging` to the GCP bake VM creation command
+
+#### Scenario: No provider args provided
+
+- **WHEN** user runs `spinner setup --name my-env` without any `--provider-args` flags
+- **THEN** the CLI SHALL behave identically to the current implementation (no change in behavior)
+
+#### Scenario: Provider args from config file
+
+- **WHEN** `.spinner.json` contains `{"provider-args": ["--no-cache"]}`
+- **AND** user runs `spinner setup --name my-env`
+- **THEN** the CLI SHALL forward `--no-cache` to the backend build command
+
+### Requirement: Provider Args Conflict Detection for Setup
+
+The CLI SHALL reject `--provider-args` values that conflict with arguments managed by Spinner during setup.
+
+#### Scenario: Docker build tag conflict
+
+- **WHEN** user provides `--provider-args="-t my-tag"` with the Docker backend setup
+- **THEN** the CLI SHALL print an error indicating `-t` is managed by Spinner and exit with non-zero status
+
+#### Scenario: Non-conflicting build args pass through
+
+- **WHEN** user provides `--provider-args="--no-cache"` with the Docker backend setup
+- **THEN** the CLI SHALL accept and forward the argument without error
+
+### Requirement: Removed Backend-Specific Setup Flags
+
+The setup command SHALL NOT accept the following backend-specific flags, which have been replaced by `--provider-args`:
+`--base-image`, `--dockerfile`, `--machine-type`, `--disk-size`.
+
+#### Scenario: Removed flag produces error
+
+- **WHEN** user provides `--base-image=node:20`
+- **THEN** the CLI SHALL print an unknown flag error and exit with non-zero status
 
