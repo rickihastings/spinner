@@ -90,13 +90,17 @@ func init() {
 	viper.AutomaticEnv()
 
 	// Primary config: .spinner.json (traverses from cwd up to root, then checks $HOME)
-	cwd, _ := os.Getwd()
+	// SPINNER_SKIP_CONFIG=true disables config file discovery (used by integration tests
+	// to prevent developer configs from leaking into test subprocesses).
+	if os.Getenv("SPINNER_SKIP_CONFIG") != "true" {
+		cwd, _ := os.Getwd()
 
-	home, _ := os.UserHomeDir()
-	if configPath := findConfigFile(cwd, home); configPath != "" {
-		viper.SetConfigFile(configPath)
+		home, _ := os.UserHomeDir()
+		if configPath := findConfigFile(cwd, home); configPath != "" {
+			viper.SetConfigFile(configPath)
 
-		_ = viper.ReadInConfig() // Ignore error if config can't be read
+			_ = viper.ReadInConfig() // Ignore error if config can't be read
+		}
 	}
 
 	// Watch mode defaults

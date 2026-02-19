@@ -76,6 +76,10 @@ func RunCommandWithEnv(t *testing.T, env map[string]string, args ...string) (std
 		filteredEnv = append(filteredEnv, e)
 	}
 
+	// Disable config file discovery so developer .spinner.json files don't bleed
+	// into test subprocesses. Tests that need config should pass flags explicitly.
+	filteredEnv = append(filteredEnv, "SPINNER_SKIP_CONFIG=true")
+
 	cmd.Env = filteredEnv
 
 	// Add custom environment variables (including explicit SPINNER_* vars)

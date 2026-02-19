@@ -164,7 +164,10 @@ func createSharedGCPImage(cfg *testutil.GCPTestConfig, imageName, configHash str
 		"--project", cfg.Project,
 		"--zone", cfg.Zone,
 		"--state-bucket", cfg.Bucket,
-		"--service-account", cfg.ServiceAccount,
+	}
+
+	if cfg.ServiceAccount != "" {
+		args = append(args, "--provider-args", "--service-account="+cfg.ServiceAccount)
 	}
 
 	cmd := exec.Command(args[0], args[1:]...)

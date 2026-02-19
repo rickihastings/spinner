@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 //go:embed templates/scripts/startup.sh
@@ -68,4 +69,18 @@ func LoadStartupScript() string {
 // This script handles binary installation from either GitHub releases or local dev.
 func LoadInstallSpinnerScript() string {
 	return installSpinnerScript
+}
+
+// SplitArgs splits a slice of potentially space-separated argument strings into
+// individual tokens. This handles the case where a user passes
+// --provider-args="-f ./Dockerfile" as a single string rather than two separate
+// --provider-args flags. Each element is split on whitespace via strings.Fields.
+func SplitArgs(args []string) []string {
+	result := make([]string, 0, len(args))
+
+	for _, arg := range args {
+		result = append(result, strings.Fields(arg)...)
+	}
+
+	return result
 }
