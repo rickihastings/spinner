@@ -67,12 +67,12 @@ Wants=tailscaled.service
 Type=oneshot
 ExecStart=/bin/bash -c '\
     KEY=$(curl -sf -H "Metadata-Flavor: Google" \
-        "http://metadata.google.internal/computeMetadata/v1/instance/attributes/SPINNER_ENV_TAILSCALE_AUTHKEY" || true); \
+        "http://metadata.google.internal/computeMetadata/v1/instance/attributes/TAILSCALE_AUTHKEY" || true); \
     if [ -n "$KEY" ]; then \
         echo "Tailscale auth key found, connecting..."; \
         tailscale up --authkey="$KEY" --ssh; \
     else \
-        echo "No SPINNER_ENV_TAILSCALE_AUTHKEY in metadata, skipping auto-auth"; \
+        echo "No TAILSCALE_AUTHKEY in metadata, skipping auto-auth"; \
     fi'
 RemainAfterExit=yes
 

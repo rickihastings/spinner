@@ -26,6 +26,10 @@ const (
 	// defaultSecretsBlobPath is the path where the encrypted secrets blob is
 	// mounted inside the container.
 	defaultSecretsBlobPath = "/run/spinner/secrets.enc"
+
+	// defaultSecretsKeyPath is the path where the ephemeral decryption key is
+	// mounted inside the container.
+	defaultSecretsKeyPath = "/run/spinner/secrets.key"
 )
 
 // StateSyncFunc is called after each local state save to sync state to a
@@ -51,10 +55,10 @@ var (
 			Env:              env,
 		})
 	}
-	pushChangesFunc = pushChanges
-	decryptBlobFunc = secret.DecryptBlob
-	osUnsetenv      = os.Unsetenv
-	secretsBlobPath = defaultSecretsBlobPath
+	pushChangesFunc        = pushChanges
+	decryptBlobWithKeyFile = secret.DecryptBlobWithKeyFile
+	secretsBlobPath        = defaultSecretsBlobPath
+	secretsKeyPath         = defaultSecretsKeyPath
 )
 
 // Runner executes the main iteration loop.
@@ -118,19 +122,15 @@ func (r *Runner) Run(ctx context.Context) int {
 	fmt.Printf("Starting Ralph loop with prompt: %s\n", r.config.Prompt)
 	fmt.Printf("Max iterations: %d\n", r.config.MaxIterations)
 
-	// Decrypt secrets blob and build env for child processes
+	// Decrypt secrets blob using key file and build env for child processes
 	var secretEnv []string
 
-	passphrase := os.Getenv("SPINNER_SECRET_PASSPHRASE")
-	if passphrase != "" {
-		if _, err := os.Stat(secretsBlobPath); err == nil {
-			secrets, err := decryptBlobFunc(secretsBlobPath, passphrase)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to decrypt secrets blob: %v\n", err)
+	if _, err := os.Stat(secretsBlobPath); err == nil {
+		if _, keyErr := os.Stat(secretsKeyPath); keyErr == nil {
+			secrets, decryptErr := decryptBlobWithKeyFile(secretsBlobPath, secretsKeyPath)
+			if decryptErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to decrypt secrets blob: %v\n", decryptErr)
 			} else {
-				// Unset passphrase from own process env
-				_ = osUnsetenv("SPINNER_SECRET_PASSPHRASE")
-
 				// Build env slice with all secrets + inception support
 				// Sort keys for deterministic ordering
 				keys := make([]string, 0, len(secrets))
@@ -144,7 +144,7 @@ func (r *Runner) Run(ctx context.Context) int {
 					secretEnv = append(secretEnv, k+"="+secrets[k])
 				}
 
-				secretEnv = append(secretEnv, "SPINNER_SECRET_PASSPHRASE="+passphrase)
+				secretEnv = append(secretEnv, "SPINNER_SECRET_KEY="+secretsKeyPath)
 				secretEnv = append(secretEnv, "SPINNER_SECRET_STORE="+secretsBlobPath)
 			}
 		}

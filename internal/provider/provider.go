@@ -72,7 +72,8 @@ type SetupConfig struct {
 // an env file from the --env-file flag (passed through as-is to backends).
 // ProviderArgs carries raw pass-through arguments for the backend.
 // SecretBlob carries the encrypted secrets blob for delivery into the instance.
-// Passphrase carries the decryption passphrase for the blob.
+// SecretKey carries the ephemeral 32-byte AES-256-GCM key for blob decryption.
+// The key is delivered via file, never as an env var or instance metadata value.
 type CreateConfig struct {
 	Repo          string
 	Prompt        string
@@ -83,6 +84,7 @@ type CreateConfig struct {
 	EnvVars       map[string]string
 	EnvFile       string
 	SecretBlob    []byte
+	SecretKey     []byte
 	Passphrase    string
 	ProviderArgs  []string
 }

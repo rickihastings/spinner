@@ -26,10 +26,9 @@ ANTHROPIC_MODEL=$(curl -sf -H "$META_HEADER" "$META_URL/ANTHROPIC_MODEL" || echo
 GIT_USER_NAME=$(curl -sf -H "$META_HEADER" "$META_URL/GIT_USER_NAME" || echo "")
 GIT_USER_EMAIL=$(curl -sf -H "$META_HEADER" "$META_URL/GIT_USER_EMAIL" || echo "")
 
-# Read encrypted secrets blob and passphrase from metadata.
+# Read encrypted secrets blob from metadata.
 # Tokens (GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN) travel via the encrypted blob, not as plaintext metadata.
 SPINNER_SECRET_BLOB_B64=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_SECRET_BLOB" || echo "")
-SPINNER_SECRET_PASSPHRASE=$(curl -sf -H "$META_HEADER" "$META_URL/SPINNER_SECRET_PASSPHRASE" || echo "")
 
 # Decode the blob and write it to the expected path for startup.sh
 if [ -n "$SPINNER_SECRET_BLOB_B64" ]; then
@@ -40,9 +39,22 @@ if [ -n "$SPINNER_SECRET_BLOB_B64" ]; then
     echo "Encrypted secrets blob written to /run/spinner/secrets.enc"
 fi
 
+# Fetch ephemeral decryption key from GCS (not metadata — metadata is visible in GCP Console).
+# The key is a raw 32-byte AES-256-GCM key written to /run/spinner/secrets.key.
+if [ -n "$SPINNER_STATE_BUCKET" ] && [ -n "$SPINNER_INSTANCE_NAME" ]; then
+    KEY_PATH="gs://${SPINNER_STATE_BUCKET}/${SPINNER_INSTANCE_NAME}/secrets.key"
+    if gsutil -q stat "$KEY_PATH" 2>/dev/null; then
+        mkdir -p /run/spinner
+        gsutil cp "$KEY_PATH" /run/spinner/secrets.key
+        chmod 600 /run/spinner/secrets.key
+        chown spinner:spinner /run/spinner/secrets.key
+        echo "Secrets key fetched from GCS to /run/spinner/secrets.key"
+    fi
+fi
+
 export REPO_URL PROMPT BRANCH MAX_ITERATIONS
 export SPINNER_LOG_BUCKET SPINNER_INSTANCE_NAME SPINNER_STATE_BUCKET ANTHROPIC_MODEL
-export SPINNER_SECRET_PASSPHRASE GIT_USER_NAME GIT_USER_EMAIL
+export GIT_USER_NAME GIT_USER_EMAIL
 
 # Read custom env vars from metadata (SPINNER_ENV_ prefix)
 echo "Reading custom environment variables..."

@@ -149,6 +149,9 @@ func newSecretDeleteCommand(sf storeFactory) *cobra.Command {
 // defaultBlobPath is the default path for the encrypted secrets blob inside containers.
 var defaultBlobPath = "/run/spinner/secrets.enc"
 
+// defaultKeyPath is the default path for the ephemeral decryption key inside containers.
+var defaultKeyPath = "/run/spinner/secrets.key"
+
 // osExit is a package-level variable for testing.
 var osExit = os.Exit
 
@@ -169,14 +172,19 @@ func newSecretInjectCommand() *cobra.Command {
 				return fmt.Errorf("missing command argument: usage: spinner secret inject -- <command> [args...]")
 			}
 
-			passphrase, err := passphraseFromEnvOrPrompt()
+			// Try key-file decryption first (preferred path)
+			secrets, err := tryKeyFileDecrypt()
 			if err != nil {
-				return fmt.Errorf("getting passphrase: %w", err)
-			}
+				// Fall back to passphrase-based decryption (backward compatibility)
+				passphrase, passErr := passphraseFromEnvOrPrompt()
+				if passErr != nil {
+					return fmt.Errorf("getting passphrase: %w", passErr)
+				}
 
-			secrets, err := secret.DecryptBlob(defaultBlobPath, passphrase)
-			if err != nil {
-				return fmt.Errorf("decrypting secrets blob: %w", err)
+				secrets, err = secret.DecryptBlob(defaultBlobPath, passphrase)
+				if err != nil {
+					return fmt.Errorf("decrypting secrets blob: %w", err)
+				}
 			}
 
 			child := exec.Command(args[0], args[1:]...)
@@ -200,6 +208,18 @@ func newSecretInjectCommand() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// tryKeyFileDecrypt attempts to decrypt the blob using the key file.
+// Returns ErrNotFound-style error if the key file doesn't exist.
+func tryKeyFileDecrypt() (map[string]string, error) {
+	// Check SPINNER_SECRET_KEY env var for key file path, then default
+	keyPath := os.Getenv("SPINNER_SECRET_KEY")
+	if keyPath == "" {
+		keyPath = defaultKeyPath
+	}
+
+	return secret.DecryptBlobWithKeyFile(defaultBlobPath, keyPath)
 }
 
 // secretsToEnvSlice converts a secrets map to KEY=VALUE environment variable strings.

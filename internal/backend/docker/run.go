@@ -29,6 +29,7 @@ type spinConfig struct {
 	EnvVars       map[string]string
 	EnvFile       string
 	SecretBlob    []byte
+	SecretKey     []byte
 	Passphrase    string
 	ExtraArgs     []string
 }
@@ -157,11 +158,6 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		_, _ = fmt.Fprintf(tmpFile, "LOG_DIR=/logs\n")
 	}
 
-	// Pass SPINNER_SECRET_PASSPHRASE so startup.sh can decrypt the blob
-	if config.Passphrase != "" {
-		_, _ = fmt.Fprintf(tmpFile, "SPINNER_SECRET_PASSPHRASE=%s\n", config.Passphrase)
-	}
-
 	// Write custom environment variables
 	for key, value := range config.EnvVars {
 		_, _ = fmt.Fprintf(tmpFile, "%s=%s\n", key, value)
@@ -173,7 +169,7 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		return nil, "", fmt.Errorf("failed to close env file: %w", err)
 	}
 
-	// Write encrypted blob to host-mounted directory for container access
+	// Write encrypted blob and key file to host-mounted directory for container access
 	if len(config.SecretBlob) > 0 {
 		blobDir := filepath.Join(homeDir, ".spinner", containerName)
 		if err := os.MkdirAll(blobDir, 0700); err != nil {
@@ -183,6 +179,13 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		blobPath := filepath.Join(blobDir, "secrets.enc")
 		if err := os.WriteFile(blobPath, config.SecretBlob, 0600); err != nil {
 			return nil, "", fmt.Errorf("failed to write secrets blob: %w", err)
+		}
+
+		if len(config.SecretKey) > 0 {
+			keyPath := filepath.Join(blobDir, "secrets.key")
+			if err := os.WriteFile(keyPath, config.SecretKey, 0600); err != nil {
+				return nil, "", fmt.Errorf("failed to write secrets key: %w", err)
+			}
 		}
 	}
 
@@ -201,10 +204,15 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		fmt.Sprintf("%s/.spinner/%s/state:/state", homeDir, containerName),
 	}
 
-	// Mount encrypted secrets blob read-only into container
+	// Mount encrypted secrets blob and key file read-only into container
 	if len(config.SecretBlob) > 0 {
 		blobPath := filepath.Join(homeDir, ".spinner", containerName, "secrets.enc")
 		dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/run/spinner/secrets.enc:ro", blobPath))
+
+		if len(config.SecretKey) > 0 {
+			keyPath := filepath.Join(homeDir, ".spinner", containerName, "secrets.key")
+			dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/run/spinner/secrets.key:ro", keyPath))
+		}
 	}
 
 	// Add .npmrc mount if it exists

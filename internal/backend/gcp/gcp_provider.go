@@ -181,9 +181,13 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		metadata["SPINNER_SECRET_BLOB"] = base64.StdEncoding.EncodeToString(config.SecretBlob)
 	}
 
-	// Pass passphrase so startup.sh can decrypt the blob
-	if config.Passphrase != "" {
-		metadata["SPINNER_SECRET_PASSPHRASE"] = config.Passphrase
+	// Upload ephemeral key to GCS (not metadata — metadata is visible in GCP Console).
+	// The key is fetched by gcp_runtime.sh on boot and written to /run/spinner/secrets.key.
+	if len(config.SecretKey) > 0 && p.bucket != "" {
+		keyObject := name + "/secrets.key"
+		if err := p.client.WriteObject(ctx, p.bucket, keyObject, config.SecretKey); err != nil {
+			return nil, fmt.Errorf("failed to upload secrets key to GCS: %w", err)
+		}
 	}
 
 	if p.bucket != "" {
@@ -278,13 +282,17 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 		"PROMPT": config.Prompt,
 	}
 
-	// Update blob and passphrase if provided (e.g. secrets may have changed)
+	// Update blob if provided (e.g. secrets may have changed)
 	if len(config.SecretBlob) > 0 {
 		updates["SPINNER_SECRET_BLOB"] = base64.StdEncoding.EncodeToString(config.SecretBlob)
 	}
 
-	if config.Passphrase != "" {
-		updates["SPINNER_SECRET_PASSPHRASE"] = config.Passphrase
+	// Re-upload key to GCS if provided
+	if len(config.SecretKey) > 0 && p.bucket != "" {
+		keyObject := name + "/secrets.key"
+		if err := p.client.WriteObject(ctx, p.bucket, keyObject, config.SecretKey); err != nil {
+			return fmt.Errorf("failed to upload secrets key to GCS: %w", err)
+		}
 	}
 
 	if config.MaxIterations != "" {
@@ -295,15 +303,28 @@ func (p *Provider) updateMetadata(ctx context.Context, name string, config provi
 		updates["ANTHROPIC_MODEL"] = config.Model
 	}
 
-	// Update existing metadata items in-place
+	// Update existing metadata items in-place, removing SPINNER_SECRET_PASSPHRASE
+	// (replaced by key-file transport via GCS)
+	var filtered []GCPMetadataItem
+
 	for i := range metadata.Items {
 		key := metadata.Items[i].Key
+
+		// Remove deprecated passphrase metadata
+		if key == "SPINNER_SECRET_PASSPHRASE" {
+			continue
+		}
+
 		if newVal, ok := updates[key]; ok {
 			metadata.Items[i].Value = newVal
 
 			delete(updates, key)
 		}
+
+		filtered = append(filtered, metadata.Items[i])
 	}
+
+	metadata.Items = filtered
 
 	// Append any new keys that didn't exist in the original metadata
 	for key, value := range updates {

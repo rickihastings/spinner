@@ -80,7 +80,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		EnvFile:       config.EnvFile,
 		ExtraArgs:     config.ProviderArgs,
 		SecretBlob:    config.SecretBlob,
-		Passphrase:    config.Passphrase,
+		SecretKey:     config.SecretKey,
 	}
 
 	args, tmpFile, err := buildDockerRunCommand(sc, containerName, hasNpmrc)

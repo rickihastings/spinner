@@ -12,31 +12,37 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// setupBlobFile creates an encrypted blob file in a temp directory and returns the path.
-// It also sets SPINNER_SECRET_PASSPHRASE and overrides defaultBlobPath for the test.
+// setupBlobWithKeyFile creates an encrypted blob and key file in a temp directory.
+// It overrides defaultBlobPath and defaultKeyPath for the test.
 // Callers must defer the returned cleanup function.
-func setupBlobFile(t *testing.T, secrets map[string]string, passphrase string) func() {
+func setupBlobWithKeyFile(t *testing.T, secrets map[string]string) func() {
 	t.Helper()
 
 	dir := t.TempDir()
 	blobPath := filepath.Join(dir, "secrets.enc")
+	keyFilePath := filepath.Join(dir, "secrets.key")
 
-	blob, err := secret.EncryptBlob(secrets, passphrase)
+	key, blob, err := secret.EncryptBlobWithKey(secrets)
 	if err != nil {
-		t.Fatalf("EncryptBlob: %v", err)
+		t.Fatalf("EncryptBlobWithKey: %v", err)
 	}
 
 	if err := os.WriteFile(blobPath, blob, 0600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
+		t.Fatalf("WriteFile blob: %v", err)
+	}
+
+	if err := os.WriteFile(keyFilePath, key, 0600); err != nil {
+		t.Fatalf("WriteFile key: %v", err)
 	}
 
 	origBlobPath := defaultBlobPath
+	origKeyPath := defaultKeyPath
 	defaultBlobPath = blobPath
-
-	t.Setenv("SPINNER_SECRET_PASSPHRASE", passphrase)
+	defaultKeyPath = keyFilePath
 
 	return func() {
 		defaultBlobPath = origBlobPath
+		defaultKeyPath = origKeyPath
 	}
 }
 
@@ -244,10 +250,10 @@ func TestSecretDeleteCommand_MissingKeyArg(t *testing.T) {
 }
 
 func TestSecretInjectCommand_DecryptsAndRunsCommand(t *testing.T) {
-	cleanup := setupBlobFile(t, map[string]string{
+	cleanup := setupBlobWithKeyFile(t, map[string]string{
 		"GITHUB_TOKEN": "ghp_test123",
 		"CUSTOM_KEY":   "custom_val",
-	}, "test-passphrase")
+	})
 	defer cleanup()
 
 	cmd := newSecretCommand(nil)
@@ -262,39 +268,80 @@ func TestSecretInjectCommand_DecryptsAndRunsCommand(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSecretInjectCommand_PassphraseFromEnv(t *testing.T) {
-	cleanup := setupBlobFile(t, map[string]string{
+func TestSecretInjectCommand_KeyFromEnvVar(t *testing.T) {
+	// Create blob + key, set SPINNER_SECRET_KEY to key path
+	dir := t.TempDir()
+	blobPath := filepath.Join(dir, "secrets.enc")
+	keyFilePath := filepath.Join(dir, "secrets.key")
+
+	key, blob, err := secret.EncryptBlobWithKey(map[string]string{
 		"MY_SECRET": "secret_value",
-	}, "env-passphrase")
-	defer cleanup()
+	})
+	assert.NoError(t, err)
+	assert.NoError(t, os.WriteFile(blobPath, blob, 0600))
+	assert.NoError(t, os.WriteFile(keyFilePath, key, 0600))
+
+	origBlobPath := defaultBlobPath
+	origKeyPath := defaultKeyPath
+	defaultBlobPath = blobPath
+	// Set defaultKeyPath to nonexistent so env var is used
+	defaultKeyPath = filepath.Join(dir, "nonexistent.key")
+
+	defer func() {
+		defaultBlobPath = origBlobPath
+		defaultKeyPath = origKeyPath
+	}()
+
+	t.Setenv("SPINNER_SECRET_KEY", keyFilePath)
 
 	cmd := newSecretCommand(nil)
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	// Use env to print all env vars, pipe through grep to find our secret
 	cmd.SetArgs([]string{"inject", "--", "sh", "-c", "printenv MY_SECRET"})
 
-	err := cmd.Execute()
+	err = cmd.Execute()
 
 	assert.NoError(t, err)
 }
 
-func TestSecretInjectCommand_WrongPassphrase(t *testing.T) {
-	// Create blob with one passphrase, set env with another
+func TestSecretInjectCommand_WrongKey(t *testing.T) {
 	dir := t.TempDir()
 	blobPath := filepath.Join(dir, "secrets.enc")
+	wrongKeyPath := filepath.Join(dir, "wrong.key")
 
-	blob, err := secret.EncryptBlob(map[string]string{"KEY": "val"}, "correct-pass")
+	_, blob, err := secret.EncryptBlobWithKey(map[string]string{"KEY": "val"})
 	assert.NoError(t, err)
 	assert.NoError(t, os.WriteFile(blobPath, blob, 0600))
 
+	// Write a different 32-byte key
+	wrongKey := make([]byte, 32)
+	for i := range wrongKey {
+		wrongKey[i] = 0xFF
+	}
+
+	assert.NoError(t, os.WriteFile(wrongKeyPath, wrongKey, 0600))
+
 	origBlobPath := defaultBlobPath
+	origKeyPath := defaultKeyPath
 	defaultBlobPath = blobPath
+	defaultKeyPath = wrongKeyPath
 
-	defer func() { defaultBlobPath = origBlobPath }()
+	defer func() {
+		defaultBlobPath = origBlobPath
+		defaultKeyPath = origKeyPath
+	}()
 
-	t.Setenv("SPINNER_SECRET_PASSPHRASE", "wrong-pass")
+	// Clear passphrase env so it doesn't fall back to passphrase
+	t.Setenv("SPINNER_SECRET_PASSPHRASE", "")
+
+	// Mock readPassword to return empty (so fallback also fails)
+	origReadPassword := readPassword
+	readPassword = func(fd int) ([]byte, error) {
+		return []byte(""), nil
+	}
+
+	defer func() { readPassword = origReadPassword }()
 
 	cmd := newSecretCommand(nil)
 	buf := new(bytes.Buffer)
@@ -305,16 +352,31 @@ func TestSecretInjectCommand_WrongPassphrase(t *testing.T) {
 	err = cmd.Execute()
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "decrypting secrets blob")
 }
 
 func TestSecretInjectCommand_MissingBlob(t *testing.T) {
+	dir := t.TempDir()
+
 	origBlobPath := defaultBlobPath
+	origKeyPath := defaultKeyPath
 	defaultBlobPath = "/nonexistent/path/secrets.enc"
+	defaultKeyPath = filepath.Join(dir, "nonexistent.key")
 
-	defer func() { defaultBlobPath = origBlobPath }()
+	defer func() {
+		defaultBlobPath = origBlobPath
+		defaultKeyPath = origKeyPath
+	}()
 
-	t.Setenv("SPINNER_SECRET_PASSPHRASE", "test-pass")
+	// Clear passphrase env so fallback path also fails
+	t.Setenv("SPINNER_SECRET_PASSPHRASE", "")
+
+	// Mock readPassword to return empty (so passphrase fallback also fails)
+	origReadPassword := readPassword
+	readPassword = func(fd int) ([]byte, error) {
+		return []byte(""), nil
+	}
+
+	defer func() { readPassword = origReadPassword }()
 
 	cmd := newSecretCommand(nil)
 	buf := new(bytes.Buffer)
@@ -325,7 +387,6 @@ func TestSecretInjectCommand_MissingBlob(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "decrypting secrets blob")
 }
 
 func TestSecretInjectCommand_MissingCommandArg(t *testing.T) {
@@ -343,8 +404,8 @@ func TestSecretInjectCommand_MissingCommandArg(t *testing.T) {
 	assert.Contains(t, err.Error(), "missing command argument")
 }
 
-func TestSecretInjectCommand_PassphraseFromPrompt(t *testing.T) {
-	// Create blob with known passphrase
+func TestSecretInjectCommand_PassphraseFallback(t *testing.T) {
+	// When key file is missing, inject should fall back to passphrase-based decryption
 	dir := t.TempDir()
 	blobPath := filepath.Join(dir, "secrets.enc")
 
@@ -353,9 +414,15 @@ func TestSecretInjectCommand_PassphraseFromPrompt(t *testing.T) {
 	assert.NoError(t, os.WriteFile(blobPath, blob, 0600))
 
 	origBlobPath := defaultBlobPath
+	origKeyPath := defaultKeyPath
 	defaultBlobPath = blobPath
+	// Set key path to nonexistent so it falls back to passphrase
+	defaultKeyPath = filepath.Join(dir, "nonexistent.key")
 
-	defer func() { defaultBlobPath = origBlobPath }()
+	defer func() {
+		defaultBlobPath = origBlobPath
+		defaultKeyPath = origKeyPath
+	}()
 
 	// Ensure env var is NOT set so it falls back to prompt
 	t.Setenv("SPINNER_SECRET_PASSPHRASE", "")

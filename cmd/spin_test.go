@@ -567,6 +567,8 @@ func TestParseAndValidateEnvVars_ReservedVars(t *testing.T) {
 		"SPINNER_STATE_BUCKET",
 		"SPINNER_INSTANCE_NAME",
 		"ANTHROPIC_MODEL",
+		"SPINNER_SECRET_PASSPHRASE",
+		"SPINNER_SECRET_KEY",
 	}
 
 	for _, reserved := range reservedVars {

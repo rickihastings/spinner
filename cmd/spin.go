@@ -185,14 +185,8 @@ EXAMPLES:
 				return err
 			}
 
-			// Get the passphrase for blob encryption (already cached from Resolve)
-			passphrase, err := passphraseFromEnvOrPrompt()
-			if err != nil {
-				return fmt.Errorf("getting passphrase: %w", err)
-			}
-
-			// Encrypt resolved secrets into a per-session blob
-			blob, err := secret.EncryptBlob(resolved, passphrase)
+			// Encrypt resolved secrets into a per-session blob with a random key
+			key, blob, err := secret.EncryptBlobWithKey(resolved)
 			if err != nil {
 				return fmt.Errorf("encrypting secrets: %w", err)
 			}
@@ -220,6 +214,7 @@ EXAMPLES:
 				EnvVars:       envVars,
 				EnvFile:       spinEnvFile,
 				SecretBlob:    blob,
+				SecretKey:     key,
 				Passphrase:    passphrase,
 				ProviderArgs:  providerArgs,
 			}
@@ -352,18 +347,20 @@ func parseAndValidateEnvVars(envVars []string) (map[string]string, error) {
 
 	// Reserved variables that cannot be overridden
 	reserved := map[string]bool{
-		"GITHUB_TOKEN":            true,
-		"CLAUDE_CODE_OAUTH_TOKEN": true,
-		"REPO_URL":                true,
-		"PROMPT":                  true,
-		"BRANCH":                  true,
-		"MAX_ITERATIONS":          true,
-		"LOG_DIR":                 true,
-		"STATE_DIR":               true,
-		"SPINNER_LOG_BUCKET":      true,
-		"SPINNER_STATE_BUCKET":    true,
-		"SPINNER_INSTANCE_NAME":   true,
-		"ANTHROPIC_MODEL":         true,
+		"GITHUB_TOKEN":              true,
+		"CLAUDE_CODE_OAUTH_TOKEN":   true,
+		"REPO_URL":                  true,
+		"PROMPT":                    true,
+		"BRANCH":                    true,
+		"MAX_ITERATIONS":            true,
+		"LOG_DIR":                   true,
+		"STATE_DIR":                 true,
+		"SPINNER_LOG_BUCKET":        true,
+		"SPINNER_STATE_BUCKET":      true,
+		"SPINNER_INSTANCE_NAME":     true,
+		"ANTHROPIC_MODEL":           true,
+		"SPINNER_SECRET_PASSPHRASE": true,
+		"SPINNER_SECRET_KEY":        true,
 	}
 
 	for _, env := range envVars {
