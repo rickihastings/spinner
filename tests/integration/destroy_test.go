@@ -12,7 +12,7 @@ import (
 )
 
 // TestDestroy_Docker tests the destroy command with Docker backend
-func TestDestroy_Docker(t *testing.T) {
+func TestDockerDestroy(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -49,7 +49,7 @@ func TestDestroy_Docker(t *testing.T) {
 }
 
 // TestDestroy_Docker_MultipleInstances tests destroying multiple Docker instances
-func TestDestroy_Docker_MultipleInstances(t *testing.T) {
+func TestDockerDestroy_MultipleInstances(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -84,7 +84,7 @@ func TestDestroy_Docker_MultipleInstances(t *testing.T) {
 }
 
 // TestDestroy_Docker_NonExistent tests destroy command with non-existent instance
-func TestDestroy_Docker_NonExistent(t *testing.T) {
+func TestDockerDestroy_NonExistent(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Run destroy command with non-existent container

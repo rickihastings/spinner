@@ -13,7 +13,7 @@ import (
 
 // TestList_ShowsSpunContainer tests that `spinner list` shows a container
 // created via `spinner spin` with correct status and backend.
-func TestList_ShowsSpunContainer(t *testing.T) {
+func TestDockerList_ShowsSpunContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image and spin up a container
@@ -43,7 +43,7 @@ func TestList_ShowsSpunContainer(t *testing.T) {
 
 // TestList_ShowsStoppedContainer tests that `spinner list` shows a stopped
 // container with the correct status.
-func TestList_ShowsStoppedContainer(t *testing.T) {
+func TestDockerList_ShowsStoppedContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image and spin up a container
@@ -79,7 +79,7 @@ func TestList_ShowsStoppedContainer(t *testing.T) {
 
 // TestList_NoInstances tests that `spinner list` shows an appropriate message
 // when no spinner-managed instances exist.
-func TestList_NoInstances(t *testing.T) {
+func TestDockerList_NoInstances(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Run list command without creating any containers
@@ -97,7 +97,7 @@ func TestList_NoInstances(t *testing.T) {
 }
 
 // TestList_MultipleContainers tests that `spinner list` shows multiple containers.
-func TestList_MultipleContainers(t *testing.T) {
+func TestDockerList_MultipleContainers(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -129,7 +129,7 @@ func TestList_MultipleContainers(t *testing.T) {
 
 // TestList_LabelPresence tests that containers created via `spinner spin` have
 // the `spinner-managed=true` label, which is how `spinner list` discovers them.
-func TestList_LabelPresence(t *testing.T) {
+func TestDockerList_LabelPresence(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image and spin up a container
@@ -153,7 +153,7 @@ func TestList_LabelPresence(t *testing.T) {
 
 // TestList_LabelPresentAfterRecreate tests that the spinner-managed label persists
 // when a container is recreated with --recreate.
-func TestList_LabelPresentAfterRecreate(t *testing.T) {
+func TestDockerList_LabelPresentAfterRecreate(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image with a specific tag

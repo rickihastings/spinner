@@ -21,7 +21,7 @@ const (
 )
 
 // TestWatch_WithRunningContainer tests the watch command with a running container
-func TestWatch_WithRunningContainer(t *testing.T) {
+func TestDockerWatch_WithRunningContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	binaryPath := testutil.GetBinaryPath()
@@ -79,7 +79,7 @@ func TestWatch_WithRunningContainer(t *testing.T) {
 }
 
 // TestWatch_WithNonExistentContainer tests the watch command with a non-existent container
-func TestWatch_WithNonExistentContainer(t *testing.T) {
+func TestDockerWatch_WithNonExistentContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Run watch command with a non-existent container
@@ -93,7 +93,7 @@ func TestWatch_WithNonExistentContainer(t *testing.T) {
 }
 
 // TestWatch_WithStoppedContainer tests the watch command with a stopped container
-func TestWatch_WithStoppedContainer(t *testing.T) {
+func TestDockerWatch_WithStoppedContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	binaryPath := testutil.GetBinaryPath()
@@ -158,7 +158,7 @@ func TestWatch_WithStoppedContainer(t *testing.T) {
 }
 
 // TestSpinWatch_FlagIntegration tests the --watch flag with spin command
-func TestSpinWatch_FlagIntegration(t *testing.T) {
+func TestDockerSpinWatch_FlagIntegration(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	binaryPath := testutil.GetBinaryPath()
@@ -213,7 +213,7 @@ func TestSpinWatch_FlagIntegration(t *testing.T) {
 }
 
 // TestWatch_MissingLogDirectory tests the watch command when log directory doesn't exist
-func TestWatch_MissingLogDirectory(t *testing.T) {
+func TestDockerWatch_MissingLogDirectory(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	binaryPath := testutil.GetBinaryPath()
@@ -245,7 +245,7 @@ func TestWatch_MissingLogDirectory(t *testing.T) {
 }
 
 // TestWatch_LogFormatting verifies that logs are formatted correctly, not displayed as raw JSON
-func TestWatch_LogFormatting(t *testing.T) {
+func TestDockerWatch_LogFormatting(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image and container
@@ -295,7 +295,7 @@ func TestWatch_LogFormatting(t *testing.T) {
 }
 
 // TestWatch_NoEmptyTimestamps verifies that logs without proper timestamps don't show "00:00:00"
-func TestWatch_NoEmptyTimestamps(t *testing.T) {
+func TestDockerWatch_NoEmptyTimestamps(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image and container
@@ -334,7 +334,7 @@ func TestWatch_NoEmptyTimestamps(t *testing.T) {
 }
 
 // TestWatch_MetricsCollection verifies that metrics are collected from running containers
-func TestWatch_MetricsCollection(t *testing.T) {
+func TestDockerWatch_MetricsCollection(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image and container
@@ -364,7 +364,7 @@ func TestWatch_MetricsCollection(t *testing.T) {
 }
 
 // TestWatch_RealLogFile tests with actual spinner container logs
-func TestWatch_RealLogFile(t *testing.T) {
+func TestDockerWatch_RealLogFile(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Check if there's a real log file we can test with

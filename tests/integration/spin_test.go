@@ -20,7 +20,7 @@ const (
 )
 
 // TestSpin_SuccessfulContainerCreation tests successful container creation with valid flags
-func TestSpin_SuccessfulContainerCreation(t *testing.T) {
+func TestDockerSpin_SuccessfulContainerCreation(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -44,7 +44,7 @@ func TestSpin_SuccessfulContainerCreation(t *testing.T) {
 }
 
 // TestSpin_ContainerNaming tests that container is named deterministically based on image + repo
-func TestSpin_ContainerNaming(t *testing.T) {
+func TestDockerSpin_ContainerNaming(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image with a specific tag
@@ -74,7 +74,7 @@ func TestSpin_ContainerNaming(t *testing.T) {
 }
 
 // TestSpin_ContainerRunning tests that container is running after spin command completes
-func TestSpin_ContainerRunning(t *testing.T) {
+func TestDockerSpin_ContainerRunning(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -102,7 +102,7 @@ func TestSpin_ContainerRunning(t *testing.T) {
 }
 
 // TestSpin_RepositoryCloned tests that repository is cloned into /home/spinner/workspace inside container
-func TestSpin_RepositoryCloned(t *testing.T) {
+func TestDockerSpin_RepositoryCloned(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -132,7 +132,7 @@ func TestSpin_RepositoryCloned(t *testing.T) {
 }
 
 // TestSpin_ContainerExec tests that container can be exec'd into with bash
-func TestSpin_ContainerExec(t *testing.T) {
+func TestDockerSpin_ContainerExec(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -158,7 +158,7 @@ func TestSpin_ContainerExec(t *testing.T) {
 }
 
 // TestSpin_NonExistentImage tests that non-existent Docker image exits with error
-func TestSpin_NonExistentImage(t *testing.T) {
+func TestDockerSpin_NonExistentImage(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Use a non-existent image name
@@ -177,7 +177,7 @@ func TestSpin_NonExistentImage(t *testing.T) {
 }
 
 // TestSpin_PromptWithoutBranch tests that --prompt without --branch runs on default branch
-func TestSpin_PromptWithoutBranch(t *testing.T) {
+func TestDockerSpin_PromptWithoutBranch(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -217,7 +217,7 @@ func TestSpin_PromptWithoutBranch(t *testing.T) {
 }
 
 // TestSpin_BranchWithoutPrompt tests that --branch without --prompt creates idle container
-func TestSpin_BranchWithoutPrompt(t *testing.T) {
+func TestDockerSpin_BranchWithoutPrompt(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -254,7 +254,7 @@ func TestSpin_BranchWithoutPrompt(t *testing.T) {
 }
 
 // TestSpin_ReuseRunningContainer tests that running container is reused
-func TestSpin_ReuseRunningContainer(t *testing.T) {
+func TestDockerSpin_ReuseRunningContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image with a specific tag
@@ -288,7 +288,7 @@ func TestSpin_ReuseRunningContainer(t *testing.T) {
 }
 
 // TestSpin_RestartStoppedContainer tests that stopped container is restarted
-func TestSpin_RestartStoppedContainer(t *testing.T) {
+func TestDockerSpin_RestartStoppedContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image with a specific tag
@@ -330,7 +330,7 @@ func TestSpin_RestartStoppedContainer(t *testing.T) {
 }
 
 // TestSpin_PrivateRepoClone tests that private repository can be cloned with GITHUB_TOKEN
-func TestSpin_PrivateRepoClone(t *testing.T) {
+func TestDockerSpin_PrivateRepoClone(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image
@@ -358,7 +358,7 @@ func TestSpin_PrivateRepoClone(t *testing.T) {
 }
 
 // TestSpin_DeterministicNamingWithBranch tests container naming with branch
-func TestSpin_DeterministicNamingWithBranch(t *testing.T) {
+func TestDockerSpin_DeterministicNamingWithBranch(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image with a specific tag
@@ -389,7 +389,7 @@ func TestSpin_DeterministicNamingWithBranch(t *testing.T) {
 }
 
 // TestSpin_NameSanitization tests that container names are properly sanitized
-func TestSpin_NameSanitization(t *testing.T) {
+func TestDockerSpin_NameSanitization(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image with a specific tag
@@ -426,7 +426,7 @@ func TestSpin_NameSanitization(t *testing.T) {
 }
 
 // TestSpin_RecreateFlag tests that --recreate flag removes and recreates container
-func TestSpin_RecreateFlag(t *testing.T) {
+func TestDockerSpin_RecreateFlag(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Setup test image with a specific tag
@@ -474,54 +474,8 @@ func TestSpin_RecreateFlag(t *testing.T) {
 	assert.Contains(t, recreateOutput, "Instance created successfully: "+containerName, "should show container creation message")
 }
 
-// TestSpin_SetupWithBaseImage tests that --setup with --base-image builds and creates container
-func TestSpin_SetupWithBaseImage(t *testing.T) {
-	testutil.SkipIfDockerNotAvailable(t)
-
-	imageTag := "setup-test"
-	imageName := "spinner:" + imageTag
-
-	// Cleanup
-	t.Cleanup(func() {
-		// Clean up container first (extract from potential error output)
-		containerName := "spinner-" + imageTag + "-hello-world"
-		testutil.RemoveDockerContainer(t, containerName)
-		testutil.RemoveDockerImage(t, imageName)
-	})
-
-	// Run spin command with --setup and --base-image
-	args := []string{"spin", "--setup", "--image", imageTag, "--base-image", "ubuntu:22.04", "--repo", testRepo, "--prompt", "echo test"}
-	stdout, stderr := testutil.RunCommandExpectSuccess(t, args...)
-	output := stdout + stderr
-
-	// Verify image build was successful
-	assert.Contains(t, output, "Environment provisioned", "should show image build success message")
-
-	// Verify container creation was successful
-	assert.Contains(t, output, "Instance created successfully", "should show container creation message")
-
-	// Verify the image was created
-	assert.True(t, testutil.DockerImageExists(t, imageName), "image should exist after setup")
-
-	// Extract container name and verify it's running
-	var containerName string
-
-	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "Instance created successfully:") {
-			parts := strings.Fields(line)
-			if len(parts) >= 4 {
-				containerName = parts[len(parts)-1]
-				break
-			}
-		}
-	}
-
-	require.NotEmpty(t, containerName, "should extract container name")
-	assert.True(t, testutil.DockerContainerRunning(t, containerName), "container should be running")
-}
-
 // TestSpin_SetupWithDockerfile tests that --setup with --dockerfile uses custom Dockerfile
-func TestSpin_SetupWithDockerfile(t *testing.T) {
+func TestDockerSpin_SetupWithDockerfile(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	imageTag := "dockerfile-test"
@@ -584,7 +538,7 @@ WORKDIR /workspace
 
 // TestSpin_EnvFilePassedToContainer tests that --env-file passes env vars into the container
 // and copies the file to the workspace
-func TestSpin_EnvFilePassedToContainer(t *testing.T) {
+func TestDockerSpin_EnvFilePassedToContainer(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	_, imageName := testutil.SetupTestImage(t)
@@ -628,7 +582,7 @@ func TestSpin_EnvFilePassedToContainer(t *testing.T) {
 }
 
 // TestSpin_EnvFileNotFoundError tests that --env-file with a non-existent file produces an error
-func TestSpin_EnvFileNotFoundError(t *testing.T) {
+func TestDockerSpin_EnvFileNotFoundError(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	args := []string{"spin", "--image", "spinner:fake", "--repo", testRepo, "--env-file", "/nonexistent/path/.env"}
@@ -640,7 +594,7 @@ func TestSpin_EnvFileNotFoundError(t *testing.T) {
 }
 
 // TestSpin_EnvFileWithEnvVarsCombined tests that --env-file and --env flags work together
-func TestSpin_EnvFileWithEnvVarsCombined(t *testing.T) {
+func TestDockerSpin_EnvFileWithEnvVarsCombined(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	_, imageName := testutil.SetupTestImage(t)
@@ -673,7 +627,7 @@ func TestSpin_EnvFileWithEnvVarsCombined(t *testing.T) {
 }
 
 // TestSpin_EnvVarsSingleVar tests that --env KEY=VALUE sets the env var in the container
-func TestSpin_EnvVarsSingleVar(t *testing.T) {
+func TestDockerSpin_EnvVarsSingleVar(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	_, imageName := testutil.SetupTestImage(t)
@@ -694,7 +648,7 @@ func TestSpin_EnvVarsSingleVar(t *testing.T) {
 }
 
 // TestSpin_EnvVarsMultipleVars tests that multiple --env flags all set their env vars
-func TestSpin_EnvVarsMultipleVars(t *testing.T) {
+func TestDockerSpin_EnvVarsMultipleVars(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	_, imageName := testutil.SetupTestImage(t)
@@ -722,7 +676,7 @@ func TestSpin_EnvVarsMultipleVars(t *testing.T) {
 }
 
 // TestSpin_EnvVarsReservedRejected tests that reserved variable names are rejected
-func TestSpin_EnvVarsReservedRejected(t *testing.T) {
+func TestDockerSpin_EnvVarsReservedRejected(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	reservedVars := []string{
@@ -748,7 +702,7 @@ func TestSpin_EnvVarsReservedRejected(t *testing.T) {
 }
 
 // TestSpin_EnvVarsInvalidFormat tests that invalid --env format is rejected
-func TestSpin_EnvVarsInvalidFormat(t *testing.T) {
+func TestDockerSpin_EnvVarsInvalidFormat(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	args := []string{"spin", "--image", "spinner:fake", "--repo", testRepo, "--env", "NO_EQUALS_SIGN"}
@@ -760,7 +714,7 @@ func TestSpin_EnvVarsInvalidFormat(t *testing.T) {
 }
 
 // TestSpin_EnvVarsValueWithEquals tests that env values containing '=' are handled correctly
-func TestSpin_EnvVarsValueWithEquals(t *testing.T) {
+func TestDockerSpin_EnvVarsValueWithEquals(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	_, imageName := testutil.SetupTestImage(t)
@@ -781,7 +735,7 @@ func TestSpin_EnvVarsValueWithEquals(t *testing.T) {
 }
 
 // TestSpin_ModelFlagSetsEnvVar tests that --model sets ANTHROPIC_MODEL in container environment
-func TestSpin_ModelFlagSetsEnvVar(t *testing.T) {
+func TestDockerSpin_ModelFlagSetsEnvVar(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	_, imageName := testutil.SetupTestImage(t)
@@ -803,7 +757,7 @@ func TestSpin_ModelFlagSetsEnvVar(t *testing.T) {
 }
 
 // TestSpin_NoModelFlagOmitsEnvVar tests that ANTHROPIC_MODEL is not set when --model is not provided
-func TestSpin_NoModelFlagOmitsEnvVar(t *testing.T) {
+func TestDockerSpin_NoModelFlagOmitsEnvVar(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	_, imageName := testutil.SetupTestImage(t)
@@ -837,7 +791,7 @@ func TestSpin_NoModelFlagOmitsEnvVar(t *testing.T) {
 }
 
 // TestSpin_SetupRebuildsExistingImage tests that --setup rebuilds image even if it exists
-func TestSpin_SetupRebuildsExistingImage(t *testing.T) {
+func TestDockerSpin_SetupRebuildsExistingImage(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	imageTag := "rebuild-test"
@@ -851,13 +805,13 @@ func TestSpin_SetupRebuildsExistingImage(t *testing.T) {
 	})
 
 	// First, create the image using setup command
-	testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag, "--base-image", "ubuntu:22.04")
+	testutil.RunCommandExpectSuccess(t, "setup", "--name", imageTag)
 
 	// Verify the image exists before running spin with --setup
 	assert.True(t, testutil.DockerImageExists(t, imageName), "initial image should exist")
 
 	// Now run spin with --setup on the existing image
-	args := []string{"spin", "--setup", "--image", imageTag, "--base-image", "ubuntu:22.04", "--repo", testRepo, "--prompt", "echo test"}
+	args := []string{"spin", "--setup", "--image", imageTag, "--repo", testRepo, "--prompt", "echo test"}
 	stdout, stderr := testutil.RunCommandExpectSuccess(t, args...)
 	output := stdout + stderr
 

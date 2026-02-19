@@ -10,7 +10,7 @@ import (
 )
 
 // TestSetup_BasicBuild tests basic setup scenarios with different configurations
-func TestSetup_BasicBuild(t *testing.T) {
+func TestDockerSetup_BasicBuild(t *testing.T) {
 	tests := []struct {
 		name       string
 		setupArgs  []string
@@ -22,8 +22,8 @@ func TestSetup_BasicBuild(t *testing.T) {
 			wantOutput: "Environment provisioned",
 		},
 		{
-			name:       "custom base image",
-			setupArgs:  []string{"--base-image", "ubuntu:22.04"},
+			name:       "with provider-args no-cache",
+			setupArgs:  []string{"--provider-args", "--no-cache"},
 			wantOutput: "Environment provisioned",
 		},
 	}
@@ -54,7 +54,7 @@ func TestSetup_BasicBuild(t *testing.T) {
 }
 
 // TestSetup_InstalledTools tests that required tools are installed in the created image
-func TestSetup_InstalledTools(t *testing.T) {
+func TestDockerSetup_InstalledTools(t *testing.T) {
 	tests := []struct {
 		name            string
 		command         []string
