@@ -53,18 +53,18 @@ func setupSpinCommandWithMocks(t *testing.T) *cobra.Command {
 
 // TestMergeProviderArgs_CLIOnly tests mergeProviderArgs with only CLI args
 func TestMergeProviderArgs_CLIOnly(t *testing.T) {
-	result := mergeProviderArgs([]string{"-v /data:/data", "--network=host"})
+	result := mergeProviderArgs(configSpinProviderArgs, []string{"-v /data:/data", "--network=host"})
 	assert.Equal(t, []string{"-v /data:/data", "--network=host"}, result)
 }
 
 // TestMergeProviderArgs_Empty tests mergeProviderArgs with no args from any source
 func TestMergeProviderArgs_Empty(t *testing.T) {
-	result := mergeProviderArgs(nil)
+	result := mergeProviderArgs(configSpinProviderArgs, nil)
 	assert.Empty(t, result)
 }
 
 // TestMergeProviderArgs_EmptySlice tests mergeProviderArgs with empty slice
 func TestMergeProviderArgs_EmptySlice(t *testing.T) {
-	result := mergeProviderArgs([]string{})
+	result := mergeProviderArgs(configSpinProviderArgs, []string{})
 	assert.Empty(t, result)
 }

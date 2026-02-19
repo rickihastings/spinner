@@ -36,6 +36,7 @@ func NewSpinCommand(f *provider.Factory) *cobra.Command {
 		spinEnvVars       []string
 		spinEnvFile       string
 		spinProviderArgs  []string
+		spinDockerfile    string
 	)
 
 	cmd := &cobra.Command{
@@ -59,6 +60,7 @@ GENERAL FLAGS:
 
 SETUP OPTIONS (use with --setup flag):
   --setup                    Build/rebuild the environment before spinning (optional)
+  --dockerfile <path>        Custom Dockerfile to use as the base image (Docker backend, used with --setup)
 
 GCP BACKEND FLAGS:
   --project <project>        GCP project ID (required for GCP)
@@ -88,7 +90,7 @@ EXAMPLES:
 			bindFlags(cmd,
 				flagImage, flagRepo, flagPrompt, flagBranch,
 				flagMaxIterations, flagModel, flagRecreate,
-				flagSetup, flagWatch,
+				flagSetup, flagWatch, flagDockerfile,
 			)
 
 			// Resolve and validate backend
@@ -107,6 +109,7 @@ EXAMPLES:
 			spinRecreate = viper.GetBool(flagRecreate)
 			spinSetup = viper.GetBool(flagSetup)
 			spinWatch = viper.GetBool(flagWatch)
+			spinDockerfile = viper.GetString(flagDockerfile)
 
 			// Parse and validate custom env vars
 			envVars, err := parseAndValidateEnvVars(spinEnvVars)
@@ -142,7 +145,7 @@ EXAMPLES:
 			ctx := context.Background()
 
 			// Merge provider args: config file provides base args, CLI appends on top.
-			providerArgs := mergeProviderArgs(spinProviderArgs)
+			providerArgs := mergeProviderArgs(configSpinProviderArgs, spinProviderArgs)
 
 			// If --setup is provided, provision the environment first
 			if spinSetup {
@@ -303,6 +306,9 @@ EXAMPLES:
 	cmd.Flags().StringSliceVar(&spinEnvVars, flagEnv, []string{}, "Custom environment variables (KEY=VALUE, repeatable)")
 	cmd.Flags().StringVar(&spinEnvFile, flagEnvFile, "", "Path to env file to pass to instance (optional)")
 	cmd.Flags().StringSliceVar(&spinProviderArgs, flagProviderArgs, []string{}, "Extra arguments passed directly to the backend (repeatable)")
+
+	// Docker backend flags (only valid with --setup)
+	cmd.Flags().StringVar(&spinDockerfile, flagDockerfile, "", "Path to custom Dockerfile to use as the base image (Docker backend, used with --setup)")
 
 	// GCP backend flags (routing + bake-script only; machine-type, disk-size, service-account
 	// are now passed via --provider-args)

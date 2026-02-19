@@ -31,8 +31,9 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 	}
 
 	return p.client.BuildImage(ctx, BuildConfig{
-		Name:      config.Name,
-		ExtraArgs: config.ProviderArgs,
+		Name:       config.Name,
+		Dockerfile: config.Options["dockerfile"],
+		ExtraArgs:  config.ProviderArgs,
 	})
 }
 

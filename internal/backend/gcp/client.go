@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/rickihastings/spinner/internal/util"
 )
 
 // Client defines the interface for GCP operations.
@@ -141,7 +143,7 @@ func (c *RealGCPClient) CreateInstance(ctx context.Context, config instanceConfi
 	}
 
 	// Append provider pass-through args (e.g. --machine-type, --accelerator)
-	args = append(args, config.ExtraArgs...)
+	args = append(args, util.SplitArgs(config.ExtraArgs)...)
 
 	_, err := runGcloud(ctx, args...)
 	if err != nil {

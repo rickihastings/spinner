@@ -23,6 +23,7 @@ const (
 	flagRecreate      = "recreate"
 	flagSetup         = "setup"
 	flagWatch         = "watch"
+	flagDockerfile    = "dockerfile"
 	flagProject       = "project"
 	flagZone          = "zone"
 	flagStateBucket   = "state-bucket"
@@ -31,6 +32,12 @@ const (
 	flagEnvFile       = "env-file"
 	flagModel         = "model"
 	flagProviderArgs  = "provider-args"
+
+	// Config file keys for command-specific provider args.
+	// Using separate keys prevents build flags (e.g. -f ./Dockerfile) from
+	// leaking into docker run, and run flags from leaking into docker build.
+	configSetupProviderArgs = "setup-provider-args"
+	configSpinProviderArgs  = "spin-provider-args"
 )
 
 // performSetup runs the shared setup workflow: environment provisioning.
@@ -88,14 +95,15 @@ func resolveAndValidateBackend(cmd *cobra.Command) (string, error) {
 
 // buildSetupOptions builds the options map for environment setup.
 // For GCP, this includes routing options (project, zone, state-bucket, bake-script).
-// Docker no longer has dedicated setup options — backend-specific tuning is
-// passed via --provider-args.
+// For Docker, this includes the optional custom Dockerfile path.
 func buildSetupOptions(backend string) map[string]string {
 	if backend == provider.BackendGCP {
 		return gcpRoutingOptions()
 	}
 
-	return map[string]string{}
+	return map[string]string{
+		flagDockerfile: viper.GetString(flagDockerfile),
+	}
 }
 
 // runSetup executes the full environment setup workflow for any backend.
@@ -226,10 +234,14 @@ func bindFlags(cmd *cobra.Command, flags ...string) {
 // with CLI-provided args. Config file args form the base; CLI args are appended.
 // If the same flag appears in both, the backend tool uses its own last-wins semantics.
 //
+// configKey is the command-specific .spinner.json key to read (e.g.
+// configSetupProviderArgs or configSpinProviderArgs). Using separate keys prevents
+// build-only flags (e.g. -f ./Dockerfile) from leaking into docker run, and vice versa.
+//
 // Note: --provider-args is NOT bound to Viper via BindPFlag so that both sources
 // can be read independently. Viper reads config file values; cliArgs comes from Cobra.
-func mergeProviderArgs(cliArgs []string) []string {
-	configArgs := viper.GetStringSlice(flagProviderArgs)
+func mergeProviderArgs(configKey string, cliArgs []string) []string {
+	configArgs := viper.GetStringSlice(configKey)
 	if len(cliArgs) == 0 {
 		return configArgs
 	}

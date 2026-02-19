@@ -35,6 +35,9 @@ GENERAL FLAGS:
   --backend <backend>        Backend provider: docker, gcp (default: docker)
   --provider-args <arg>      Extra arguments passed directly to the backend (repeatable)
 
+DOCKER BACKEND FLAGS:
+  --dockerfile <path>        Path to custom Dockerfile to use as the base image (optional)
+
 GCP BACKEND FLAGS:
   --project <project>        GCP project ID (required for GCP)
   --zone <zone>              GCP zone (required for GCP)
@@ -44,10 +47,10 @@ GCP BACKEND FLAGS:
 EXAMPLES:
   # Docker (default)
   spinner setup --name my-sandbox
-  spinner setup --name my-sandbox --provider-args="--build-arg=BASE_IMAGE=node:20-bullseye"
+  spinner setup --name my-sandbox --provider-args="--build-arg=MYARG=value"
 
-  # Docker with custom Dockerfile
-  spinner setup --name my-sandbox --provider-args="-f /path/to/Dockerfile"
+  # Docker with custom Dockerfile (used as the base; spinner tooling is layered on top)
+  spinner setup --name my-sandbox --dockerfile ./Dockerfile
 
   # GCP
   spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket
@@ -55,7 +58,7 @@ EXAMPLES:
     --provider-args="--machine-type=e2-standard-4" --provider-args="--boot-disk-size=50GB"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Bind general flags to Viper
-			bindFlags(cmd, flagName)
+			bindFlags(cmd, flagName, flagDockerfile)
 
 			// Resolve and validate backend
 			backend, err := resolveAndValidateBackend(cmd)
@@ -78,7 +81,7 @@ EXAMPLES:
 			}
 
 			// Merge provider args: config file provides base args, CLI appends on top.
-			providerArgs := mergeProviderArgs(setupProviderArgs)
+			providerArgs := mergeProviderArgs(configSetupProviderArgs, setupProviderArgs)
 
 			return runSetup(context.Background(), p, backend, setupName, providerArgs)
 		},
@@ -88,6 +91,9 @@ EXAMPLES:
 	cmd.Flags().StringVar(&setupName, flagName, "", "Name for the environment (required)")
 	cmd.Flags().String(flagBackend, "", "Backend provider: docker, gcp (default: docker)")
 	cmd.Flags().StringSliceVar(&setupProviderArgs, flagProviderArgs, []string{}, "Extra arguments passed directly to the backend (repeatable)")
+
+	// Docker backend flags
+	cmd.Flags().String(flagDockerfile, "", "Path to custom Dockerfile to use as the base image (Docker backend)")
 
 	// GCP backend flags (routing + bake-script only; machine-type, disk-size, service-account
 	// are now passed via --provider-args)

@@ -79,7 +79,7 @@ commit).
   "zone": "us-central1-a",
   "state-bucket": "my-state-bucket",
   "image": "my-default-image",
-  "provider-args": ["--machine-type=e2-standard-2", "--boot-disk-size=30GB"]
+  "spin-provider-args": ["--machine-type=e2-standard-2", "--boot-disk-size=30GB"]
 }
 ```
 
@@ -228,7 +228,7 @@ Common things you might want to include:
 
 The mechanism differs by backend:
 
-- **Docker** — use a custom Dockerfile via `--provider-args="-f /path/to/Dockerfile"` (see the [Docker guide](guides/docker.md#customizing-claude-code-configuration))
+- **Docker** — use a custom Dockerfile via `--dockerfile /path/to/Dockerfile` (see the [Docker guide](guides/docker.md#customizing-claude-code-configuration))
 - **GCP** — use a custom bake script via `--bake-script` (see the [GCP guide](guides/gcp.md#customizing-claude-code-configuration))
 
 ## Working Command Examples
@@ -238,14 +238,14 @@ These are tested, working examples for future reference:
 ### Setup Command Examples
 
 ```bash
-# Basic setup with default base image
+# Basic setup with default base image (ubuntu:22.04)
 ./dist/spinner setup --name spinner:default
 
-# Setup with custom base image
-./dist/spinner setup --name ubuntu --provider-args="--build-arg=BASE_IMAGE=ubuntu:22.04"
+# Setup with custom Dockerfile (used as base; spinner tooling layered on top)
+./dist/spinner setup --name custom --dockerfile ./path/to/Dockerfile
 
-# Setup with custom Dockerfile
-./dist/spinner setup --name custom --provider-args="-f ./path/to/Dockerfile"
+# Setup with extra build args passed through
+./dist/spinner setup --name my-env --provider-args="--build-arg=MYARG=value"
 ```
 
 ### Spin Command Examples

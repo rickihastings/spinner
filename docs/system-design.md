@@ -42,16 +42,16 @@ Provider configurations use `Options map[string]string` for backend-specific par
 
 ```go
 type SetupConfig struct {
-Name    string            // Universal: environment name
-Options map[string]string // Backend-specific (e.g., "base-image", "dockerfile")
+    Name    string            // Universal: environment name
+    Options map[string]string // Backend-specific (e.g., "dockerfile" for Docker)
 }
 
 type CreateConfig struct {
-Repo          string // Universal fields
-Prompt        string
-Branch        string
-MaxIterations int
-Options       map[string]string // Backend-specific (e.g., "image")
+   Repo          string // Universal fields
+   Prompt        string
+   Branch        string
+   MaxIterations int
+   Options       map[string]string // Backend-specific (e.g., "image")
 }
 ```
 

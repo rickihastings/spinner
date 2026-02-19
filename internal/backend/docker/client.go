@@ -86,10 +86,23 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 
 	defer func() { _ = os.RemoveAll(buildContextDir) }()
 
+	// Determine base image: if a custom Dockerfile was provided, build it
+	// first and use the resulting image as the base for the extending template.
+	baseImage := "ubuntu:22.04"
+
+	if config.Dockerfile != "" {
+		userBaseImageTag := fmt.Sprintf("spinner-base:%s", config.Name)
+		if err := c.buildUserDockerfile(ctx, config.Dockerfile, userBaseImageTag); err != nil {
+			return fmt.Errorf("failed to build user Dockerfile: %w", err)
+		}
+
+		baseImage = userBaseImageTag
+	}
+
 	// Generate the final Dockerfile
 	dockerfilePath := filepath.Join(buildContextDir, "Dockerfile")
 
-	dockerfileContent, err := generateDockerfile(dockerfileConfig{BaseImage: "ubuntu:22.04"})
+	dockerfileContent, err := generateDockerfile(dockerfileConfig{BaseImage: baseImage})
 	if err != nil {
 		return fmt.Errorf("failed to generate Dockerfile: %w", err)
 	}
@@ -155,6 +168,15 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	return nil
 }
 
+// buildUserDockerfile builds a user-provided Dockerfile using the Docker CLI.
+// The resulting image is used as the base for the spinner extending template.
+func (c *RealDockerClient) buildUserDockerfile(ctx context.Context, dockerfilePath, tag string) error {
+	contextDir := filepath.Dir(dockerfilePath)
+	dockerfileName := filepath.Base(dockerfilePath)
+
+	return c.buildWithCLI(ctx, contextDir, dockerfileName, tag, nil)
+}
+
 // buildWithCLI builds a Docker image using the docker build CLI command.
 // ExtraArgs are injected before the context directory argument.
 func (c *RealDockerClient) buildWithCLI(ctx context.Context, contextDir, dockerfileName, tag string, extraArgs []string) error {
@@ -173,7 +195,7 @@ func (c *RealDockerClient) buildWithCLI(ctx context.Context, contextDir, dockerf
 	}
 
 	// Append provider pass-through args before the context directory
-	args = append(args, extraArgs...)
+	args = append(args, util.SplitArgs(extraArgs)...)
 
 	args = append(args, contextDir)
 

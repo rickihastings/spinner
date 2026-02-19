@@ -13,7 +13,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && npm install -g @fission-ai/openspec
 
 # Install golangci-lint
-RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.9.0
+RUN curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.9.0
 
 WORKDIR /home/spinner/workspace
 

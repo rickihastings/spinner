@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rickihastings/spinner/internal/util"
 )
 
 // Pre-compiled regexes for container name sanitization.
@@ -193,7 +195,7 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	}
 
 	// Append provider pass-through args before the image
-	dockerArgs = append(dockerArgs, config.ExtraArgs...)
+	dockerArgs = append(dockerArgs, util.SplitArgs(config.ExtraArgs)...)
 
 	// Add image (must be last)
 	dockerArgs = append(dockerArgs, config.Image)

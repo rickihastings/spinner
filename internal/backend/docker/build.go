@@ -8,8 +8,9 @@ import (
 
 // BuildConfig contains configuration for building a Docker image.
 type BuildConfig struct {
-	Name      string
-	ExtraArgs []string
+	Name       string
+	Dockerfile string // path to a custom Dockerfile to use as the base image
+	ExtraArgs  []string
 }
 
 // buildFile defines a file to copy into the Docker build context

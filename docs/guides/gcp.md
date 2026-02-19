@@ -409,7 +409,7 @@ you run Spinner:
   "project": "my-project",
   "zone": "us-central1-a",
   "state-bucket": "my-project-spinner-state",
-  "provider-args": ["--machine-type=e2-standard-4", "--boot-disk-size=50GB"]
+  "spin-provider-args": ["--machine-type=e2-standard-4", "--boot-disk-size=50GB"]
 }
 ```
 
