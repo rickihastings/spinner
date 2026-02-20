@@ -20,11 +20,11 @@ test:
 
 # Run docker tests
 test-docker:
-	go test ./tests/integration/ -v -run Docker
+	go test ./test/integration/ -v -run Docker
 
 # Run gcp tests
 test-gcp:
-	go test ./tests/integration/ -v -run GCP -timeout 60m
+	go test ./test/integration/ -v -run GCP -timeout 60m
 
 # Run all tests
 test-all: test test-docker test-gcp

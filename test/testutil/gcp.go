@@ -368,7 +368,7 @@ func GetSharedGCPImage(t *testing.T) string {
 	t.Helper()
 
 	// Access the shared image name from the integration package
-	// This is set by TestMain in tests/integration/main_test.go
+	// This is set by TestMain in test/integration/main_test.go
 	imageName := getSharedImageName()
 	if imageName == "" {
 		t.Skip("Shared GCP image not available (GCP test environment not configured)")

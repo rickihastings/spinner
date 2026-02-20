@@ -10,11 +10,11 @@ go test ./...
 go test -short ./...
 
 # Integration tests only (requires Docker, and GCP cloud)
-go test ./tests/integration/...
+go test ./test/integration/...
 
 # Backend-specific integration tests
-go test ./tests/integration/ -run Docker    # Docker backend only
-go test ./tests/integration/ -run GCP       # GCP backend only
+go test ./test/integration/ -run Docker    # Docker backend only
+go test ./test/integration/ -run GCP       # GCP backend only
 
 # With coverage
 go test -coverprofile=coverage.out ./...
@@ -34,12 +34,12 @@ go tool cover -html=coverage.out
 - Fast (milliseconds), no Docker required
 - Run: `go test -short ./...`
 
-**Integration Tests** (`tests/integration/*_test.go`):
+**Integration Tests** (`test/integration/*_test.go`):
 - Test CLI end-to-end with real backend operations
 - Slower, requires backend (Docker daemon or GCP credentials)
-- Run all: `go test ./tests/integration/...`
-- Run Docker tests: `go test ./tests/integration/ -run Docker`
-- Run GCP tests: `go test ./tests/integration/ -run GCP`
+- Run all: `go test ./test/integration/...`
+- Run Docker tests: `go test ./test/integration/ -run Docker`
+- Run GCP tests: `go test ./test/integration/ -run GCP`
 - Skip in short mode automatically
 
 ## Backend-Specific Testing
@@ -49,24 +49,24 @@ Integration tests are organized by backend. Test file naming indicates which bac
 **Docker Backend Tests:**
 - `setup_test.go`, `spin_test.go`, `watch_test.go`
 - Require Docker daemon running
-- Run: `go test ./tests/integration/ -run Docker` or `go test ./tests/integration/ -run "^Test(Setup|Spin|Watch)_"`
+- Run: `go test ./test/integration/ -run Docker` or `go test ./test/integration/ -run "^Test(Setup|Spin|Watch)_"`
 
 **GCP Backend Tests:**
 - `gcp_setup_test.go`, `gcp_spin_test.go`, `gcp_watch_test.go`, etc.
 - Require GCP credentials and configuration
-- Run: `go test ./tests/integration/ -run GCP`
+- Run: `go test ./test/integration/ -run GCP`
 - Set required env vars: `SPINNER_TEST_GCP_PROJECT`, `SPINNER_TEST_GCP_ZONE`, `SPINNER_TEST_GCP_BUCKET`
 
 **Running all integration tests:**
 ```bash
-go test ./tests/integration/...
+go test ./test/integration/...
 ```
 
 **Running only Docker tests:**
 ```bash
-go test ./tests/integration/ -run Docker
+go test ./test/integration/ -run Docker
 # Or match specific test patterns
-go test ./tests/integration/ -run "^Test(Setup|Spin|Watch)_"
+go test ./test/integration/ -run "^Test(Setup|Spin|Watch)_"
 ```
 
 **Running only GCP tests:**
@@ -74,7 +74,7 @@ go test ./tests/integration/ -run "^Test(Setup|Spin|Watch)_"
 export SPINNER_TEST_GCP_PROJECT=your-project
 export SPINNER_TEST_GCP_ZONE=europe-west2-a  # Must include zone letter (a/b/c)
 export SPINNER_TEST_GCP_BUCKET=your-bucket
-go test ./tests/integration/ -run GCP
+go test ./test/integration/ -run GCP
 ```
 
 ### Optimizing GCP Test Image Reuse
@@ -97,16 +97,16 @@ GCP integration tests use a shared image that takes 35+ minutes to bake. To avoi
 **Example Workflow**:
 ```bash
 # First run: creates image (~40 minutes)
-go test ./tests/integration -run GCP
+go test ./test/integration -run GCP
 
 # Later runs: reuses existing image (~5 minutes)
-go test ./tests/integration -run GCP
+go test ./test/integration -run GCP
 
 # Force rebuild (tool updates, base image changes)
-SPINNER_TEST_FORCE_REBUILD=1 go test ./tests/integration -run GCP
+SPINNER_TEST_FORCE_REBUILD=1 go test ./test/integration -run GCP
 
 # Delete image after tests (one-off cleanup)
-SPINNER_TEST_DELETE_IMAGE=1 go test ./tests/integration -run GCP
+SPINNER_TEST_DELETE_IMAGE=1 go test ./test/integration -run GCP
 ```
 
 **Manual Cleanup**:
@@ -120,7 +120,7 @@ gcloud compute images delete test-shared-v1-abc12345 --project=YOUR_PROJECT
 
 ## Test Utilities
 
-The `tests/testutil` package provides reusable helpers:
+The `test/testutil` package provides reusable helpers:
 
 **CLI Helpers** (`cli.go`):
 ```go
@@ -254,7 +254,7 @@ func setupTestImage(t *testing.T) (imageTag, imageName string) {
 
 **Where to put helpers:**
 - Test-specific: Same file as tests
-- Reusable: `tests/testutil/` package
+- Reusable: `test/testutil/` package
 
 ## Best Practices
 

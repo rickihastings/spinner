@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/rickihastings/spinner/tests/testutil"
+	"github.com/rickihastings/spinner/test/testutil"
 )
 
 // TestGCPSetup_MissingRequiredFlags tests that missing required GCP flags produce clear errors.

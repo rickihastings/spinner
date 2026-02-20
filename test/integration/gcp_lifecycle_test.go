@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rickihastings/spinner/tests/testutil"
+	"github.com/rickihastings/spinner/test/testutil"
 )
 
 // TestGCPLifecycle_FullCycle tests the complete lifecycle: setup → spin → stop → start → remove.

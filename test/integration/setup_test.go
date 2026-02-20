@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/rickihastings/spinner/tests/testutil"
+	"github.com/rickihastings/spinner/test/testutil"
 )
 
 // TestSetup_BasicBuild tests basic setup scenarios with different configurations

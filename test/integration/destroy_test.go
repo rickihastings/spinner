@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rickihastings/spinner/tests/testutil"
+	"github.com/rickihastings/spinner/test/testutil"
 )
 
 // TestDestroy_Docker tests the destroy command with Docker backend

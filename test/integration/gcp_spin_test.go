@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rickihastings/spinner/tests/testutil"
+	"github.com/rickihastings/spinner/test/testutil"
 )
 
 // TestGCPSpin_NonExistentImage tests that referencing a non-existent image produces a clear error.
