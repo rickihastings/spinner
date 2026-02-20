@@ -347,6 +347,7 @@ func parseAndValidateEnvVars(envVars []string) (map[string]string, error) {
 	// Reserved variables that cannot be overridden
 	reserved := map[string]bool{
 		"GITHUB_TOKEN":              true,
+		"ANTHROPIC_API_KEY":         true,
 		"CLAUDE_CODE_OAUTH_TOKEN":   true,
 		"REPO_URL":                  true,
 		"PROMPT":                    true,

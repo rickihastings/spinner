@@ -9,15 +9,75 @@ import (
 )
 
 func TestResolve_AllTokensFromStore(t *testing.T) {
+	// With OR-group semantics, ANTHROPIC_API_KEY is checked first.
+	// When it exists, CLAUDE_CODE_OAUTH_TOKEN is never queried.
 	store := new(MockStore)
 	store.On("Get", "GITHUB_TOKEN").Return("gh-token-123", nil)
-	store.On("Get", "CLAUDE_CODE_OAUTH_TOKEN").Return("claude-token-456", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("anthropic-key-456", nil)
 
 	secrets, err := Resolve(store, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "gh-token-123", secrets["GITHUB_TOKEN"])
-	assert.Equal(t, "claude-token-456", secrets["CLAUDE_CODE_OAUTH_TOKEN"])
+	assert.Equal(t, "anthropic-key-456", secrets["ANTHROPIC_API_KEY"])
 	assert.Len(t, secrets, 2)
+	store.AssertExpectations(t)
+}
+
+func TestResolve_AnthropicApiKeyPreferred(t *testing.T) {
+	// Both keys in store — ANTHROPIC_API_KEY wins, CLAUDE_CODE_OAUTH_TOKEN is never queried.
+	store := new(MockStore)
+	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("anthropic-key", nil)
+
+	secrets, err := Resolve(store, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "anthropic-key", secrets["ANTHROPIC_API_KEY"])
+	assert.NotContains(t, secrets, "CLAUDE_CODE_OAUTH_TOKEN")
+	assert.Len(t, secrets, 2)
+	store.AssertExpectations(t)
+}
+
+func TestResolve_FallsBackToOAuthToken(t *testing.T) {
+	// Only CLAUDE_CODE_OAUTH_TOKEN in store — falls back after ANTHROPIC_API_KEY not found.
+	store := new(MockStore)
+	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("", fmt.Errorf("%w: ANTHROPIC_API_KEY", ErrNotFound))
+	store.On("Get", "CLAUDE_CODE_OAUTH_TOKEN").Return("claude-token", nil)
+
+	secrets, err := Resolve(store, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "claude-token", secrets["CLAUDE_CODE_OAUTH_TOKEN"])
+	assert.NotContains(t, secrets, "ANTHROPIC_API_KEY")
+	assert.Len(t, secrets, 2)
+	store.AssertExpectations(t)
+}
+
+func TestResolve_AnthropicApiKeyOnly(t *testing.T) {
+	// Only ANTHROPIC_API_KEY in store — succeeds without querying CLAUDE_CODE_OAUTH_TOKEN.
+	store := new(MockStore)
+	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("anthropic-key", nil)
+
+	secrets, err := Resolve(store, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "anthropic-key", secrets["ANTHROPIC_API_KEY"])
+	assert.Len(t, secrets, 2)
+	store.AssertExpectations(t)
+}
+
+func TestResolve_NeitherClaudeAuthKey(t *testing.T) {
+	// Neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN in store — error with both names.
+	store := new(MockStore)
+	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("", fmt.Errorf("%w: ANTHROPIC_API_KEY", ErrNotFound))
+	store.On("Get", "CLAUDE_CODE_OAUTH_TOKEN").Return("", fmt.Errorf("%w: CLAUDE_CODE_OAUTH_TOKEN", ErrNotFound))
+
+	secrets, err := Resolve(store, nil)
+	assert.Error(t, err)
+	assert.Nil(t, secrets)
+	assert.Contains(t, err.Error(), "ANTHROPIC_API_KEY")
+	assert.Contains(t, err.Error(), "CLAUDE_CODE_OAUTH_TOKEN")
+	assert.Contains(t, err.Error(), "claude auth secret not found")
 	store.AssertExpectations(t)
 }
 
@@ -51,7 +111,7 @@ func TestResolve_NoEnvFallback(t *testing.T) {
 func TestResolve_CustomKeyFromStore(t *testing.T) {
 	store := new(MockStore)
 	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
-	store.On("Get", "CLAUDE_CODE_OAUTH_TOKEN").Return("claude-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("anthropic-key", nil)
 	store.On("Get", "NPM_TOKEN").Return("npm-secret-123", nil)
 
 	secrets, err := Resolve(store, []string{"NPM_TOKEN"})
@@ -64,7 +124,7 @@ func TestResolve_CustomKeyFromStore(t *testing.T) {
 func TestResolve_CustomKeyNotFound(t *testing.T) {
 	store := new(MockStore)
 	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
-	store.On("Get", "CLAUDE_CODE_OAUTH_TOKEN").Return("claude-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("anthropic-key", nil)
 	store.On("Get", "NPM_TOKEN").Return("", fmt.Errorf("%w: NPM_TOKEN", ErrNotFound))
 
 	secrets, err := Resolve(store, []string{"NPM_TOKEN"})
@@ -87,11 +147,26 @@ func TestResolve_StoreError(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
+func TestResolve_StoreErrorOnClaudeAuthKey(t *testing.T) {
+	// A non-ErrNotFound error on ANTHROPIC_API_KEY should be returned immediately
+	// (not fall through to CLAUDE_CODE_OAUTH_TOKEN).
+	store := new(MockStore)
+	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("", fmt.Errorf("decryption failed"))
+
+	secrets, err := Resolve(store, nil)
+	assert.Error(t, err)
+	assert.Nil(t, secrets)
+	assert.Contains(t, err.Error(), "reading secret")
+	assert.Contains(t, err.Error(), "ANTHROPIC_API_KEY")
+	store.AssertExpectations(t)
+}
+
 func TestResolve_DuplicateCustomAndBuiltIn(t *testing.T) {
 	// If a custom key duplicates a built-in key, it should not be resolved twice
 	store := new(MockStore)
 	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
-	store.On("Get", "CLAUDE_CODE_OAUTH_TOKEN").Return("claude-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("anthropic-key", nil)
 
 	secrets, err := Resolve(store, []string{"GITHUB_TOKEN"})
 	require.NoError(t, err)
@@ -104,7 +179,7 @@ func TestResolve_DuplicateCustomAndBuiltIn(t *testing.T) {
 func TestResolve_MultipleCustomKeys(t *testing.T) {
 	store := new(MockStore)
 	store.On("Get", "GITHUB_TOKEN").Return("gh-token", nil)
-	store.On("Get", "CLAUDE_CODE_OAUTH_TOKEN").Return("claude-token", nil)
+	store.On("Get", "ANTHROPIC_API_KEY").Return("anthropic-key", nil)
 	store.On("Get", "NPM_TOKEN").Return("npm-123", nil)
 	store.On("Get", "API_KEY").Return("api-456", nil)
 

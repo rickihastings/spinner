@@ -28,9 +28,9 @@ make install-hooks
 
 ## Secret Management
 
-Spinner uses an encrypted secret store to manage sensitive tokens like `GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN`.
-All secrets are stored in an AES-256-GCM encrypted file at `~/.spinner/secrets.enc` and delivered to containers as an
-encrypted blob — never as environment variables.
+Spinner uses an encrypted secret store to manage sensitive tokens like `GITHUB_TOKEN` and Claude auth credentials
+(`ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`). All secrets are stored in an AES-256-GCM encrypted file at
+`~/.spinner/secrets.enc` and delivered to containers as an encrypted blob — never as environment variables.
 
 **This is a breaking change:** environment variable fallback for tokens has been removed. You must store all tokens in
 the secret store before running `spinner spin`.
@@ -40,8 +40,12 @@ the secret store before running `spinner spin`.
 Store your required tokens:
 
 ```bash
-# These are required for spinner spin to work
+# Required
 spinner secret set GITHUB_TOKEN
+
+# Claude auth — set one of the following (ANTHROPIC_API_KEY is checked first)
+spinner secret set ANTHROPIC_API_KEY
+# or
 spinner secret set CLAUDE_CODE_OAUTH_TOKEN
 ```
 
@@ -63,8 +67,8 @@ spinner secret delete GITHUB_TOKEN
 
 ### Using Secrets with `spinner spin`
 
-Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) are resolved automatically from the store. For additional
-secrets, use the `--secret` flag:
+Built-in tokens (`GITHUB_TOKEN` and one of `ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`) are resolved automatically
+from the store. For additional secrets, use the `--secret` flag:
 
 ```bash
 # Built-in tokens are resolved automatically; add custom secrets with --secret
@@ -265,7 +269,7 @@ export SPINNER_STATE_BUCKET=my-state-bucket
 
 # Store required tokens in the secret store (one-time setup)
 spinner secret set GITHUB_TOKEN
-spinner secret set CLAUDE_CODE_OAUTH_TOKEN
+spinner secret set ANTHROPIC_API_KEY  # or: spinner secret set CLAUDE_CODE_OAUTH_TOKEN
 
 # Setup and spin (flags optional since env vars are set)
 ./dist/spinner setup --name my-env
@@ -543,7 +547,7 @@ The state file is JSON with the following structure:
 - `completed` - Agent detected completion signal (`~~ FEATURE_COMPLETED ~~` on its own line) and finished successfully
 - `rate_limited` - Hit Claude API rate limit, waiting before retry
 - `error` - General execution error occurred
-- `auth_error` - Claude authentication failed (check `CLAUDE_CODE_OAUTH_TOKEN` in the secret store)
+- `auth_error` - Claude authentication failed (check `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` in the secret store)
 
 ### Accessing State
 
