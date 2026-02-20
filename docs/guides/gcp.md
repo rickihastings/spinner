@@ -302,6 +302,11 @@ All resolved secrets are encrypted into a per-session blob using a random AES-25
 decryption key is stored separately in GCS and never appears in instance metadata. Inside the VM, use
 `spinner secret inject -- <command>` to run a command with secrets available as environment variables.
 
+> **Important:** `--secret` on `spinner setup` only makes secrets available during the image bake (for custom bake
+> scripts that call `spinner secret inject`). Secrets needed at **runtime** — including any secrets consumed by
+> services baked into your image — must be passed to `spinner spin`. Both commands accept `--secret`, but they
+> produce independent blobs.
+
 The `--secret` flag is repeatable:
 
 ```bash
