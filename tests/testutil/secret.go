@@ -14,6 +14,65 @@ const (
 	testClaudeOAuthToken = "test-claude-oauth-token"
 )
 
+// OverrideSecretStoreWithRealToken creates a temporary secret store using the
+// provided real GITHUB_TOKEN and a placeholder CLAUDE_CODE_OAUTH_TOKEN, then
+// overrides SPINNER_SECRET_STORE and SPINNER_SECRET_PASSPHRASE for the caller's
+// process. This is intended for tests that need to authenticate against GitHub
+// with a real token. The returned cleanup function restores the previous env values.
+func OverrideSecretStoreWithRealToken(githubToken string) (cleanup func(), err error) {
+	tmpDir, err := os.MkdirTemp("", "spinner-real-token-store-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temp dir: %w", err)
+	}
+
+	const passphrase = "spinner-real-token-passphrase"
+
+	storePath := filepath.Join(tmpDir, "secrets.enc")
+
+	store := secret.NewEncryptedFileStore(storePath, func() (string, error) {
+		return passphrase, nil
+	})
+
+	if err := store.Set("GITHUB_TOKEN", githubToken); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		return nil, fmt.Errorf("seeding GITHUB_TOKEN: %w", err)
+	}
+
+	if err := store.Set("CLAUDE_CODE_OAUTH_TOKEN", testClaudeOAuthToken); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		return nil, fmt.Errorf("seeding CLAUDE_CODE_OAUTH_TOKEN: %w", err)
+	}
+
+	prevStore := os.Getenv("SPINNER_SECRET_STORE")
+	prevPassphrase := os.Getenv("SPINNER_SECRET_PASSPHRASE")
+
+	if err := os.Setenv("SPINNER_SECRET_STORE", storePath); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		return nil, fmt.Errorf("setting SPINNER_SECRET_STORE: %w", err)
+	}
+
+	if err := os.Setenv("SPINNER_SECRET_PASSPHRASE", passphrase); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		return nil, fmt.Errorf("setting SPINNER_SECRET_PASSPHRASE: %w", err)
+	}
+
+	return func() {
+		_ = os.RemoveAll(tmpDir)
+
+		if prevStore == "" {
+			_ = os.Unsetenv("SPINNER_SECRET_STORE")
+		} else {
+			_ = os.Setenv("SPINNER_SECRET_STORE", prevStore)
+		}
+
+		if prevPassphrase == "" {
+			_ = os.Unsetenv("SPINNER_SECRET_PASSPHRASE")
+		} else {
+			_ = os.Setenv("SPINNER_SECRET_PASSPHRASE", prevPassphrase)
+		}
+	}, nil
+}
+
 // SetupTestSecretStore creates a temporary encrypted secret store populated with
 // test tokens required by `spinner spin` (GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN).
 // It also writes an empty .spinner.json config file and sets SPINNER_CONFIG_FILE so

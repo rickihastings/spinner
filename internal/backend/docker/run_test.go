@@ -3,10 +3,13 @@ package docker
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestGenerateContainerName_BasicNaming tests container naming without branch (7.3)
@@ -1102,4 +1105,108 @@ func TestBuildDockerRunCommand_NoExtraArgs(t *testing.T) {
 
 	// Verify the image is still the last argument
 	assert.Equal(t, "spinner:test", args[len(args)-1], "image should be the last argument")
+}
+
+// TestBuildDockerRunCommand_SecretBlobAndKey tests that blob and key files are written
+// to the host directory and mounted read-only into the container.
+func TestBuildDockerRunCommand_SecretBlobAndKey(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+	containerName := "spinner-test-secret-container"
+	secretBlob := []byte("encrypted-blob-data")
+	secretKey := []byte("32-byte-aes-key-data-for-testing")
+
+	config := spinConfig{
+		Image:      "spinner:test",
+		Repo:       "https://github.com/user/repo.git",
+		SecretBlob: secretBlob,
+		SecretKey:  secretKey,
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, containerName, false)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = os.Remove(tmpFile)
+		_ = os.RemoveAll(filepath.Join(homeDir, ".spinner", containerName))
+	}()
+
+	argsStr := strings.Join(args, " ")
+
+	// Verify blob volume mount
+	expectedBlobMount := filepath.Join(homeDir, ".spinner", containerName, "secrets.enc") + ":/run/spinner/secrets.enc:ro"
+	assert.Contains(t, argsStr, expectedBlobMount, "should mount encrypted blob read-only")
+
+	// Verify key volume mount
+	expectedKeyMount := filepath.Join(homeDir, ".spinner", containerName, "secrets.key") + ":/run/spinner/secrets.key:ro"
+	assert.Contains(t, argsStr, expectedKeyMount, "should mount key file read-only")
+
+	// Verify blob file was written to disk with correct contents
+	blobPath := filepath.Join(homeDir, ".spinner", containerName, "secrets.enc")
+	writtenBlob, err := os.ReadFile(blobPath)
+	require.NoError(t, err, "blob file should be written to disk")
+	assert.Equal(t, secretBlob, writtenBlob, "blob file content should match")
+
+	// Verify key file was written to disk with correct contents
+	keyPath := filepath.Join(homeDir, ".spinner", containerName, "secrets.key")
+	writtenKey, err := os.ReadFile(keyPath)
+	require.NoError(t, err, "key file should be written to disk")
+	assert.Equal(t, secretKey, writtenKey, "key file content should match")
+
+	// Verify blob and key files have restrictive permissions (0600)
+	blobInfo, err := os.Stat(blobPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), blobInfo.Mode().Perm(), "blob file should have 0600 permissions")
+
+	keyInfo, err := os.Stat(keyPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), keyInfo.Mode().Perm(), "key file should have 0600 permissions")
+}
+
+// TestBuildDockerRunCommand_SecretBlobWithoutKey tests that only the blob is mounted when no key is set.
+func TestBuildDockerRunCommand_SecretBlobWithoutKey(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+	containerName := "spinner-test-blob-only-container"
+	secretBlob := []byte("encrypted-blob-data")
+
+	config := spinConfig{
+		Image:      "spinner:test",
+		Repo:       "https://github.com/user/repo.git",
+		SecretBlob: secretBlob,
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, containerName, false)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = os.Remove(tmpFile)
+		_ = os.RemoveAll(filepath.Join(homeDir, ".spinner", containerName))
+	}()
+
+	argsStr := strings.Join(args, " ")
+
+	// Blob should be mounted
+	expectedBlobMount := filepath.Join(homeDir, ".spinner", containerName, "secrets.enc") + ":/run/spinner/secrets.enc:ro"
+	assert.Contains(t, argsStr, expectedBlobMount, "should mount encrypted blob read-only")
+
+	// Key should NOT be mounted
+	assert.NotContains(t, argsStr, "secrets.key", "should not mount key file when not provided")
+}
+
+// TestBuildDockerRunCommand_NoSecretBlob tests that no secret mounts are added when blob is empty.
+func TestBuildDockerRunCommand_NoSecretBlob(t *testing.T) {
+	config := spinConfig{
+		Image: "spinner:test",
+		Repo:  "https://github.com/user/repo.git",
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, "test-container", false)
+	require.NoError(t, err)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	argsStr := strings.Join(args, " ")
+
+	assert.NotContains(t, argsStr, "secrets.enc", "should not mount blob when none provided")
+	assert.NotContains(t, argsStr, "secrets.key", "should not mount key when none provided")
+	assert.NotContains(t, argsStr, "/run/spinner/", "should not have any /run/spinner/ mounts")
 }

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -333,10 +334,22 @@ func TestDockerSpin_RestartStoppedContainer(t *testing.T) {
 func TestDockerSpin_PrivateRepoClone(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
+	// This test requires a real GitHub token to clone a private repository.
+	// Skip if GITHUB_TOKEN is not set or is the placeholder value used by the test store.
+	githubToken := os.Getenv("GITHUB_TOKEN")
+	if githubToken == "" || githubToken == "test-github-token" {
+		t.Skip("skipping: GITHUB_TOKEN not set to a real token in environment")
+	}
+
+	// Override the secret store with the real token so the spin subprocess can use it.
+	storeCleanup, err := testutil.OverrideSecretStoreWithRealToken(githubToken)
+	require.NoError(t, err, "should override secret store with real token")
+
+	defer storeCleanup()
+
 	// Setup test image
 	_, imageName := testutil.SetupTestImage(t)
 
-	// Use a private repository (assumes GITHUB_TOKEN is set)
 	privateRepo := "https://github.com/rickihastings/spinner.git"
 
 	// Run spin command with private repo
@@ -352,9 +365,9 @@ func TestDockerSpin_PrivateRepoClone(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// Check if repository was cloned
-	cmd := exec.Command("docker", "exec", containerName, "test", "-d", workspacePath+"/.git")
-	err := cmd.Run()
-	assert.NoError(t, err, "private repository should be cloned into %s", workspacePath)
+	cloneCmd := exec.Command("docker", "exec", containerName, "test", "-d", workspacePath+"/.git")
+	cloneErr := cloneCmd.Run()
+	assert.NoError(t, cloneErr, "private repository should be cloned into %s", workspacePath)
 }
 
 // TestSpin_DeterministicNamingWithBranch tests container naming with branch

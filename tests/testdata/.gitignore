@@ -1,0 +1,2 @@
+# Un-ignore log files in testdata — they are test fixtures, not build artefacts.
+!*.log

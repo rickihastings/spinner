@@ -30,7 +30,6 @@ type spinConfig struct {
 	EnvFile       string
 	SecretBlob    []byte
 	SecretKey     []byte
-	Passphrase    string
 	ExtraArgs     []string
 }
 

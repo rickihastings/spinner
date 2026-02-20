@@ -90,7 +90,6 @@ type CreateConfig struct {
 	EnvFile       string
 	SecretBlob    []byte
 	SecretKey     []byte
-	Passphrase    string
 	ProviderArgs  []string
 }
 

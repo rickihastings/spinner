@@ -215,7 +215,6 @@ EXAMPLES:
 				EnvFile:       spinEnvFile,
 				SecretBlob:    blob,
 				SecretKey:     key,
-				Passphrase:    passphrase,
 				ProviderArgs:  providerArgs,
 			}
 
