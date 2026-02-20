@@ -81,7 +81,7 @@ func TestDestroyCommand_MultipleInstances(t *testing.T) {
 	assert.Contains(t, b.String(), "✓ Instance 'instance3' destroyed")
 }
 
-// TestDestroyCommand_InstanceNotFound tests error when instance doesn't exist
+// TestDestroyCommand_InstanceNotFound tests that a missing instance is treated as already destroyed
 func TestDestroyCommand_InstanceNotFound(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("Status", mock.Anything, "nonexistent").Return(provider.InstanceStatusNone, nil)
@@ -95,14 +95,13 @@ func TestDestroyCommand_InstanceNotFound(t *testing.T) {
 
 	err := cmd.Execute()
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to destroy 1 of 1 instance(s)")
-	assert.Contains(t, b.String(), "✗ Instance 'nonexistent' not found")
+	assert.NoError(t, err)
+	assert.Contains(t, b.String(), "✓ Instance 'nonexistent' destroyed")
 	mockProvider.AssertNotCalled(t, "Remove", mock.Anything, "nonexistent")
 }
 
-// TestDestroyCommand_PartialFailure tests partial failure with multiple instances
-func TestDestroyCommand_PartialFailure(t *testing.T) {
+// TestDestroyCommand_MixedFoundAndNotFound tests that not-found instances are treated as destroyed
+func TestDestroyCommand_MixedFoundAndNotFound(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("Status", mock.Anything, "instance1").Return(provider.InstanceStatusRunning, nil)
 	mockProvider.On("Status", mock.Anything, "instance2").Return(provider.InstanceStatusNone, nil)
@@ -119,10 +118,9 @@ func TestDestroyCommand_PartialFailure(t *testing.T) {
 
 	err := cmd.Execute()
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to destroy 1 of 3 instance(s)")
+	assert.NoError(t, err)
 	assert.Contains(t, b.String(), "✓ Instance 'instance1' destroyed")
-	assert.Contains(t, b.String(), "✗ Instance 'instance2' not found")
+	assert.Contains(t, b.String(), "✓ Instance 'instance2' destroyed")
 	assert.Contains(t, b.String(), "✓ Instance 'instance3' destroyed")
 	mockProvider.AssertCalled(t, "Remove", mock.Anything, "instance1")
 	mockProvider.AssertNotCalled(t, "Remove", mock.Anything, "instance2")

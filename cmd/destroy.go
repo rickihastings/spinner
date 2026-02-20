@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/spf13/cobra"
@@ -63,8 +65,12 @@ EXAMPLES:
 				// Check if instance exists
 				status, err := p.Status(ctx, instanceName)
 				if err != nil || status == provider.InstanceStatusNone {
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "✗ Instance '%s' not found\n", instanceName)
-					failures = append(failures, instanceName)
+					// Instance doesn't exist — clean up any local state and succeed.
+					if homeDir, err := os.UserHomeDir(); err == nil {
+						_ = os.RemoveAll(filepath.Join(homeDir, ".spinner", instanceName))
+					}
+
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✓ Instance '%s' destroyed\n", instanceName)
 
 					continue
 				}
