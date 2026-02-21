@@ -1,30 +1,4 @@
-# Development Setup & Workflow
-
-## Build System
-
-This project uses **Make** for build automation and **Go modules** for dependency management.
-
-### Common Commands
-
-```bash
-make build          # Build the spinner binary to dist/spinner
-make test           # Build and run all tests
-make lint           # Run go vet and golangci-lint
-make format         # Format code with go fmt
-make format-check   # Check formatting (used by pre-commit)
-make install-hooks  # Install git pre-commit hooks
-make clean          # Remove build artifacts
-make snapshot       # Test release build locally (no tag required)
-make release        # Create a release (requires git tag)
-```
-
-### Pre-commit Hooks
-
-Install git hooks to run format, lint, and test before each commit:
-
-```bash
-make install-hooks
-```
+# Usage Guide
 
 ## Secret Management
 
@@ -142,12 +116,12 @@ export SPINNER_SECRET_STORE=/path/to/custom/secrets.enc
 spinner secret set MY_KEY
 ```
 
-## Environment Variable Configuration
+## Configuration
+
+### Environment Variables
 
 Spinner uses Viper to support environment variable configuration. All command-line flags can be overridden using
 environment variables with the `SPINNER_` prefix.
-
-### Supported Environment Variables
 
 **Setup Command:**
 
@@ -163,21 +137,14 @@ environment variables with the `SPINNER_` prefix.
 - `SPINNER_RECREATE` - Override `--recreate` flag (set to `true` or `false`)
 - `SPINNER_WATCH` - Override `--watch` flag (set to `true` or `false`)
 
-### Usage Examples
-
 ```bash
 # Set default image via environment variable
 export SPINNER_IMAGE=spinner:default
-./dist/spinner spin --repo https://github.com/user/repo --prompt "task"
-
-# Set multiple configuration values
-export SPINNER_IMAGE=spinner:default
-export SPINNER_MAX_ITERATIONS=50
-./dist/spinner spin --repo https://github.com/user/repo --prompt "task"
+spinner spin --repo https://github.com/user/repo --prompt "task"
 
 # Command-line flags take precedence over environment variables
 export SPINNER_IMAGE=spinner:default
-./dist/spinner spin --image spinner:custom --repo https://github.com/user/repo
+spinner spin --image spinner:custom --repo https://github.com/user/repo
 # Uses spinner:custom, not spinner:default
 ```
 
@@ -206,8 +173,6 @@ SPINNER_PROJECT=my-local-project
 SPINNER_ZONE=us-west1-a
 ```
 
-**Config file search order:**
-
 Spinner searches for `.spinner.json` by traversing up from the current directory to the filesystem root, then falls
 back to `$HOME/.spinner.json` if no file is found. The first file found is used (no merging between config files).
 
@@ -227,201 +192,6 @@ Configuration values are applied in this order (highest to lowest priority):
 3. `.env` file (current directory only)
 4. `.spinner.json` file (nearest ancestor or `$HOME/.spinner.json`)
 5. Default values
-
-Note: When searching for `.spinner.json`, Spinner uses the first file found when traversing from the current directory
-upward to the filesystem root. If no file is found in the ancestor path, `$HOME/.spinner.json` is used as a fallback.
-Only one config file is loaded (no merging).
-
-### GCP Backend
-
-**Bootstrap Script:**
-
-Use `scripts/gcp-bootstrap.sh` to automatically provision the required GCP resources (GCS bucket, service account, IAM
-roles). Run the script with `--help` to see available options.
-
-**Authentication:**
-
-- `GOOGLE_APPLICATION_CREDENTIALS` - Path to service account JSON key file, OR
-- Run `gcloud auth application-default login`
-
-**Required flags (use SPINNER_ prefix for env vars):**
-
-- `SPINNER_BACKEND=gcp` - Enable GCP backend
-- `SPINNER_PROJECT` - GCP project ID
-- `SPINNER_ZONE` - GCP zone (e.g., us-central1-a)
-- `SPINNER_STATE_BUCKET` - GCS bucket for state persistence
-
-**Optional flags:**
-
-- `SPINNER_BAKE_SCRIPT` - Path to custom bake script for image creation
-
-**Example:**
-
-```bash
-# Set up authentication
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-
-# Configure GCP backend
-export SPINNER_BACKEND=gcp
-export SPINNER_PROJECT=my-project
-export SPINNER_ZONE=us-central1-a
-export SPINNER_STATE_BUCKET=my-state-bucket
-
-# Store required tokens in the secret store (one-time setup)
-spinner secret set GITHUB_TOKEN
-spinner secret set ANTHROPIC_API_KEY  # or: spinner secret set CLAUDE_CODE_OAUTH_TOKEN
-
-# Setup and spin (flags optional since env vars are set)
-./dist/spinner setup --name my-env
-./dist/spinner spin --image my-env --repo https://github.com/user/repo --prompt "task"
-```
-
-**Required GCS bucket permissions:**
-
-- `storage.objects.create`
-- `storage.objects.get`
-- `storage.objects.delete`
-
-**Required GCP API permissions:**
-
-- Compute Engine API enabled
-- Service account with `roles/compute.instanceAdmin.v1` or equivalent
-
-**Metrics and Monitoring:**
-
-The GCP backend collects CPU and memory usage from `/proc` inside the VM and writes them to the GCS state file on each
-iteration. The `spinner watch` TUI reads these metrics by polling the state file at 5-second intervals. No additional
-agents or Cloud Monitoring configuration is required.
-
-## Development Workflow
-
-### Build and Test
-
-Always build before testing CLI commands:
-
-```bash
-# 1. Build
-make build
-
-# 2. Setup (required before first spin)
-./dist/spinner setup --name default
-
-# 3. Test
-./dist/spinner spin --image default --repo . --prompt "your test prompt"
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-make test
-
-# Run tests for a specific package
-go test ./internal/docker/...
-```
-
-### Debugging Checklist
-
-- Docker is running: `docker ps` should execute without errors
-- You're in a git repository with proper configuration
-- The `--image` matches a previous `--name` from setup
-
-## Customizing the Agent's Claude Code Configuration
-
-Spinner images come with Claude Code installed, but with a default configuration. If you use custom MCP servers,
-skills, commands, or other Claude Code settings locally, you can bake them into the image so the agent has access to
-them at runtime.
-
-Claude Code stores its configuration in the `~/.claude/` directory. Inside a Spinner container or VM, the agent runs as
-the `spinner` user with home directory `/home/spinner`, so the target path is `/home/spinner/.claude/`.
-
-Common things you might want to include:
-
-- **MCP servers** — `settings.json` with your `mcpServers` configuration
-- **Custom slash commands** — files in `.claude/commands/`
-- **Skills** — files in `.claude/skills/`
-- **Settings** — `settings.json` with permissions, preferences, or model configuration
-
-The mechanism differs by backend:
-
-- **Docker** — use a custom Dockerfile via `--dockerfile /path/to/Dockerfile` (see the [Docker guide](guides/docker.md#customizing-claude-code-configuration))
-- **GCP** — use a custom bake script via `--bake-script` (see the [GCP guide](guides/gcp.md#customizing-claude-code-configuration))
-
-## Working Command Examples
-
-These are tested, working examples for future reference:
-
-### Setup Command Examples
-
-```bash
-# Basic setup with default base image (ubuntu:22.04)
-./dist/spinner setup --name spinner:default
-
-# Setup with custom Dockerfile (used as base; spinner tooling layered on top)
-./dist/spinner setup --name custom --dockerfile ./path/to/Dockerfile
-
-# Setup with extra build args passed through
-./dist/spinner setup --name my-env --provider-args="--build-arg=MYARG=value"
-```
-
-### Spin Command Examples
-
-```bash
-# Basic spin with prompt only (uses current branch)
-./dist/spinner spin \
-  --image spinner:default \
-  --repo https://github.com/anthropics/anthropic-quickstarts \
-  --prompt "add a readme explaining how to run the customer support agent"
-
-# Spin with specific branch
-./dist/spinner spin \
-  --image spinner:default \
-  --repo https://github.com/anthropics/anthropic-quickstarts \
-  --branch main \
-  --prompt "fix any linting errors"
-
-# Spin with max iterations limit
-./dist/spinner spin \
-  --image spinner:default \
-  --repo https://github.com/anthropics/anthropic-quickstarts \
-  --prompt "refactor the authentication module" \
-  --max-iterations 10
-
-# Spin without prompt (interactive mode on current branch)
-./dist/spinner spin \
-  --image spinner:default \
-  --repo https://github.com/user/repo \
-  --branch feature/new-feature
-
-# Spin and immediately enter watch mode
-./dist/spinner spin \
-  --image spinner:default \
-  --repo https://github.com/user/repo \
-  --prompt "implement feature X" \
-  --watch
-```
-
-### Watch Command Examples
-
-```bash
-# Watch a running container
-./dist/spinner watch spinner-default-abc123
-
-# Watch mode displays:
-# - Container status (running/stopped/exited)
-# - CPU and memory usage
-# - Real-time streaming logs
-#
-# Press 'q' or Ctrl+C to exit
-```
-
-### Important Notes
-
-- The `--image` parameter must match a `--name` from a previous setup
-- Repository must be a valid git URL (https://, http://, or git@)
-- Either `--prompt` or `--branch` (or both) must be provided
-- Default `max-iterations` is 100 if not specified
-- The `--watch` flag can be combined with any spin flags
 
 ## Writing Effective Prompts
 
@@ -469,7 +239,7 @@ the state is in the file itself, not in the agent's memory.
 Pass this file as your prompt:
 
 ```bash
-./dist/spinner spin \
+spinner spin \
   --image my-env \
   --repo https://github.com/user/repo \
   --prompt "$(cat prompt.md)"
@@ -484,7 +254,7 @@ becomes the source of truth that survives restarts.
 is useful when you want to run a single sandboxed command and not have the agent loop:
 
 ```bash
-./dist/spinner spin \
+spinner spin \
   --image my-env \
   --repo https://github.com/user/repo \
   --prompt "run the test suite and paste the output into test-results.txt" \
@@ -504,100 +274,3 @@ Use this for tasks where you know one iteration is enough and you don't need the
   cleaner commits and easier recovery if something goes wrong.
 - **Include constraints up front.** Style guides, libraries to use, files to avoid — put them in the prompt so the
   agent doesn't have to guess.
-
-## State Management
-
-Spinner maintains persistent state for each running container to track iteration progress and status. This state
-survives container restarts and allows you to resume work after interruptions.
-
-### State File Location
-
-State is stored in `${STATE_DIR}/state.json` where `STATE_DIR` defaults to `/state` inside the container. This directory
-is mounted from the host at `~/.spinner/<container-name>/state/` to ensure persistence.
-
-### State File Format
-
-The state file is JSON with the following structure:
-
-```json
-{
-  "branch": "feature-branch",
-  "iteration": 5,
-  "status": "running",
-  "last_updated": "2026-02-02T10:35:00Z",
-  "started_at": "2026-02-02T10:30:00Z",
-  "completed_at": "2026-02-02T10:40:00Z",
-  "error_message": ""
-}
-```
-
-**Fields:**
-
-- `branch` - The git branch being worked on
-- `iteration` - Current iteration count (increments after each Claude execution)
-- `status` - Current execution status (values: `running`, `completed`, `rate_limited`, `error`, `auth_error`)
-- `last_updated` - ISO 8601 timestamp of last state update
-- `started_at` - ISO 8601 timestamp when execution started
-- `completed_at` - ISO 8601 timestamp when execution completed (omitted if not completed)
-- `error_message` - Error message if status is `error` or `auth_error` (omitted if no error)
-
-### Status Values
-
-- `running` - Agent is actively working through iterations
-- `completed` - Agent detected completion signal (`~~ FEATURE_COMPLETED ~~` on its own line) and finished successfully
-- `rate_limited` - Hit Claude API rate limit, waiting before retry
-- `error` - General execution error occurred
-- `auth_error` - Claude authentication failed (check `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` in the secret store)
-
-### Accessing State
-
-View state while container is running:
-
-```bash
-# From host
-cat ~/.spinner/<container-name>/state/state.json
-
-# Inside container
-docker exec -it <container-name> cat /state/state.json
-```
-
-### Resetting State
-
-To start fresh with a new state, either:
-
-1. Use `--recreate` flag which removes the container and its state directory
-2. Manually remove the state directory: `rm -rf ~/.spinner/<container-name>/state/`
-
-### GCP State Persistence
-
-When using the GCP backend, state is persisted to Google Cloud Storage for durability across VM lifecycle events:
-
-- **Location:** `gs://{state-bucket}/{instance-name}/state.json`
-- **Download on boot:** The GCP runtime startup script checks for existing state in GCS and restores it before running
-  `spinner exec`
-- **Upload after changes:** The exec loop syncs state to GCS after each state change (iteration start, completion,
-  errors, rate limits)
-- **Fresh start:** If no state exists in GCS, the VM starts with default state
-
-View GCP state:
-
-```bash
-gsutil cat gs://<state-bucket>/<instance-name>/state.json
-```
-
-### Auto-Stop Behavior
-
-GCP VMs automatically stop when the agent completes successfully **and a prompt was specified**. This prevents wasted compute resources and reduces costs for autonomous tasks.
-
-**Behavior:**
-- **Successful completion with prompt (exit 0):** VM stops automatically within 5 seconds
-- **Successful completion without prompt:** VM keeps running for interactive use
-- **Errors/rate limits (exit 1):** VM keeps running for debugging
-
-**To restart a stopped VM:**
-```bash
-gcloud compute instances start <instance-name> --zone <zone> --project <project>
-```
-
-**To access a stopped VM for debugging:**
-The VM is stopped, not deleted. Use `gcloud compute instances describe` to view final state, or restart it to examine logs and workspace.

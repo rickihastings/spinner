@@ -265,11 +265,13 @@ For detailed walkthroughs, see the [guides](docs/guides/) directory:
 - **[Docker Sandbox Guide](docs/guides/docker.md)** — Setting up sandbox images, running interactive or autonomous containers, and monitoring progress with watch mode
 - **[GCP Sandbox Guide](docs/guides/gcp.md)** — Baking VM images, custom bake scripts, running agents on GCP VMs, auto-stop behavior, and state persistence with GCS
 
+For configuration and prompt authoring, see [docs/usage.md](docs/usage.md).
+
 ## Development
 
 For contributing to Spinner itself, see the development documentation:
 
-- [docs/usage.md](docs/usage.md) - Development workflow and commands
+- [docs/development.md](docs/development.md) - Build system, workflow, and local testing
 - [docs/standards.md](docs/standards.md) - Coding standards and conventions
 - [docs/testing.md](docs/testing.md) - Testing approach and requirements
 - [docs/system-design.md](docs/system-design.md) - Architecture overview

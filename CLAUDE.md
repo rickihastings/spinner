@@ -47,7 +47,8 @@ and persists state. The agent works until it outputs `~~ FEATURE_COMPLETED ~~` o
 
 Detailed guides for specific topics:
 
-- **docs/usage.md** - Development workflow, package manager, and command examples
+- **docs/development.md** - Build system, dev workflow, and local testing
+- **docs/usage.md** - User configuration, secrets, and prompt authoring guide
 - **docs/standards.md** - Coding standards, communication guidelines, Go conventions, and git commit format
 - **docs/system-design.md** - Architecture, code organization, and design patterns
 - **docs/testing.md** - Testing approach, coverage requirements, and testability guidelines

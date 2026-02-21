@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Claude auth secret resolution SHALL use ANTHROPIC_API_KEY with fallback to CLAUDE_CODE_OAUTH_TOKEN
 

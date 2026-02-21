@@ -83,18 +83,17 @@ func TestDockerDestroy_MultipleInstances(t *testing.T) {
 	assert.False(t, testutil.DockerContainerExists(t, containerName2), "container2 should not exist after destroy")
 }
 
-// TestDestroy_Docker_NonExistent tests destroy command with non-existent instance
+// TestDestroy_Docker_NonExistent tests that destroying a non-existent instance succeeds
 func TestDockerDestroy_NonExistent(t *testing.T) {
 	testutil.SkipIfDockerNotAvailable(t)
 
 	// Run destroy command with non-existent container
 	destroyArgs := []string{"destroy", "non-existent-container"}
-	stdout, stderr, exitCode := testutil.RunCommandExpectError(t, destroyArgs...)
-	require.NotEqual(t, 0, exitCode, "should fail when destroying non-existent instance")
+	stdout, stderr, exitCode := testutil.RunCommand(t, destroyArgs...)
+	require.Equal(t, 0, exitCode, "should succeed when destroying non-existent instance (already gone)")
 
 	output := stdout + stderr
 
-	// Verify error message
-	assert.Contains(t, output, "Instance 'non-existent-container' not found", "should show instance not found error")
-	assert.Contains(t, output, "failed to destroy 1 of 1 instance(s)", "should show aggregate error")
+	// Verify success message — missing instance is treated as already destroyed
+	assert.Contains(t, output, "✓ Instance 'non-existent-container' destroyed", "should show destroyed message")
 }

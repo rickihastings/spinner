@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Setup documentation MUST present ANTHROPIC_API_KEY and CLAUDE_CODE_OAUTH_TOKEN as equal peers
 
