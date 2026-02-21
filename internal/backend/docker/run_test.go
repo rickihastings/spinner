@@ -1187,3 +1187,113 @@ func TestBuildDockerRunCommand_NoSecretBlob(t *testing.T) {
 	assert.NotContains(t, argsStr, "secrets.key", "should not mount key when none provided")
 	assert.NotContains(t, argsStr, "/run/spinner/", "should not have any /run/spinner/ mounts")
 }
+
+// TestBuildDockerRunCommand_PreCreatesStateDirs verifies that state and logs directories
+// are created before docker run so Docker doesn't create them as root.
+func TestBuildDockerRunCommand_PreCreatesStateDirs(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+	containerName := "spinner-test-precreate-dirs"
+
+	config := spinConfig{
+		Image: "spinner:test",
+		Repo:  "https://github.com/user/repo.git",
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, containerName, false)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = os.Remove(tmpFile)
+		_ = os.RemoveAll(filepath.Join(homeDir, ".spinner", containerName))
+	}()
+
+	_ = args
+
+	stateDir := filepath.Join(homeDir, ".spinner", containerName, "state")
+	logsDir := filepath.Join(homeDir, ".spinner", containerName, "logs")
+
+	stateInfo, err := os.Stat(stateDir)
+	require.NoError(t, err, "state dir should be pre-created")
+	assert.True(t, stateInfo.IsDir())
+
+	logsInfo, err := os.Stat(logsDir)
+	require.NoError(t, err, "logs dir should be pre-created")
+	assert.True(t, logsInfo.IsDir())
+}
+
+// TestBuildDockerRunCommand_WritesHostStateDirToEnvFile verifies that SPINNER_HOST_STATE_DIR
+// is written to the env file so nested spinner spin calls can resolve host paths.
+func TestBuildDockerRunCommand_WritesHostStateDirToEnvFile(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+	containerName := "spinner-test-host-state-dir"
+
+	config := spinConfig{
+		Image: "spinner:test",
+		Repo:  "https://github.com/user/repo.git",
+	}
+
+	_, tmpFile, err := buildDockerRunCommand(config, containerName, false)
+	require.NoError(t, err)
+
+	defer func() {
+		_ = os.Remove(tmpFile)
+		_ = os.RemoveAll(filepath.Join(homeDir, ".spinner", containerName))
+	}()
+
+	content, err := os.ReadFile(tmpFile)
+	require.NoError(t, err)
+
+	expectedStateDir := filepath.Join(homeDir, ".spinner", containerName, "state")
+	assert.Contains(t, string(content), "SPINNER_HOST_STATE_DIR="+expectedStateDir+"\n")
+}
+
+// TestBuildDockerRunCommand_InceptionMode verifies that when SPINNER_HOST_STATE_DIR is set,
+// files are written to the outer container's bind-mounted /state dir and docker args use
+// the host-side path so the host Docker daemon can resolve volume mounts correctly.
+func TestBuildDockerRunCommand_InceptionMode(t *testing.T) {
+	// Redirect the inception mount base to a temp dir so we don't need /state on the host.
+	tmpMount := t.TempDir()
+	oldBase := inceptionMountBase
+	inceptionMountBase = tmpMount
+
+	defer func() { inceptionMountBase = oldBase }()
+
+	parentStateDir := t.TempDir()
+	t.Setenv("SPINNER_HOST_STATE_DIR", parentStateDir)
+
+	containerName := "spinner-inner-container"
+	secretBlob := []byte("encrypted-blob-data")
+	secretKey := []byte("32-byte-aes-key-data-for-testing")
+
+	config := spinConfig{
+		Image:      "spinner:test",
+		Repo:       "https://github.com/user/repo.git",
+		SecretBlob: secretBlob,
+		SecretKey:  secretKey,
+	}
+
+	args, tmpFile, err := buildDockerRunCommand(config, containerName, false)
+	require.NoError(t, err)
+
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	argsStr := strings.Join(args, " ")
+	hostBase := filepath.Join(parentStateDir, containerName)
+
+	// Volume mounts should use the host-side paths (hostBase), not the container write path.
+	assert.Contains(t, argsStr, filepath.Join(hostBase, "state")+":/state", "state mount should use host path")
+	assert.Contains(t, argsStr, filepath.Join(hostBase, "logs")+":/logs", "logs mount should use host path")
+	assert.Contains(t, argsStr, filepath.Join(hostBase, "secrets.enc")+":/run/spinner/secrets.enc:ro")
+	assert.Contains(t, argsStr, filepath.Join(hostBase, "secrets.key")+":/run/spinner/secrets.key:ro")
+
+	// Files should be written to fileBase (tmpMount/<containerName>), not hostBase.
+	fileBase := filepath.Join(tmpMount, containerName)
+	blobData, err := os.ReadFile(filepath.Join(fileBase, "secrets.enc"))
+	require.NoError(t, err)
+	assert.Equal(t, secretBlob, blobData)
+
+	// SPINNER_HOST_STATE_DIR in env file should propagate the next level's host path.
+	content, err := os.ReadFile(tmpFile)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "SPINNER_HOST_STATE_DIR="+filepath.Join(hostBase, "state")+"\n")
+}

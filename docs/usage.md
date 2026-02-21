@@ -94,18 +94,16 @@ spinner secret inject -- bash
 
 ### Inception (Spinner Inside Spinner)
 
-The encrypted blob format matches the store format, so an outer Spinner's blob can serve as the inner Spinner's store.
-The `SPINNER_SECRET_STORE` environment variable controls where the store file is read from:
+You can run `spinner spin` from inside a container (e.g. from a Claude prompt) to launch a nested agent. No extra
+setup is needed — Spinner auto-detects the container blob at `/run/spinner/secrets.enc` and its key file, so secrets
+are resolved transparently:
 
 ```bash
-# Inside a container, use the blob as the inner spinner's store
-spinner secret inject -- sh -c '
-  SPINNER_SECRET_STORE=/run/spinner/secrets.enc \
-  spinner spin --backend docker --secret NPM_TOKEN --repo ... --prompt "sub-task"
-'
+# Inside a container, just run spinner spin directly
+spinner spin --image default --repo https://github.com/user/repo --prompt "sub-task"
 ```
 
-Each layer decrypts what it needs and re-encrypts for the next. Same passphrase at every layer, separate salts per blob.
+This works from Claude prompts, shell sessions inside the container, or any subprocess spawned by the agent.
 
 ### Configurable Store Path
 

@@ -15,15 +15,20 @@ import (
 )
 
 const (
-	saltLen       = 16
-	nonceLen      = 12
-	argonTime     = 1
-	argonMemory   = 64 * 1024
-	argonThreads  = 4
-	argonKeyLen   = 32
-	fileMode      = 0600
-	envStorePath  = "SPINNER_SECRET_STORE"
-	envPassphrase = "SPINNER_SECRET_PASSPHRASE"
+	saltLen      = 16
+	nonceLen     = 12
+	argonTime    = 1
+	argonMemory  = 64 * 1024
+	argonThreads = 4
+	argonKeyLen  = 32
+	fileMode     = 0600
+	envStorePath = "SPINNER_SECRET_STORE"
+	envSecretKey = "SPINNER_SECRET_KEY"
+
+	// ContainerBlobPath is the well-known path for the secrets blob inside a spinner container.
+	ContainerBlobPath = "/run/spinner/secrets.enc"
+	// ContainerKeyPath is the well-known path for the blob decryption key inside a spinner container.
+	ContainerKeyPath = "/run/spinner/secrets.key"
 )
 
 // PassphraseFunc is a function that returns the passphrase for encrypting/decrypting secrets.
@@ -49,11 +54,17 @@ func NewEncryptedFileStore(path string, passphrase PassphraseFunc) *EncryptedFil
 	}
 }
 
-// DefaultStorePath returns the default store file path, checking SPINNER_SECRET_STORE
-// env var first, then falling back to ~/.spinner/secrets.enc.
+// DefaultStorePath returns the default store file path.
+// Priority: SPINNER_SECRET_STORE env var → container blob (if present) → ~/.spinner/secrets.enc.
 func DefaultStorePath() string {
 	if p := os.Getenv(envStorePath); p != "" {
 		return p
+	}
+
+	// Inside a spinner container the blob is always at ContainerBlobPath.
+	// Auto-detect it so inception works without any env var setup.
+	if _, err := os.Stat(ContainerBlobPath); err == nil {
+		return ContainerBlobPath
 	}
 
 	home, err := os.UserHomeDir()
@@ -126,6 +137,8 @@ func (s *EncryptedFileStore) List() ([]string, error) {
 
 // load reads and decrypts the store file, returning the secrets map.
 // Returns an empty map if the file does not exist.
+// When SPINNER_SECRET_KEY is set, uses key-file decryption (container/inception mode)
+// instead of passphrase-based Argon2id decryption.
 func (s *EncryptedFileStore) load() (map[string]string, error) {
 	data, err := os.ReadFile(s.path)
 	if err != nil {
@@ -134,6 +147,25 @@ func (s *EncryptedFileStore) load() (map[string]string, error) {
 		}
 
 		return nil, fmt.Errorf("reading secret store: %w", err)
+	}
+
+	// In container/inception mode the blob uses nonce+ciphertext format (no Argon2id salt).
+	// Detect this via SPINNER_SECRET_KEY env var, or by checking the well-known container key
+	// path so inception works with no env var setup at all.
+	keyPath := os.Getenv(envSecretKey)
+	if keyPath == "" {
+		if _, err := os.Stat(ContainerKeyPath); err == nil {
+			keyPath = ContainerKeyPath
+		}
+	}
+
+	if keyPath != "" {
+		key, readErr := os.ReadFile(keyPath)
+		if readErr != nil {
+			return nil, fmt.Errorf("reading secret key file: %w", readErr)
+		}
+
+		return decryptDataWithKey(data, key)
 	}
 
 	passphrase, err := s.passphrase()

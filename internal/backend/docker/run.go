@@ -84,13 +84,52 @@ func generateContainerName(config spinConfig) string {
 	return fmt.Sprintf("%s-%s", imagePart, repoPart)
 }
 
+// inceptionMountBase is the container-local mount point for the outer state directory.
+// Overridden in tests to avoid writing to /state on the host machine.
+var inceptionMountBase = "/state"
+
 // buildDockerRunCommand builds the docker run command arguments.
 // Returns docker args and a temp file path (or empty string if no temp file created).
 // The caller MUST delete the temp file after docker run completes.
+//
+// In normal mode (running on the host), files are written to ~/.spinner/<containerName>/
+// and the same paths are passed as Docker volume mount sources.
+//
+// In inception mode (running inside a spinner container, detected via SPINNER_HOST_STATE_DIR),
+// files are written to the outer container's /state/<containerName>/ directory which is
+// bind-mounted from the host. The host-side path (from SPINNER_HOST_STATE_DIR) is passed
+// to Docker for volume mounts so the host Docker daemon can resolve them correctly.
 func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc bool) ([]string, string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Determine write paths (where this process creates files) and host paths (what Docker
+	// passes to the daemon for volume mounts). In inception mode these diverge: files are
+	// written inside the container at /state/<name>/ but Docker needs the host-side path.
+	var fileBase string // path in this process's filesystem for writing files
+
+	var hostBase string // path the host Docker daemon uses for volume mounts
+
+	if parentStateDir := os.Getenv("SPINNER_HOST_STATE_DIR"); parentStateDir != "" {
+		// Inception mode: write into the outer container's bind-mounted /state/ dir.
+		// The outer container's /state maps to parentStateDir on the host, so sibling
+		// directories written there are accessible to the host Docker daemon.
+		fileBase = filepath.Join(inceptionMountBase, containerName)
+		hostBase = filepath.Join(parentStateDir, containerName)
+	} else {
+		fileBase = filepath.Join(homeDir, ".spinner", containerName)
+		hostBase = fileBase
+	}
+
+	// Pre-create state and logs directories now (as the current user) so Docker doesn't
+	// create them as root when processing the volume mount, which would make them
+	// unwritable by the spinner user inside the container.
+	for _, subDir := range []string{"state", "logs"} {
+		if err := os.MkdirAll(filepath.Join(fileBase, subDir), 0755); err != nil {
+			return nil, "", fmt.Errorf("failed to create %s directory: %w", subDir, err)
+		}
 	}
 
 	// Create temp file for non-secret environment variables
@@ -112,6 +151,10 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 	// Write non-secret built-in environment variables.
 	// Tokens (GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN) travel via the encrypted blob.
 	_, _ = fmt.Fprintf(tmpFile, "REPO_URL=%s\n", config.Repo)
+
+	// Pass the host-side state directory path so the container can support inception:
+	// if it runs `spinner spin` itself, it uses this to resolve host-accessible paths.
+	_, _ = fmt.Fprintf(tmpFile, "SPINNER_HOST_STATE_DIR=%s\n", filepath.Join(hostBase, "state"))
 
 	// Pass host git user config so commits are attributed correctly
 	if name := gitConfigValue("user.name"); name != "" {
@@ -156,20 +199,19 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		return nil, "", fmt.Errorf("failed to close env file: %w", err)
 	}
 
-	// Write encrypted blob and key file to host-mounted directory for container access
+	// Write encrypted blob and key file
 	if len(config.SecretBlob) > 0 {
-		blobDir := filepath.Join(homeDir, ".spinner", containerName)
-		if err := os.MkdirAll(blobDir, 0700); err != nil {
+		if err := os.MkdirAll(fileBase, 0700); err != nil {
 			return nil, "", fmt.Errorf("failed to create blob directory: %w", err)
 		}
 
-		blobPath := filepath.Join(blobDir, "secrets.enc")
+		blobPath := filepath.Join(fileBase, "secrets.enc")
 		if err := os.WriteFile(blobPath, config.SecretBlob, 0600); err != nil {
 			return nil, "", fmt.Errorf("failed to write secrets blob: %w", err)
 		}
 
 		if len(config.SecretKey) > 0 {
-			keyPath := filepath.Join(blobDir, "secrets.key")
+			keyPath := filepath.Join(fileBase, "secrets.key")
 			if err := os.WriteFile(keyPath, config.SecretKey, 0600); err != nil {
 				return nil, "", fmt.Errorf("failed to write secrets key: %w", err)
 			}
@@ -186,19 +228,17 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		"--env-file",
 		tmpFilePath,
 		"-v",
-		fmt.Sprintf("%s/.spinner/%s/logs:/logs", homeDir, containerName),
+		fmt.Sprintf("%s:/logs", filepath.Join(hostBase, "logs")),
 		"-v",
-		fmt.Sprintf("%s/.spinner/%s/state:/state", homeDir, containerName),
+		fmt.Sprintf("%s:/state", filepath.Join(hostBase, "state")),
 	}
 
 	// Mount encrypted secrets blob and key file read-only into container
 	if len(config.SecretBlob) > 0 {
-		blobPath := filepath.Join(homeDir, ".spinner", containerName, "secrets.enc")
-		dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/run/spinner/secrets.enc:ro", blobPath))
+		dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/run/spinner/secrets.enc:ro", filepath.Join(hostBase, "secrets.enc")))
 
 		if len(config.SecretKey) > 0 {
-			keyPath := filepath.Join(homeDir, ".spinner", containerName, "secrets.key")
-			dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/run/spinner/secrets.key:ro", keyPath))
+			dockerArgs = append(dockerArgs, "-v", fmt.Sprintf("%s:/run/spinner/secrets.key:ro", filepath.Join(hostBase, "secrets.key")))
 		}
 	}
 

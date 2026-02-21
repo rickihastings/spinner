@@ -147,10 +147,10 @@ func newSecretDeleteCommand(sf storeFactory) *cobra.Command {
 }
 
 // defaultBlobPath is the default path for the encrypted secrets blob inside containers.
-var defaultBlobPath = "/run/spinner/secrets.enc"
+var defaultBlobPath = secret.ContainerBlobPath
 
 // defaultKeyPath is the default path for the ephemeral decryption key inside containers.
-var defaultKeyPath = "/run/spinner/secrets.key"
+var defaultKeyPath = secret.ContainerKeyPath
 
 // osExit is a package-level variable for testing.
 var osExit = os.Exit

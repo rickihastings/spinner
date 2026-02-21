@@ -79,10 +79,6 @@ func DecryptBlobWithKeyFile(blobPath, keyPath string) (map[string]string, error)
 		return nil, fmt.Errorf("reading secrets key: %w", err)
 	}
 
-	if len(key) != aesKeyLen {
-		return nil, fmt.Errorf("invalid key length: expected %d bytes, got %d", aesKeyLen, len(key))
-	}
-
 	data, err := os.ReadFile(blobPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -90,6 +86,15 @@ func DecryptBlobWithKeyFile(blobPath, keyPath string) (map[string]string, error)
 		}
 
 		return nil, fmt.Errorf("reading secrets blob: %w", err)
+	}
+
+	return decryptDataWithKey(data, key)
+}
+
+// decryptDataWithKey decrypts a blob (nonce+ciphertext format) using a raw AES-256 key.
+func decryptDataWithKey(data, key []byte) (map[string]string, error) {
+	if len(key) != aesKeyLen {
+		return nil, fmt.Errorf("invalid key length: expected %d bytes, got %d", aesKeyLen, len(key))
 	}
 
 	block, err := aes.NewCipher(key)

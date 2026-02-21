@@ -148,13 +148,24 @@ func (p *Provider) Start(ctx context.Context, name string, config provider.Creat
 
 // writeConfigOverrides writes prompt, max-iterations, and model to the host-mounted
 // state directory so the container picks up updated values on restart.
+// In inception mode (SPINNER_HOST_STATE_DIR set), writes to the outer container's
+// bind-mounted /state/ dir so the host Docker daemon can resolve the path.
 func writeConfigOverrides(containerName string, config provider.CreateConfig) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+	var stateDir string
+
+	if parentStateDir := os.Getenv("SPINNER_HOST_STATE_DIR"); parentStateDir != "" {
+		// Inception mode: write under /state/<containerName>/state/ which maps to a
+		// host-accessible path via the outer container's bind mount.
+		stateDir = filepath.Join(inceptionMountBase, containerName, "state")
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get home directory: %w", err)
+		}
+
+		stateDir = filepath.Join(homeDir, ".spinner", containerName, "state")
 	}
 
-	stateDir := filepath.Join(homeDir, ".spinner", containerName, "state")
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}

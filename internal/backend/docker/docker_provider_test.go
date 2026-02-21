@@ -620,3 +620,42 @@ func TestWriteConfigOverrides_DefaultMaxIterations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, defaultMaxIterations, string(maxIterData))
 }
+
+// TestWriteConfigOverrides_InceptionMode verifies that when SPINNER_HOST_STATE_DIR is set,
+// config files are written to the outer container's bind-mounted state dir rather than
+// ~/.spinner/<name>/state so the host Docker daemon can access them.
+func TestWriteConfigOverrides_InceptionMode(t *testing.T) {
+	// Redirect inceptionMountBase so we don't need /state to exist on the host.
+	tmpMount := t.TempDir()
+	oldBase := inceptionMountBase
+	inceptionMountBase = tmpMount
+
+	defer func() { inceptionMountBase = oldBase }()
+
+	t.Setenv("SPINNER_HOST_STATE_DIR", t.TempDir()) // just needs to be non-empty
+
+	containerName := "inner-container"
+	config := provider.CreateConfig{
+		Prompt:        "do the thing",
+		MaxIterations: "5",
+		Model:         "claude-opus-4-6",
+	}
+
+	err := writeConfigOverrides(containerName, config)
+	assert.NoError(t, err)
+
+	// Files should be written under tmpMount/<containerName>/state/, not ~/.spinner/
+	stateDir := filepath.Join(tmpMount, containerName, "state")
+
+	promptData, err := os.ReadFile(filepath.Join(stateDir, "prompt.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "do the thing", string(promptData))
+
+	maxIterData, err := os.ReadFile(filepath.Join(stateDir, "max-iterations.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "5", string(maxIterData))
+
+	modelData, err := os.ReadFile(filepath.Join(stateDir, "model.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "claude-opus-4-6", string(modelData))
+}
