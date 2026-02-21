@@ -94,6 +94,6 @@ func TestDockerDestroy_NonExistent(t *testing.T) {
 
 	output := stdout + stderr
 
-	// Verify success message — missing instance is treated as already destroyed
-	assert.Contains(t, output, "✓ Instance 'non-existent-container' destroyed", "should show destroyed message")
+	// Verify warning message — missing instance is reported as not found
+	assert.Contains(t, output, "! Instance 'non-existent-container' not found, nothing to destroy", "should show not found message")
 }
