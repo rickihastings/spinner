@@ -290,14 +290,15 @@ EXAMPLES:
 			if backend == provider.BackendGCP {
 				gcpProject := viper.GetString(flagProject)
 				gcpZone := viper.GetString(flagZone)
+				gcpBucket := viper.GetString(flagStateBucket)
 
 				fmt.Printf("To access: gcloud compute ssh %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
 				fmt.Printf("To stop:   gcloud compute instances stop %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
-				fmt.Printf("To destroy: spinner destroy %s\n", instance.Name)
+				fmt.Printf("To destroy: spinner destroy %s --backend gcp --project %s --zone %s --state-bucket %s\n", instance.Name, gcpProject, gcpZone, gcpBucket)
 			} else {
 				fmt.Printf("To access: docker exec -it %s bash\n", instance.Name)
 				fmt.Printf("To stop: docker stop %s\n", instance.Name)
-				fmt.Printf("To destroy: spinner destroy %s\n", instance.Name)
+				fmt.Printf("To destroy: spinner destroy %s --backend docker\n", instance.Name)
 			}
 
 			// Enter watch mode if --watch flag is set

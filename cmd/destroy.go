@@ -65,12 +65,12 @@ EXAMPLES:
 				// Check if instance exists
 				status, err := p.Status(ctx, instanceName)
 				if err != nil || status == provider.InstanceStatusNone {
-					// Instance doesn't exist — clean up any local state and succeed.
+					// Instance doesn't exist — clean up any local state and warn.
 					if homeDir, err := os.UserHomeDir(); err == nil {
 						_ = os.RemoveAll(filepath.Join(homeDir, ".spinner", instanceName))
 					}
 
-					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✓ Instance '%s' destroyed\n", instanceName)
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "! Instance '%s' not found, nothing to destroy\n", instanceName)
 
 					continue
 				}

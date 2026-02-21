@@ -81,7 +81,7 @@ func TestDestroyCommand_MultipleInstances(t *testing.T) {
 	assert.Contains(t, b.String(), "✓ Instance 'instance3' destroyed")
 }
 
-// TestDestroyCommand_InstanceNotFound tests that a missing instance is treated as already destroyed
+// TestDestroyCommand_InstanceNotFound tests that a missing instance warns but succeeds
 func TestDestroyCommand_InstanceNotFound(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("Status", mock.Anything, "nonexistent").Return(provider.InstanceStatusNone, nil)
@@ -96,11 +96,11 @@ func TestDestroyCommand_InstanceNotFound(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
-	assert.Contains(t, b.String(), "✓ Instance 'nonexistent' destroyed")
+	assert.Contains(t, b.String(), "! Instance 'nonexistent' not found, nothing to destroy")
 	mockProvider.AssertNotCalled(t, "Remove", mock.Anything, "nonexistent")
 }
 
-// TestDestroyCommand_MixedFoundAndNotFound tests that not-found instances are treated as destroyed
+// TestDestroyCommand_MixedFoundAndNotFound tests that not-found instances warn but the command succeeds
 func TestDestroyCommand_MixedFoundAndNotFound(t *testing.T) {
 	mockProvider := new(provider.MockProvider)
 	mockProvider.On("Status", mock.Anything, "instance1").Return(provider.InstanceStatusRunning, nil)
@@ -120,7 +120,7 @@ func TestDestroyCommand_MixedFoundAndNotFound(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Contains(t, b.String(), "✓ Instance 'instance1' destroyed")
-	assert.Contains(t, b.String(), "✓ Instance 'instance2' destroyed")
+	assert.Contains(t, b.String(), "! Instance 'instance2' not found, nothing to destroy")
 	assert.Contains(t, b.String(), "✓ Instance 'instance3' destroyed")
 	mockProvider.AssertCalled(t, "Remove", mock.Anything, "instance1")
 	mockProvider.AssertNotCalled(t, "Remove", mock.Anything, "instance2")
