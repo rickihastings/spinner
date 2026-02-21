@@ -46,8 +46,7 @@ else
     if [ -z "$SPINNER_VERSION" ]; then
         echo "Warning: Could not detect latest release, skipping spinner install"
     else
-        VERSION_NUM="${SPINNER_VERSION#v}"
-        curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_${VERSION_NUM}_linux_amd64.tar.gz" -o /tmp/spinner.tar.gz
+        curl -fsSL "https://github.com/rickihastings/spinner/releases/download/${SPINNER_VERSION}/spinner_linux_amd64.tar.gz" -o /tmp/spinner.tar.gz
         tar -xzf /tmp/spinner.tar.gz -C /usr/local/bin
         chmod +x /usr/local/bin/spinner
         rm /tmp/spinner.tar.gz
