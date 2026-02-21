@@ -25,17 +25,17 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 ```bash
 # macOS (Apple Silicon)
-curl -Lo spinner https://github.com/rickihastings/spinner/releases/latest/download/spinner_darwin_arm64.tar.gz
+curl -Lo spinner_darwin_arm64.tar.gz https://github.com/rickihastings/spinner/releases/latest/download/spinner_darwin_arm64.tar.gz
 tar -xzf spinner_darwin_arm64.tar.gz
 sudo mv spinner /usr/local/bin/
 
 # macOS (Intel)
-curl -Lo spinner https://github.com/rickihastings/spinner/releases/latest/download/spinner_darwin_amd64.tar.gz
+curl -Lo spinner_darwin_amd64.tar.gz https://github.com/rickihastings/spinner/releases/latest/download/spinner_darwin_amd64.tar.gz
 tar -xzf spinner_darwin_amd64.tar.gz
 sudo mv spinner /usr/local/bin/
 
 # Linux (amd64)
-curl -Lo spinner https://github.com/rickihastings/spinner/releases/latest/download/spinner_linux_amd64.tar.gz
+curl -Lo spinner_linux_amd64.tar.gz https://github.com/rickihastings/spinner/releases/latest/download/spinner_linux_amd64.tar.gz
 tar -xzf spinner_linux_amd64.tar.gz
 sudo mv spinner /usr/local/bin/
 ```
