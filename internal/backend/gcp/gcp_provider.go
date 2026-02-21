@@ -239,7 +239,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		ImageName:    image,
 		DiskSizeGB:   defaultDiskSizeGB,
 		Network:      "default",
-		ExternalIP:   false,
+		ExternalIP:   true,
 		Metadata:     metadata,
 		Labels:       labels,
 		Scopes: []string{
