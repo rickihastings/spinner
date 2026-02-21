@@ -172,23 +172,46 @@ spinner spin \
 
 ### Passing Secrets and Environment Variables
 
-Use the `--env` flag to inject custom environment variables (API keys, tokens, config values) into the container at
-runtime:
+#### Encrypted secrets (`--secret`)
+
+Use `--secret` for sensitive values (API keys, tokens). Secrets must be stored in Spinner's encrypted secret store
+first, then referenced by key name at runtime:
+
+```bash
+# Store secrets once
+spinner secret set NPM_TOKEN npm_abc123
+spinner secret set MY_API_KEY sk-xyz
+
+# Reference them when spinning
+spinner spin \
+  --image my-sandbox \
+  --repo https://github.com/your-org/your-repo.git \
+  --prompt "Publish the package" \
+  --secret NPM_TOKEN \
+  --secret MY_API_KEY
+```
+
+Secrets are encrypted into a per-session blob and delivered to the container. In `--prompt` mode, `spinner exec`
+decrypts the blob at startup and injects secrets into the Claude CLI environment automatically.
+
+The `--secret` flag is repeatable. Built-in tokens (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) are resolved
+automatically — pass `--secret` only for custom secrets.
+
+#### Plaintext environment variables (`--env`)
+
+Use `--env` for non-sensitive configuration values:
 
 ```bash
 spinner spin \
   --image my-sandbox \
   --repo https://github.com/your-org/your-repo.git \
-  --prompt "Publish the package" \
-  --env NPM_TOKEN=npm_abc123 \
-  --env MY_API_KEY=sk-xyz
+  --prompt "Run the test suite" \
+  --env NODE_ENV=production \
+  --env MY_CONFIG_FLAG=true
 ```
 
 The flag is repeatable — pass `--env` once per variable. Values are split on the first `=`, so values containing `=` are
 handled correctly (e.g., `--env "DATABASE_URL=postgres://host/db?ssl=true"`).
-
-Secrets passed via `--env` are written to a temporary file and delivered to Docker via `--env-file`. This keeps secret
-values out of host process listings (`ps aux`). The temporary file is deleted immediately after the container starts.
 
 > **Note:** You cannot override reserved variables (`GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `REPO_URL`, `PROMPT`,
 > `BRANCH`, `MAX_ITERATIONS`, and others used internally). The CLI will print an error if you try.
@@ -297,5 +320,5 @@ If Claude hits an API rate limit during autonomous execution, Spinner automatica
 | Watch existing         | `spinner watch <container-name>`                                       |
 | Recreate container     | `spinner spin --image my-sandbox --repo <url> --recreate`              |
 | Check state            | `cat ~/.spinner/<container-name>/state/state.json`                     |
-| Pass secrets           | `spinner spin --image my-sandbox --repo <url> --env NPM_TOKEN=abc`     |
+| Pass secrets           | `spinner spin --image my-sandbox --repo <url> --secret NPM_TOKEN`      |
 | Update spinner         | `spinner update`                                                       |

@@ -13,8 +13,8 @@ This is particularly useful for:
 ## How It Works
 
 During the bake phase, Tailscale is installed and a systemd service is configured to authenticate on first boot. When
-you spin up a VM, you pass your Tailscale auth key via `--env`. The service reads the key from GCP instance metadata
-and connects the VM to your Tailscale network automatically.
+you spin up a VM, you pass your Tailscale auth key via `--secret`. The service decrypts and reads the key using
+`spinner secret inject` and connects the VM to your Tailscale network automatically.
 
 Tailscale's `--ssh` flag is used, which enables [Tailscale SSH](https://tailscale.com/kb/1193/tailscale-ssh). This
 means Tailscale handles SSH authentication — you do not need to manage SSH key pairs separately. You can configure
@@ -49,24 +49,23 @@ apt-get install -y tailscale
 
 systemctl enable tailscaled
 
-# Create a oneshot service that reads TAILSCALE_AUTHKEY from GCE instance metadata
+# Create a oneshot service that reads TAILSCALE_AUTHKEY from the Spinner secret store
 # and authenticates on boot. If the key is absent, it does nothing.
 cat > /etc/systemd/system/tailscale-auth.service << 'TSEOF'
 [Unit]
-Description=Tailscale auto-auth from GCE metadata
-After=tailscaled.service
+Description=Tailscale auto-auth via Spinner secrets
+After=tailscaled.service google-startup-scripts.service
 Wants=tailscaled.service
 
 [Service]
 Type=oneshot
+User=spinner
 ExecStart=/bin/bash -c '\
-    KEY=$(curl -sf -H "Metadata-Flavor: Google" \
-        "http://metadata.google.internal/computeMetadata/v1/instance/attributes/SPINNER_ENV_TAILSCALE_AUTHKEY" || true); \
-    if [ -n "$KEY" ]; then \
+    if [ -f /run/spinner/secrets.enc ] && [ -f /run/spinner/secrets.key ]; then \
         echo "Tailscale auth key found, connecting..."; \
-        tailscale up --authkey="$KEY" --ssh; \
+        spinner secret inject -- sh -c "tailscale up --authkey=\"\$TAILSCALE_AUTHKEY\" --ssh"; \
     else \
-        echo "No SPINNER_ENV_TAILSCALE_AUTHKEY in metadata, skipping auto-auth"; \
+        echo "No Spinner secrets available, skipping Tailscale auto-auth"; \
     fi'
 RemainAfterExit=yes
 
@@ -87,21 +86,24 @@ spinner setup --name my-sandbox --bake-script ./tailscale-bake.sh
 
 ## Step 3: Spin with Your Auth Key
 
-Pass your Tailscale auth key via `--env` when spinning up a VM:
+Store your Tailscale auth key in Spinner's encrypted secret store, then reference it with `--secret`:
 
 ```bash
+# Store the key once
+spinner secret set TAILSCALE_AUTHKEY tskey-auth-xxxxx
+
 # Interactive VM
 spinner spin \
   --image my-sandbox \
   --repo https://github.com/your-org/your-repo.git \
-  --env TAILSCALE_AUTHKEY=tskey-auth-xxxxx
+  --secret TAILSCALE_AUTHKEY
 
 # Autonomous agent
 spinner spin \
   --image my-sandbox \
   --repo https://github.com/your-org/your-repo.git \
   --prompt "Fix the authentication bug" \
-  --env TAILSCALE_AUTHKEY=tskey-auth-xxxxx
+  --secret TAILSCALE_AUTHKEY
 ```
 
 Within a few seconds of the VM starting, it will appear in your [Tailscale admin console](https://login.tailscale.com/admin/machines)
@@ -175,7 +177,7 @@ Then in Terminus, set the username to `spinner` and attach your private key in t
 |-----------------------------|---------------------------------------------------------------------|
 | Generate auth key           | [tailscale.com/admin/settings/keys](https://login.tailscale.com/admin/settings/keys) |
 | Bake image with Tailscale   | `spinner setup --name my-sandbox --bake-script ./tailscale-bake.sh` |
-| Spin with Tailscale         | `spinner spin --image my-sandbox --repo <url> --env TAILSCALE_AUTHKEY=tskey-auth-xxx` |
+| Spin with Tailscale         | `spinner spin --image my-sandbox --repo <url> --secret TAILSCALE_AUTHKEY`             |
 | Find Tailscale IP           | [tailscale.com/admin/machines](https://login.tailscale.com/admin/machines) |
 | Check Tailscale status      | `gcloud compute ssh <instance> -- tailscale status`                 |
 | Connect from Terminus       | Host: Tailscale IP, Port: 22, User: your Tailscale username         |
