@@ -916,7 +916,7 @@ func (ui *WatchUI) runInTestMode(logCh <-chan agent.Event, metricsCh <-chan prov
 	return nil
 }
 
-// Context returns the UI's context for coordinating shutdown
+// Context returns the UI's context for coordinating shutdown.
 func (ui *WatchUI) Context() context.Context {
 	return ui.ctx
 }

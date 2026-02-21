@@ -227,7 +227,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 	labels := map[string]string{
 		"spinner-managed": "true",
 		"spinner-image":   sanitizeLabel(image),
-		"spinner-repo":    sanitizeLabel(extractRepoName(config.Repo)),
+		"spinner-repo":    sanitizeLabel(util.ExtractRepoName(config.Repo)),
 	}
 
 	err = p.client.CreateInstance(ctx, instanceConfig{
@@ -239,7 +239,7 @@ func (p *Provider) Create(ctx context.Context, config provider.CreateConfig) (*p
 		ImageName:    image,
 		DiskSizeGB:   defaultDiskSizeGB,
 		Network:      "default",
-		ExternalIP:   true,
+		ExternalIP:   false,
 		Metadata:     metadata,
 		Labels:       labels,
 		Scopes: []string{

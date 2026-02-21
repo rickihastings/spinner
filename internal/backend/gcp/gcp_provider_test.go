@@ -286,7 +286,7 @@ func TestProviderCreateSuccess(t *testing.T) {
 			config.ImageProject == "test-project" &&
 			config.MachineType == "e2-standard-2" &&
 			config.DiskSizeGB == 30 &&
-			config.ExternalIP == true &&
+			config.ExternalIP == false &&
 			config.Labels["spinner-managed"] == "true" &&
 			config.Labels["spinner-image"] == "my-env" &&
 			config.Metadata["REPO_URL"] == "https://github.com/user/repo.git" &&

@@ -230,42 +230,6 @@ func TestMapVMStatus(t *testing.T) {
 	}
 }
 
-func TestExtractRepoName(t *testing.T) {
-	tests := []struct {
-		name     string
-		repoURL  string
-		expected string
-	}{
-		{
-			name:     "HTTPS with .git suffix",
-			repoURL:  "https://github.com/user/my-repo.git",
-			expected: "my-repo",
-		},
-		{
-			name:     "HTTPS without .git suffix",
-			repoURL:  "https://github.com/user/my-repo",
-			expected: "my-repo",
-		},
-		{
-			name:     "SSH URL",
-			repoURL:  "git@github.com:user/my-repo.git",
-			expected: "my-repo",
-		},
-		{
-			name:     "deeply nested path",
-			repoURL:  "https://github.com/org/team/my-repo.git",
-			expected: "my-repo",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractRepoName(tt.repoURL)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestSanitizeGCPName(t *testing.T) {
 	tests := []struct {
 		name     string

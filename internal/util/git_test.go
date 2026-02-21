@@ -6,6 +6,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestExtractRepoName(t *testing.T) {
+	tests := []struct {
+		repoURL  string
+		expected string
+	}{
+		{"https://github.com/user/repo.git", "repo"},
+		{"https://github.com/user/my-repo.git", "my-repo"},
+		{"git@github.com:user/repo.git", "repo"},
+		{"https://github.com/octocat/Hello-World.git", "Hello-World"},
+		{"https://github.com/user/repo", "repo"},
+		{"https://github.com/org/team/my-repo.git", "my-repo"},
+		{"invalid-url", "invalid-url"},
+		{"", "sandbox"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.repoURL, func(t *testing.T) {
+			result := ExtractRepoName(tt.repoURL)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestConvertSshToHttps(t *testing.T) {
 	tests := []struct {
 		input    string

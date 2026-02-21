@@ -15,7 +15,6 @@ import (
 var (
 	reInvalidChars    = regexp.MustCompile(`[^a-z0-9-_]`)
 	reConsecutiveDash = regexp.MustCompile(`-+`)
-	reRepoName        = regexp.MustCompile(`([^/:]+)(\.git)?$`)
 )
 
 // spinConfig contains configuration for spinning up a container.
@@ -71,22 +70,11 @@ func sanitizeComponent(input string) string {
 	return result
 }
 
-// extractRepoName extracts the repository name from a Git URL.
-// Handles both SSH (git@github.com:user/repo.git) and HTTPS (https://github.com/user/repo.git) formats.
-func extractRepoName(repoURL string) string {
-	matches := reRepoName.FindStringSubmatch(repoURL)
-	if len(matches) > 1 {
-		return strings.TrimSuffix(matches[1], ".git")
-	}
-
-	return "sandbox"
-}
-
 // generateContainerName generates a deterministic container name based on image, repo, and branch.
 // Format: {image}-{repo} or {image}-{repo}-{branch}
 func generateContainerName(config spinConfig) string {
 	imagePart := sanitizeComponent(strings.ReplaceAll(config.Image, ":", "-"))
-	repoPart := sanitizeComponent(extractRepoName(config.Repo))
+	repoPart := sanitizeComponent(util.ExtractRepoName(config.Repo))
 
 	if config.Branch != "" {
 		branchPart := sanitizeComponent(config.Branch)

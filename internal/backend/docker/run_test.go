@@ -216,29 +216,6 @@ func TestSanitizeComponent(t *testing.T) {
 	}
 }
 
-// TestExtractRepoName tests repository name extraction
-func TestExtractRepoName(t *testing.T) {
-	tests := []struct {
-		repoURL  string
-		expected string
-	}{
-		{"https://github.com/user/repo.git", "repo"},
-		{"https://github.com/user/my-repo.git", "my-repo"},
-		{"git@github.com:user/repo.git", "repo"},
-		{"https://github.com/octocat/Hello-World.git", "Hello-World"},
-		{"https://github.com/user/repo", "repo"},
-		{"invalid-url", "invalid-url"},
-		{"", "sandbox"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.repoURL, func(t *testing.T) {
-			result := extractRepoName(tt.repoURL)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 // TestBuildDockerRunCommand_BasicScenarios tests Docker run command building (7.2)
 func TestBuildDockerRunCommand_BasicScenarios(t *testing.T) {
 	// Set required environment variables

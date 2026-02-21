@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rickihastings/spinner/internal/provider"
+	"github.com/rickihastings/spinner/internal/util"
 )
 
 const (
@@ -40,7 +41,7 @@ var consecutiveHyphensRegex = regexp.MustCompile(`-{2,}`)
 // If the generated name exceeds 63 characters, it is truncated and a hash suffix
 // is appended for uniqueness.
 func generateInstanceName(image, repo, branch string) string {
-	repoPart := extractRepoName(repo)
+	repoPart := util.ExtractRepoName(repo)
 
 	var raw string
 	if branch != "" {
@@ -56,19 +57,6 @@ func generateInstanceName(image, repo, branch string) string {
 	}
 
 	return name
-}
-
-// extractRepoName extracts the repository name from a Git URL.
-// Handles SSH (git@github.com:user/repo.git) and HTTPS (https://github.com/user/repo.git).
-func extractRepoName(repoURL string) string {
-	re := regexp.MustCompile(`([^/:]+)(\.git)?$`)
-	matches := re.FindStringSubmatch(repoURL)
-
-	if len(matches) > 1 {
-		return strings.TrimSuffix(matches[1], ".git")
-	}
-
-	return "repo"
 }
 
 // sanitizeGCPName converts a string to a valid GCP instance name component.

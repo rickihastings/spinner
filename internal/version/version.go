@@ -19,11 +19,6 @@ func Info() string {
 	return Version
 }
 
-// Full returns the full version string including commit and date.
-func Full() string {
-	return Version + " (" + Commit + ") built " + Date
-}
-
 // IsRelease reports whether this is a release build (version set via ldflags).
 func IsRelease() bool {
 	return Version != "dev"
