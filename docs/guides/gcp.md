@@ -9,14 +9,9 @@ Before you begin, make sure you have:
 
 - **Google Cloud SDK** installed (`gcloud` CLI available)
 - **A GCP project** with billing enabled
-- **A GitHub token** exported as `GITHUB_TOKEN`
-- **A Claude Code OAuth token** exported as `CLAUDE_CODE_OAUTH_TOKEN`
+- **A GitHub token** set as a secret `GITHUB_TOKEN`
+- **A Claude Code OAuth token** OR **anthropic API key** set as a secret `CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`
 - **GCP authentication** configured (see below)
-
-```bash
-export GITHUB_TOKEN="ghp_your_token_here"
-export CLAUDE_CODE_OAUTH_TOKEN="your_oauth_token_here"
-```
 
 ### GCP Authentication
 
