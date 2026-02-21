@@ -62,13 +62,18 @@ spinner update
 ### Prerequisites
 
 - Docker (running)
-- `GITHUB_TOKEN` environment variable (for cloning repos)
-- `CLAUDE_CODE_OAUTH_TOKEN` environment variable (for the agent)
+- `GITHUB_TOKEN` secret (for cloning repos)
+- `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` secret (for the agent)
+
+```bash
+spinner secret set GITHUB_TOKEN
+spinner secret set CLAUDE_CODE_OAUTH_TOKEN
+```
 
 ### Create a Sandbox Image
 
 ```bash
-./dist/spinner setup --name default
+spinner setup --name default
 ```
 
 This builds a Docker image with Claude Code and git pre-installed.
@@ -76,10 +81,7 @@ This builds a Docker image with Claude Code and git pre-installed.
 ### Run an Agent
 
 ```bash
-export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-export CLAUDE_CODE_OAUTH_TOKEN=your_token_here
-
-./dist/spinner spin \
+spinner spin \
   --image default \
   --repo https://github.com/your-org/your-repo \
   --prompt "$(cat prompt.md)"
@@ -111,20 +113,13 @@ indefinitely or exit with an error.
 - Use the existing `db` package for queries
 ```
 
-```bash
-./dist/spinner spin \
-  --image default \
-  --repo https://github.com/your-org/your-repo \
-  --prompt "$(cat prompt.md)"
-```
-
 Each iteration the agent picks the next unchecked task, does the work, marks it done, commits, and pushes. The file
 is the source of truth — if the run is interrupted, the next iteration picks up where it left off.
 
 **For one-shot tasks** that don't need looping, use `--max-iterations 1`:
 
 ```bash
-./dist/spinner spin \
+spinner spin \
   --image default \
   --repo https://github.com/your-org/your-repo \
   --prompt "run the test suite and save output to test-results.txt" \
@@ -141,13 +136,13 @@ Build a sandbox Docker image:
 
 ```bash
 # Default Ubuntu base
-./dist/spinner setup --name my-env
+spinner setup --name my-env
 
 # Custom base image
-./dist/spinner setup --name node-env --base-image node:20-bullseye
+spinner setup --name node-env --base-image node:20-bullseye
 
 # Custom Dockerfile
-./dist/spinner setup --name custom-env --dockerfile ./Dockerfile.custom
+spinner setup --name custom-env --dockerfile ./Dockerfile.custom
 ```
 
 ### spin
@@ -155,7 +150,7 @@ Build a sandbox Docker image:
 Launch a container and optionally start an agent:
 
 ```bash
-./dist/spinner spin \
+spinner spin \
   --image <image-name> \
   --repo <git-url> \
   [--prompt "task description"] \
@@ -180,7 +175,7 @@ Launch a container and optionally start an agent:
 Monitor a running container in real-time:
 
 ```bash
-./dist/spinner watch <container-name>
+spinner watch <container-name>
 ```
 
 Watch mode provides a terminal UI with:
@@ -195,10 +190,10 @@ Use `q` or `Ctrl+C` to exit watch mode.
 
 ```bash
 # Start a container and watch it
-./dist/spinner spin --image default --repo https://github.com/user/repo --watch
+spinner spin --image default --repo https://github.com/user/repo --watch
 
 # Or watch an existing container
-./dist/spinner watch spinner-default-<hash>
+spinner watch spinner-default-<hash>
 ```
 
 ### update
