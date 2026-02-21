@@ -7,14 +7,9 @@ This guide walks you through using Spinner to run Claude agents in sandboxed Doc
 Before you begin, make sure you have:
 
 - **Docker** installed and running (`docker ps` should work without errors)
-- **A GitHub token** exported as `GITHUB_TOKEN`
-- **A Claude Code OAuth token** exported as `CLAUDE_CODE_OAUTH_TOKEN`
+- **A GitHub token** set as a secret `GITHUB_TOKEN`
+- **A Claude Code OAuth token** OR **anthropic API key** set as a secret `CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`
 - **SSH agent** running on your host system
-
-```bash
-export GITHUB_TOKEN="ghp_your_token_here"
-export CLAUDE_CODE_OAUTH_TOKEN="your_oauth_token_here"
-```
 
 ## Step 1: Build a Sandbox Image
 
