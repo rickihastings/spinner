@@ -252,9 +252,11 @@ func passphraseFromEnvOrPrompt() (string, error) {
 
 	fmt.Fprint(os.Stderr, "Enter passphrase: ")
 
-	raw, err := readPassword(int(os.Stdin.Fd()))
+	// Try /dev/tty first: reads from the controlling terminal even when stdin is
+	// redirected (e.g. SSH multiplexing, tmux, GCP serial console, or piped input).
+	raw, err := readPassphraseFromTTYOrStdin()
 	if err != nil {
-		return "", fmt.Errorf("reading passphrase: %w", err)
+		return "", fmt.Errorf("reading passphrase: %w\nHint: set SPINNER_SECRET_PASSPHRASE env var to avoid interactive prompts", err)
 	}
 
 	fmt.Fprintln(os.Stderr) // newline after hidden input
@@ -267,4 +269,21 @@ func passphraseFromEnvOrPrompt() (string, error) {
 	cachedPassphrase = p
 
 	return p, nil
+}
+
+// readPassphraseFromTTYOrStdin attempts to read a password from /dev/tty (the
+// controlling terminal), falling back to os.Stdin. Using /dev/tty means the
+// prompt works correctly even when stdin is a pipe or socket.
+//
+// /dev/tty must be opened O_RDWR so that term.ReadPassword can call both
+// TCGETS and TCSETS (to disable echo). O_RDONLY causes TCSETS to fail with
+// ENOTTY on Linux even when TCGETS succeeds.
+func readPassphraseFromTTYOrStdin() ([]byte, error) {
+	if fd, err := syscall.Open("/dev/tty", syscall.O_RDWR, 0); err == nil {
+		defer func() { _ = syscall.Close(fd) }()
+
+		return readPassword(fd)
+	}
+
+	return readPassword(int(os.Stdin.Fd()))
 }

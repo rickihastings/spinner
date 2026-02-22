@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/secret"
@@ -59,6 +60,8 @@ EXAMPLES:
   spinner setup --backend gcp --name my-env --project my-proj --zone us-central1-a --state-bucket my-bucket \
     --provider-args="--machine-type=e2-standard-4" --provider-args="--boot-disk-size=50GB"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			start := time.Now()
+
 			// Bind general flags to Viper
 			bindFlags(cmd, flagName, flagDockerfile)
 
@@ -106,7 +109,13 @@ EXAMPLES:
 			// Merge provider args: config file provides base args, CLI appends on top.
 			providerArgs := mergeProviderArgs(configSetupProviderArgs, setupProviderArgs)
 
-			return runSetup(context.Background(), p, backend, setupName, blob, key, providerArgs)
+			if err := runSetup(context.Background(), p, backend, setupName, blob, key, providerArgs); err != nil {
+				return err
+			}
+
+			fmt.Printf("Completed in %.0fs\n", time.Since(start).Seconds())
+
+			return nil
 		},
 	}
 

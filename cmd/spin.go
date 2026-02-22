@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/secret"
@@ -94,6 +95,8 @@ EXAMPLES:
     --project my-proj --zone us-central1-a --state-bucket my-bucket \
     --provider-args="--machine-type=e2-standard-4" --provider-args="--boot-disk-size=50GB"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			start := time.Now()
+
 			// Bind general flags to Viper
 			bindFlags(cmd,
 				flagImage, flagRepo, flagPrompt, flagBranch,
@@ -306,8 +309,16 @@ EXAMPLES:
 				fmt.Println()
 				fmt.Println("Entering watch mode...")
 
-				return performWatch(ctx, p, instance.Name)
+				if err := performWatch(ctx, p, instance.Name); err != nil {
+					return err
+				}
+
+				fmt.Printf("\nCompleted in %.0fs\n", time.Since(start).Seconds())
+
+				return nil
 			}
+
+			fmt.Printf("\nCompleted in %.0fs\n", time.Since(start).Seconds())
 
 			return nil
 		},
