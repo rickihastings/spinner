@@ -56,15 +56,49 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 		return err
 	}
 
-	// Check if image already exists
-	_, err := p.client.GetImage(ctx, project, config.Name)
-	if err == nil {
-		fmt.Printf("Image '%s' already exists, deleting before rebuild...\n", config.Name)
+	// Determine what prepare actions are needed
+	imageExists := false
+	if _, getErr := p.client.GetImage(ctx, project, config.Name); getErr == nil {
+		imageExists = true
+	}
 
-		if deleteErr := p.client.DeleteImage(ctx, project, config.Name); deleteErr != nil {
-			return fmt.Errorf("failed to delete existing image: %w", deleteErr)
+	stateBucket := config.Options["state-bucket"]
+
+	localBinary := false
+
+	if stateBucket != "" && !version.IsRelease() {
+		if projectRoot, rootErr := util.FindProjectRoot(); rootErr == nil {
+			localTarball := filepath.Join(projectRoot, "dist", "spinner-dev-linux-amd64.tar.gz")
+
+			if _, statErr := os.Stat(localTarball); statErr == nil {
+				localBinary = true
+			}
 		}
 	}
+
+	if imageExists || localBinary {
+		fmt.Println("  Prepare")
+
+		if imageExists {
+			if deleteErr := p.client.DeleteImage(ctx, project, config.Name); deleteErr != nil {
+				return fmt.Errorf("failed to delete existing image: %w", deleteErr)
+			}
+
+			fmt.Println("  ✓ Removed existing image")
+		}
+
+		if localBinary {
+			if uploadErr := uploadLocalBinary(ctx, p.client, stateBucket); uploadErr != nil {
+				return fmt.Errorf("failed to upload local binary: %w", uploadErr)
+			}
+
+			fmt.Println("  ✓ Uploaded local binary")
+		}
+
+		fmt.Println()
+	}
+
+	fmt.Println("  Build")
 
 	// Load custom bake script contents (if path provided)
 	customBakeScript, err := loadBakeScriptFile(config.Options["bake-script"])
@@ -84,18 +118,6 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 
 	// Load the shared install_spinner.sh script
 	installScript := util.LoadInstallSpinnerScript()
-
-	stateBucket := config.Options["state-bucket"]
-
-	// Check if we're in development mode (local binary or running dev build).
-	// uploadLocalBinary handles both source-tree and running-binary-on-Linux paths.
-	if stateBucket != "" && !version.IsRelease() {
-		if err := uploadLocalBinary(ctx, p.client, stateBucket); err != nil {
-			fmt.Printf("⚠ Local binary upload skipped: %v\n", err)
-		} else {
-			fmt.Println("✓ Local binary uploaded to state bucket")
-		}
-	}
 
 	// Read config hash from environment if provided (used by integration tests)
 	configHash := os.Getenv("SPINNER_CONFIG_HASH")

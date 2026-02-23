@@ -171,8 +171,8 @@ EXAMPLES:
 				}
 			}
 
-			// Validate prerequisites
-			fmt.Println("Validating prerequisites...")
+			// Print phase header then validate prerequisites
+			fmt.Printf("Spinning up %s\n\n  Setup\n", spinImage)
 
 			if !isValidGitURL(spinRepo) {
 				fmt.Fprintln(os.Stderr, "✗ Error: Repository must be a valid git URL (https://, http://, or git@)")
@@ -194,7 +194,7 @@ EXAMPLES:
 				return fmt.Errorf("encrypting secrets: %w", err)
 			}
 
-			fmt.Println("✓ Prerequisites validated")
+			fmt.Println("  ✓ Prerequisites validated")
 
 			createOptions := map[string]string{flagImage: spinImage}
 
@@ -242,24 +242,21 @@ EXAMPLES:
 
 			var instance *provider.Instance
 
+			fmt.Print("\n  Launch\n")
+
 			switch status {
 			case provider.InstanceStatusNone:
-				fmt.Printf("Creating instance: %s\n", name)
-				fmt.Println("Cloning repository...")
-
 				instance, err = p.Create(ctx, createConfig)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 					return err
 				}
 
-				fmt.Printf("✓ Instance created successfully: %s\n", instance.Name)
+				fmt.Printf("  ✓ Instance created: %s\n", instance.Name)
 			case provider.InstanceStatusRunning:
 				instance = &provider.Instance{Name: name, Status: provider.InstanceStatusRunning}
 
-				fmt.Printf("✓ Reusing running instance: %s\n", name)
-				fmt.Println()
-				fmt.Println("Note: Reusing existing instance. Use --recreate flag to force recreation.")
+				fmt.Printf("  ✓ Reusing instance: %s\n", name)
 			case provider.InstanceStatusStopped:
 				instance, err = p.Start(ctx, name, createConfig)
 				if err != nil {
@@ -275,33 +272,31 @@ EXAMPLES:
 							return err
 						}
 
-						fmt.Printf("✓ Instance created successfully: %s\n", instance.Name)
+						fmt.Printf("  ✓ Instance created: %s\n", instance.Name)
 					} else {
 						fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 						return err
 					}
 				} else {
-					fmt.Printf("✓ Instance restarted: %s\n", instance.Name)
-					fmt.Println()
-					fmt.Println("Note: Reusing existing instance. Use --recreate flag to force recreation.")
+					fmt.Printf("  ✓ Instance restarted: %s\n", instance.Name)
 				}
 			}
 
 			// Display backend-specific management commands
-			fmt.Println()
-
 			if backend == provider.BackendGCP {
 				gcpProject := viper.GetString(flagProject)
 				gcpZone := viper.GetString(flagZone)
 				gcpBucket := viper.GetString(flagStateBucket)
 
-				fmt.Printf("To access: gcloud compute ssh %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
-				fmt.Printf("To stop:   gcloud compute instances stop %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
-				fmt.Printf("To destroy: spinner destroy %s --backend gcp --project %s --zone %s --state-bucket %s\n", instance.Name, gcpProject, gcpZone, gcpBucket)
+				fmt.Print("\n  Manage\n")
+				fmt.Printf("  access   gcloud compute ssh %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
+				fmt.Printf("  stop     gcloud compute instances stop %s --project %s --zone %s\n", instance.Name, gcpProject, gcpZone)
+				fmt.Printf("  destroy  spinner destroy %s --backend gcp --project %s --zone %s --state-bucket %s\n", instance.Name, gcpProject, gcpZone, gcpBucket)
 			} else {
-				fmt.Printf("To access: docker exec -it %s bash\n", instance.Name)
-				fmt.Printf("To stop: docker stop %s\n", instance.Name)
-				fmt.Printf("To destroy: spinner destroy %s --backend docker\n", instance.Name)
+				fmt.Print("\n  Manage\n")
+				fmt.Printf("  access   docker exec -it %s bash\n", instance.Name)
+				fmt.Printf("  stop     docker stop %s\n", instance.Name)
+				fmt.Printf("  destroy  spinner destroy %s --backend docker\n", instance.Name)
 			}
 
 			// Enter watch mode if --watch flag is set
@@ -313,12 +308,12 @@ EXAMPLES:
 					return err
 				}
 
-				fmt.Printf("\nCompleted in %.0fs\n", time.Since(start).Seconds())
+				fmt.Printf("\n✓ Done in %.0fs\n", time.Since(start).Seconds())
 
 				return nil
 			}
 
-			fmt.Printf("\nCompleted in %.0fs\n", time.Since(start).Seconds())
+			fmt.Printf("\n✓ Done in %.0fs\n", time.Since(start).Seconds())
 
 			return nil
 		},

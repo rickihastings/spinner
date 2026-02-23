@@ -44,14 +44,12 @@ const (
 // performSetup runs the shared setup workflow: environment provisioning.
 // Called by both the setup and spin --setup paths.
 func performSetup(ctx context.Context, p provider.Provider, config provider.SetupConfig) error {
-	fmt.Printf("Provisioning environment: %s\n", config.Name)
+	fmt.Printf("Setting up %s\n\n", config.Name)
 
 	if err := p.Setup(ctx, config); err != nil {
 		fmt.Fprintf(os.Stderr, "✗ Error: %s\n", err.Error())
 		return err
 	}
-
-	fmt.Printf("✓ Environment provisioned: %s\n", config.Name)
 
 	return nil
 }

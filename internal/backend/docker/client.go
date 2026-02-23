@@ -135,15 +135,13 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 		localBinaryPath := filepath.Join(projectRoot, "dist", "spinner-linux-amd64")
 		if _, statErr := os.Stat(localBinaryPath); statErr == nil {
 			// Local binary exists - use it automatically
-			fmt.Println("🔧 Local development binary detected, using dist/spinner-linux-amd64...")
-
 			if err := copyFile(localBinaryPath, destPath); err != nil {
 				return fmt.Errorf("failed to copy local binary: %w", err)
 			}
 
 			localBuildDetected = true
 
-			fmt.Println("✓ Using local binary for Docker image")
+			fmt.Println("  ✓ Using local binary")
 		}
 	}
 
@@ -152,15 +150,13 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	if !localBuildDetected && !version.IsRelease() && runtime.GOOS == "linux" {
 		execPath, execErr := os.Executable()
 		if execErr == nil {
-			fmt.Println("🔧 Dev build on Linux detected, using running binary...")
-
 			if err := copyFile(execPath, destPath); err != nil {
 				return fmt.Errorf("failed to copy running binary: %w", err)
 			}
 
 			localBuildDetected = true
 
-			fmt.Println("✓ Using running binary for Docker image")
+			fmt.Println("  ✓ Using local binary")
 		}
 	}
 

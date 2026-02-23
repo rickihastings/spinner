@@ -113,7 +113,7 @@ EXAMPLES:
 				return err
 			}
 
-			fmt.Printf("Completed in %.0fs\n", time.Since(start).Seconds())
+			fmt.Printf("\n✓ Done in %.0fs\n", time.Since(start).Seconds())
 
 			return nil
 		},

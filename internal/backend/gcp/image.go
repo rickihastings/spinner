@@ -90,7 +90,7 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 	bakeVMName := bakeVMPrefix + config.ImageName
 
 	// Step 1: Create temporary bake VM
-	fmt.Printf("Creating temporary bake VM: %s\n", bakeVMName)
+	fmt.Printf("  Creating bake VM: %s\n", bakeVMName)
 
 	// Pin spinner version to match host binary for production builds.
 	// Dev builds skip this — install_spinner.sh detects the dev tarball in STATE_BUCKET.
@@ -150,7 +150,7 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 
 	// Ensure temp VM is always cleaned up
 	defer func() {
-		fmt.Printf("Cleaning up bake VM: %s\n", bakeVMName)
+		fmt.Println("  ✓ Bake VM removed")
 
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
@@ -161,13 +161,11 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 	}()
 
 	// Step 2: Wait for VM to shut down (bake script calls shutdown -h now)
-	fmt.Println("Waiting for bake to complete (this may take several minutes)...")
+	fmt.Println("  Baking image (this may take several minutes)...")
 
 	if err := waitForVMTerminated(ctx, client, config.Project, config.Zone, bakeVMName); err != nil {
 		return fmt.Errorf("bake failed: %w", err)
 	}
-
-	fmt.Println("Bake VM has shut down, creating image...")
 
 	// Step 3: Create custom image from the bake VM's boot disk
 	sourceDisk := fmt.Sprintf(
@@ -196,7 +194,7 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 	}
 
 	// Step 4: Cleanup is handled by defer above
-	fmt.Printf("Image created: %s\n", config.ImageName)
+	fmt.Printf("  ✓ Image baked: %s\n", config.ImageName)
 
 	return nil
 }

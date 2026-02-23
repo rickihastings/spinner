@@ -17,8 +17,6 @@ import (
 // uploadLocalBinary uploads the locally-built spinner binary to the state bucket
 // for use during image baking. Only called for non-release (dev) builds.
 func uploadLocalBinary(ctx context.Context, client Client, bucket string) error {
-	fmt.Println("Uploading local binary to state bucket...")
-
 	// Try 1: find the tarball from the project source tree
 	projectRoot, err := util.FindProjectRoot()
 	if err == nil {
@@ -34,8 +32,6 @@ func uploadLocalBinary(ctx context.Context, client Client, bucket string) error 
 	if !version.IsRelease() && runtime.GOOS == "linux" {
 		execPath, execErr := os.Executable()
 		if execErr == nil {
-			fmt.Println("🔧 Dev build on Linux detected, creating tarball from running binary...")
-
 			data, tarErr := createTarballFromBinary(execPath)
 			if tarErr != nil {
 				return fmt.Errorf("failed to create tarball from running binary: %w", tarErr)
@@ -55,8 +51,6 @@ func uploadTarball(ctx context.Context, client Client, bucket string, data []byt
 	if err := client.WriteObject(ctx, bucket, objectPath, data); err != nil {
 		return fmt.Errorf("failed to upload to gs://%s/%s: %w", bucket, objectPath, err)
 	}
-
-	fmt.Printf("✅ Uploaded local binary to gs://%s/%s\n", bucket, objectPath)
 
 	return nil
 }
