@@ -1129,14 +1129,15 @@ func TestBuildDockerRunCommand_SecretBlobAndKey(t *testing.T) {
 	require.NoError(t, err, "key file should be written to disk")
 	assert.Equal(t, secretKey, writtenKey, "key file content should match")
 
-	// Verify blob and key files have restrictive permissions (0600)
+	// Verify blob and key files are world-readable so the container's spinner user can read them.
+	// The files are mounted read-only (:ro) into the container, and the host directory is 0700.
 	blobInfo, err := os.Stat(blobPath)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0600), blobInfo.Mode().Perm(), "blob file should have 0600 permissions")
+	assert.Equal(t, os.FileMode(0644), blobInfo.Mode().Perm(), "blob file should be world-readable for container user")
 
 	keyInfo, err := os.Stat(keyPath)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0600), keyInfo.Mode().Perm(), "key file should have 0600 permissions")
+	assert.Equal(t, os.FileMode(0644), keyInfo.Mode().Perm(), "key file should be world-readable for container user")
 }
 
 // TestBuildDockerRunCommand_SecretBlobWithoutKey tests that only the blob is mounted when no key is set.

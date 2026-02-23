@@ -279,7 +279,8 @@ func passphraseFromEnvOrPrompt() (string, error) {
 // TCGETS and TCSETS (to disable echo). O_RDONLY causes TCSETS to fail with
 // ENOTTY on Linux even when TCGETS succeeds.
 func readPassphraseFromTTYOrStdin() ([]byte, error) {
-	if fd, err := syscall.Open("/dev/tty", syscall.O_RDWR, 0); err == nil {
+	fd, ttyErr := syscall.Open("/dev/tty", syscall.O_RDWR, 0)
+	if ttyErr == nil {
 		defer func() { _ = syscall.Close(fd) }()
 
 		return readPassword(fd)

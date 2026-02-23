@@ -24,8 +24,8 @@ echo "  Zone: $SPINNER_ZONE"
 echo "  Bucket: $SPINNER_STATE_BUCKET"
 echo ""
 
-echo "Setting up dev environment..."
-./scripts/dev-setup.sh
+echo "Building..."
+make build
 
 echo ""
 echo "Running setup with GCP backend..."

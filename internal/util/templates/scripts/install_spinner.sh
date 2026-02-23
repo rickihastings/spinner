@@ -4,34 +4,30 @@ set -e
 # Shared script to install the spinner binary
 # Used by both Docker (extending.template) and GCP (gcp_bake.sh)
 #
+# Detection order:
+#   1. /tmp/spinner exists and is non-empty → use it (Docker dev build)
+#   2. STATE_BUCKET is set and dev tarball exists in GCS → use it (GCP dev build)
+#   3. Download from GitHub releases (production)
+#
 # Environment variables:
-#   LOCAL_BUILD - if "true", download from state bucket instead of GitHub
-#   STATE_BUCKET - GCS bucket containing local dev binary (required if LOCAL_BUILD=true)
+#   STATE_BUCKET - GCS bucket containing local dev binary (optional, for GCP dev)
 #   SPINNER_VERSION - if set, download this specific version instead of latest (e.g. "v1.0.0")
 
 echo "Installing spinner binary..."
 
-# Check for local development mode
-if [ "${LOCAL_BUILD}" = "true" ] && [ -n "${STATE_BUCKET}" ]; then
-    echo "LOCAL_BUILD detected, downloading from state bucket..."
-
-    # Download from state bucket
-    if gsutil cp "gs://${STATE_BUCKET}/local-dev/spinner-dev-linux-amd64.tar.gz" /tmp/spinner.tar.gz 2>/dev/null; then
-        tar -xzf /tmp/spinner.tar.gz -C /usr/local/bin
-        chmod +x /usr/local/bin/spinner
-        rm /tmp/spinner.tar.gz
-        echo "✅ Installed local development spinner"
-    else
-        echo "Error: LOCAL_BUILD=true but no binary found in gs://${STATE_BUCKET}/local-dev/"
-        echo "Make sure the setup command uploaded the binary first"
-        exit 1
-    fi
-elif [ "${LOCAL_BUILD}" = "true" ] && [ -f "/tmp/spinner" ] && [ -s "/tmp/spinner" ]; then
-    # Docker mode: binary was COPYed to /tmp/spinner
+# Check for Docker dev mode: binary was COPYed to /tmp/spinner
+if [ -f "/tmp/spinner" ] && [ -s "/tmp/spinner" ]; then
     # -s checks that file exists and is not empty (not a placeholder)
-    echo "LOCAL_BUILD detected, using local binary..."
+    echo "Local development binary detected at /tmp/spinner..."
     mv /tmp/spinner /usr/local/bin/spinner
     chmod +x /usr/local/bin/spinner
+    echo "✅ Installed local development spinner"
+# Check for GCP dev mode: download from state bucket
+elif [ -n "${STATE_BUCKET}" ] && gsutil cp "gs://${STATE_BUCKET}/local-dev/spinner-dev-linux-amd64.tar.gz" /tmp/spinner.tar.gz 2>/dev/null; then
+    echo "Local development binary detected in state bucket..."
+    tar -xzf /tmp/spinner.tar.gz -C /usr/local/bin
+    chmod +x /usr/local/bin/spinner
+    rm /tmp/spinner.tar.gz
     echo "✅ Installed local development spinner"
 else
     # Production mode: download from GitHub releases

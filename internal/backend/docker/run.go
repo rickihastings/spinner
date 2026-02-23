@@ -123,11 +123,11 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		hostBase = fileBase
 	}
 
-	// Pre-create state and logs directories now (as the current user) so Docker doesn't
-	// create them as root when processing the volume mount, which would make them
-	// unwritable by the spinner user inside the container.
+	// Pre-create state and logs directories now so Docker doesn't create them as root.
+	// Use 0777 because the container's spinner user (different UID) needs write access.
+	// The parent directory (fileBase) is 0700 which restricts access on the host.
 	for _, subDir := range []string{"state", "logs"} {
-		if err := os.MkdirAll(filepath.Join(fileBase, subDir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(fileBase, subDir), 0777); err != nil {
 			return nil, "", fmt.Errorf("failed to create %s directory: %w", subDir, err)
 		}
 	}
@@ -206,13 +206,13 @@ func buildDockerRunCommand(config spinConfig, containerName string, hasNpmrc boo
 		}
 
 		blobPath := filepath.Join(fileBase, "secrets.enc")
-		if err := os.WriteFile(blobPath, config.SecretBlob, 0600); err != nil {
+		if err := os.WriteFile(blobPath, config.SecretBlob, 0644); err != nil {
 			return nil, "", fmt.Errorf("failed to write secrets blob: %w", err)
 		}
 
 		if len(config.SecretKey) > 0 {
 			keyPath := filepath.Join(fileBase, "secrets.key")
-			if err := os.WriteFile(keyPath, config.SecretKey, 0600); err != nil {
+			if err := os.WriteFile(keyPath, config.SecretKey, 0644); err != nil {
 				return nil, "", fmt.Errorf("failed to write secrets key: %w", err)
 			}
 		}

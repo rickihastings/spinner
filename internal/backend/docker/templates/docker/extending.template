@@ -41,9 +41,7 @@ ENV PATH=/home/spinner/.local/bin:${PATH}
 
 # Install spinner binary
 USER root
-ARG LOCAL_BUILD
 ARG SPINNER_VERSION
-ENV LOCAL_BUILD=${LOCAL_BUILD}
 ENV SPINNER_VERSION=${SPINNER_VERSION}
 COPY spinner /tmp/spinner
 COPY templates/scripts/install_spinner.sh /tmp/install_spinner.sh

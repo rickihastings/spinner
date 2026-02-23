@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/rickihastings/spinner/internal/version"
@@ -94,14 +93,14 @@ func bakeImage(ctx context.Context, client Client, config bakeConfig) error {
 	fmt.Printf("Creating temporary bake VM: %s\n", bakeVMName)
 
 	// Pin spinner version to match host binary for production builds.
+	// Dev builds skip this — install_spinner.sh detects the dev tarball in STATE_BUCKET.
 	spinnerVersion := ""
-	if os.Getenv("LOCAL_BUILD") == "" && version.IsRelease() {
+	if version.IsRelease() {
 		spinnerVersion = version.Tag()
 	}
 
 	metadata := map[string]string{
 		"startup-script":  config.StartupScript,
-		"LOCAL_BUILD":     os.Getenv("LOCAL_BUILD"),
 		"STATE_BUCKET":    config.StateBucket,
 		"SPINNER_VERSION": spinnerVersion,
 	}

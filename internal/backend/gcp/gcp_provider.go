@@ -13,6 +13,7 @@ import (
 
 	"github.com/rickihastings/spinner/internal/provider"
 	"github.com/rickihastings/spinner/internal/util"
+	"github.com/rickihastings/spinner/internal/version"
 )
 
 const (
@@ -86,28 +87,13 @@ func (p *Provider) Setup(ctx context.Context, config provider.SetupConfig) error
 
 	stateBucket := config.Options["state-bucket"]
 
-	// Check if we're in development mode (local binary exists)
-	// This happens when running from source after ./scripts/dev-setup.sh
-	if stateBucket != "" {
-		projectRoot, rootErr := util.FindProjectRoot()
-		if rootErr == nil {
-			localTarball := filepath.Join(projectRoot, "dist", "spinner-dev-linux-amd64.tar.gz")
-			if _, statErr := os.Stat(localTarball); statErr == nil {
-				// Local binary exists - upload it automatically
-				fmt.Println("🔧 Local development binary detected, uploading to GCS...")
-
-				if err := uploadLocalBinary(ctx, p.client, stateBucket); err != nil {
-					return fmt.Errorf("failed to upload local binary: %w", err)
-				}
-
-				// Set LOCAL_BUILD so bake VM knows to download from GCS
-				err := os.Setenv("LOCAL_BUILD", "true")
-				if err != nil {
-					return fmt.Errorf("failed to set LOCAL_BUILD env var: %w", err)
-				}
-
-				fmt.Println("✓ Local binary uploaded to state bucket")
-			}
+	// Check if we're in development mode (local binary or running dev build).
+	// uploadLocalBinary handles both source-tree and running-binary-on-Linux paths.
+	if stateBucket != "" && !version.IsRelease() {
+		if err := uploadLocalBinary(ctx, p.client, stateBucket); err != nil {
+			fmt.Printf("⚠ Local binary upload skipped: %v\n", err)
+		} else {
+			fmt.Println("✓ Local binary uploaded to state bucket")
 		}
 	}
 

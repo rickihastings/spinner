@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -125,7 +126,7 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 	}
 
 	// Check if we're in development mode (local binary exists)
-	// This happens when running from source after ./scripts/dev-setup.sh
+	// This happens when running from source after 'make build'
 	destPath := filepath.Join(buildContextDir, "spinner")
 	localBuildDetected := false
 
@@ -140,15 +141,26 @@ func (c *RealDockerClient) BuildImage(ctx context.Context, config BuildConfig) e
 				return fmt.Errorf("failed to copy local binary: %w", err)
 			}
 
-			// Set LOCAL_BUILD for the Dockerfile
-			err := os.Setenv("LOCAL_BUILD", "true")
-			if err != nil {
-				return fmt.Errorf("failed to set LOCAL_BUILD env var: %w", err)
+			localBuildDetected = true
+
+			fmt.Println("✓ Using local binary for Docker image")
+		}
+	}
+
+	// Fallback: if no project root but we're a dev build running on Linux,
+	// use the running binary itself (e.g. on a GCP VM without the source tree).
+	if !localBuildDetected && !version.IsRelease() && runtime.GOOS == "linux" {
+		execPath, execErr := os.Executable()
+		if execErr == nil {
+			fmt.Println("🔧 Dev build on Linux detected, using running binary...")
+
+			if err := copyFile(execPath, destPath); err != nil {
+				return fmt.Errorf("failed to copy running binary: %w", err)
 			}
 
 			localBuildDetected = true
 
-			fmt.Println("✓ Using local binary for Docker image")
+			fmt.Println("✓ Using running binary for Docker image")
 		}
 	}
 
@@ -182,15 +194,9 @@ func (c *RealDockerClient) buildUserDockerfile(ctx context.Context, dockerfilePa
 func (c *RealDockerClient) buildWithCLI(ctx context.Context, contextDir, dockerfileName, tag string, extraArgs []string) error {
 	args := []string{"build", "-t", tag, "-f", filepath.Join(contextDir, dockerfileName)}
 
-	// Add build args
-	localBuild := os.Getenv("LOCAL_BUILD")
-	if localBuild != "" {
-		args = append(args, "--build-arg", fmt.Sprintf("LOCAL_BUILD=%s", localBuild))
-	}
-
 	// Pin the container's spinner version to match the host binary.
-	// Skip for dev builds — they use LOCAL_BUILD instead.
-	if localBuild == "" && version.IsRelease() {
+	// Dev builds skip this — the local binary is detected by install_spinner.sh.
+	if version.IsRelease() {
 		args = append(args, "--build-arg", fmt.Sprintf("SPINNER_VERSION=%s", version.Tag()))
 	}
 

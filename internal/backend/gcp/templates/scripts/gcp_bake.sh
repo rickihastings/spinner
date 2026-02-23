@@ -36,9 +36,7 @@ echo "Installing Claude Code CLI..."
 su - spinner -c 'curl -fsSL https://claude.ai/install.sh | bash'
 
 # Download and install spinner binary
-# Get LOCAL_BUILD, STATE_BUCKET, and SPINNER_VERSION from instance metadata
-export LOCAL_BUILD=$(curl -sf -H "Metadata-Flavor: Google" \
-    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/LOCAL_BUILD" || echo "")
+# Get STATE_BUCKET and SPINNER_VERSION from instance metadata
 export STATE_BUCKET=$(curl -sf -H "Metadata-Flavor: Google" \
     "http://metadata.google.internal/computeMetadata/v1/instance/attributes/STATE_BUCKET" || echo "")
 

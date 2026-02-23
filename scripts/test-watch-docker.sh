@@ -2,8 +2,8 @@
 
 set -e  # Exit on error
 
-echo "Setting up dev environment..."
-./scripts/dev-setup.sh
+echo "Building..."
+make build
 
 echo ""
 echo "Running setup..."

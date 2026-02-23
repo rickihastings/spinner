@@ -9,10 +9,11 @@ LDFLAGS := -s -w \
 	-X github.com/rickihastings/spinner/internal/version.Commit=$(COMMIT) \
 	-X github.com/rickihastings/spinner/internal/version.Date=$(DATE)
 
-# Build the spinner binary
+# Build the spinner binary (native + linux/amd64 for Docker/GCP)
 build:
 	go clean -cache
 	go build -ldflags "$(LDFLAGS)" -o dist/spinner
+	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/spinner-linux-amd64
 
 # Run unit tests
 test:

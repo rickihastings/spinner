@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -54,7 +53,6 @@ func TestBakeImageSuccess(t *testing.T) {
 		ExternalIP:   true,
 		Metadata: map[string]string{
 			"startup-script":  "#!/bin/bash\necho hello",
-			"LOCAL_BUILD":     os.Getenv("LOCAL_BUILD"),
 			"STATE_BUCKET":    "",
 			"SPINNER_VERSION": "",
 		},
