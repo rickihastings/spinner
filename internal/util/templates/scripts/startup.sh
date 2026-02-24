@@ -31,7 +31,11 @@ spinner secret inject -- sh -c '
     git fetch origin
   else
     echo "Cloning repository: '"$REPO_URL"'"
-    git clone "'"$REPO_URL"'" .
+    git init
+    git remote add origin "'"$REPO_URL"'"
+    git fetch origin
+    DEFAULT_REF=$(git remote show origin | sed -n "s/.*HEAD branch: //p")
+    git checkout -f -b "${DEFAULT_REF}" "origin/${DEFAULT_REF}"
     echo "Repository cloned to /home/spinner/workspace"
   fi
 '
