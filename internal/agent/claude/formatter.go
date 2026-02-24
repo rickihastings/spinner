@@ -51,9 +51,6 @@ func autoStyleNoMargin() ansi.StyleConfig {
 	style.Code.Prefix = ""
 	style.Code.Suffix = ""
 
-	// Use plain ASCII bullet instead of "•" which renders as emoji in some terminals
-	style.Item.BlockPrefix = "- "
-
 	return style
 }
 
@@ -94,7 +91,7 @@ func (f *Formatter) FormatEvent(event *agent.Event) (string, bool) {
 
 // formatAssistantRich renders assistant messages with rich formatting.
 // Text blocks are rendered through glamour for markdown formatting.
-// Tool use blocks are rendered as "⏺ ToolName(param_summary)".
+// Tool use blocks are rendered as "• ToolName(param_summary)".
 // Mixed messages render text first, then tool calls.
 func (f *Formatter) formatAssistantRich(event *agent.Event) (string, bool) {
 	data, ok := event.Data.(assistantMessageData)
@@ -126,11 +123,11 @@ func (f *Formatter) formatAssistantRich(event *agent.Event) (string, bool) {
 
 	if len(textParts) > 0 {
 		rendered := f.renderMarkdown(strings.Join(textParts, "\n\n"))
-		// Indent continuation lines to align with text after "⏺ "
+		// Indent continuation lines to align with text after "• "
 		lines := strings.Split(rendered, "\n")
 		for i, line := range lines {
 			if i == 0 {
-				lines[i] = "[gray]⏺[-] " + line
+				lines[i] = "[gray]•[-] " + line
 			} else {
 				lines[i] = "  " + line
 			}
@@ -175,9 +172,9 @@ func (f *Formatter) formatToolResult(event *agent.Event) (string, bool) {
 			continue
 		}
 
-		// Build the header line: "⏺ ToolName ⎯⎯⎯⎯⎯⎯"
-		separator := strings.Repeat("⎯", 30)
-		header := fmt.Sprintf("[gray]⏺[-] [cyan]%s[-] [darkgray]%s[-]", toolName, separator)
+		// Build the header line: "• ToolName ------"
+		separator := strings.Repeat("-", 30)
+		header := fmt.Sprintf("[gray]•[-] [cyan]%s[-] [darkgray]%s[-]", toolName, separator)
 
 		// Extract text content and build summary line
 		text := extractToolResultText(block)
@@ -288,10 +285,10 @@ func (f *Formatter) formatToolUse(block contentBlock) string {
 
 	summary := extractToolSummary(block.Name, block.Input)
 	if summary != "" {
-		return fmt.Sprintf("[gray]⏺[-] [cyan]%s[-](%s)", block.Name, summary)
+		return fmt.Sprintf("[gray]•[-] [cyan]%s[-](%s)", block.Name, summary)
 	}
 
-	return fmt.Sprintf("[gray]⏺[-] [cyan]%s[-]", block.Name)
+	return fmt.Sprintf("[gray]•[-] [cyan]%s[-]", block.Name)
 }
 
 // formatTodoWrite renders TodoWrite input as a formatted task checklist.
@@ -313,7 +310,7 @@ func formatTodoWrite(input json.RawMessage) string {
 
 	var lines []string
 
-	lines = append(lines, "[dodgerblue]⏺[-] [cyan]Tasks[-]")
+	lines = append(lines, "[dodgerblue]•[-] [cyan]Tasks[-]")
 
 	for _, todo := range data.Todos {
 		var icon string
@@ -417,16 +414,16 @@ func formatResultEvent(event *agent.Event) string {
 	}
 
 	if data.IsError {
-		return "[red]⏺[-] [cyan]Result:[-] [red]✗ Error[-]"
+		return "[red]•[-] [cyan]Result:[-] [red]✗ Error[-]"
 	}
 
-	return "[green]⏺[-] [cyan]Result:[-] [green]✓ Success[-]"
+	return "[green]•[-] [cyan]Result:[-] [green]✓ Success[-]"
 }
 
 func formatErrorEvent(event *agent.Event) string {
 	data, ok := event.Data.(errorData)
 	if !ok {
-		return "[red]⏺[-] [red]Error:[-] [gray](unknown error)[-]"
+		return "[red]•[-] [red]Error:[-] [gray](unknown error)[-]"
 	}
 
 	msg := data.Message
@@ -434,5 +431,5 @@ func formatErrorEvent(event *agent.Event) string {
 		msg = msg[:97] + "..."
 	}
 
-	return fmt.Sprintf("[red]⏺[-] [red]Error:[-] %s", msg)
+	return fmt.Sprintf("[red]•[-] [red]Error:[-] %s", msg)
 }

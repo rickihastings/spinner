@@ -86,7 +86,7 @@ func TestFormatter_BashToolCall(t *testing.T) {
 	require.True(t, ok)
 	assert.Contains(t, formatted, "Bash")
 	assert.Contains(t, formatted, "brew install tmux")
-	assert.Contains(t, formatted, "⏺")
+	assert.Contains(t, formatted, "•")
 }
 
 func TestFormatter_ReadToolCall(t *testing.T) {
@@ -390,7 +390,7 @@ func TestFormatter_ToolResultSuccess(t *testing.T) {
 	formatted, ok := f.FormatEvent(&resultEvent)
 	require.True(t, ok)
 	assert.Contains(t, formatted, "Bash")
-	assert.Contains(t, formatted, "⏺")
+	assert.Contains(t, formatted, "•")
 	assert.Contains(t, formatted, "+3 lines")
 }
 
