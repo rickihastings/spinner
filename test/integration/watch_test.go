@@ -181,9 +181,9 @@ func TestDockerSpinWatch_FlagIntegration(t *testing.T) {
 	var containerName string
 
 	for _, line := range strings.Split(outputStr, "\n") {
-		if strings.Contains(line, "Instance created successfully:") {
+		if strings.Contains(line, "Instance created:") || strings.Contains(line, "Reusing instance:") {
 			parts := strings.Fields(line)
-			if len(parts) >= 4 {
+			if len(parts) >= 3 {
 				containerName = parts[len(parts)-1]
 				break
 			}
@@ -208,7 +208,7 @@ func TestDockerSpinWatch_FlagIntegration(t *testing.T) {
 	}
 
 	// Verify that container was created and watch mode was entered
-	assert.Contains(t, outputStr, "Instance created successfully", "should create container")
+	assert.Contains(t, outputStr, "Instance created:", "should create container")
 	assert.Contains(t, outputStr, "Entering watch mode", "should enter watch mode")
 }
 

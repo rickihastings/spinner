@@ -181,11 +181,11 @@ func RunSpinCommand(t *testing.T, args ...string) (containerName string, stdout 
 	output := stdout + stderr
 
 	// Extract container name from output
-	// Expected format: "Instance created successfully: <container-name>"
+	// Expected format: "✓ Instance created: <container-name>" or "✓ Reusing instance: <container-name>"
 	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "Instance created successfully:") {
+		if strings.Contains(line, "Instance created:") || strings.Contains(line, "Reusing instance:") {
 			parts := strings.Fields(line)
-			if len(parts) >= 4 {
+			if len(parts) >= 3 {
 				containerName = parts[len(parts)-1]
 				break
 			}

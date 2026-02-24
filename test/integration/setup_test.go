@@ -19,12 +19,12 @@ func TestDockerSetup_BasicBuild(t *testing.T) {
 		{
 			name:       "default base image",
 			setupArgs:  []string{},
-			wantOutput: "Environment provisioned",
+			wantOutput: "Setting up",
 		},
 		{
 			name:       "with provider-args no-cache",
 			setupArgs:  []string{"--provider-args", "--no-cache"},
-			wantOutput: "Environment provisioned",
+			wantOutput: "Setting up",
 		},
 	}
 
