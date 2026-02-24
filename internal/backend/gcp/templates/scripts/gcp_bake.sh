@@ -25,8 +25,12 @@ apt-get install -y gh
 
 # Create spinner user
 echo "Creating spinner user..."
-useradd -m -s /bin/bash spinner
-echo "spinner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+if ! id -u spinner &>/dev/null; then
+    useradd -m -s /bin/bash spinner
+    echo "spinner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+else
+    echo "User 'spinner' already exists, skipping creation."
+fi
 mkdir -p /home/spinner
 chown -R spinner:spinner /home/spinner
 chmod 755 /home/spinner
