@@ -106,14 +106,14 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 	ctx := context.Background()
 	exitCode := runner.Run(ctx)
 
-	// Should exit with code 1 when max iterations reached
-	if exitCode != 1 {
-		t.Errorf("Expected exit code 1, got %d", exitCode)
+	// Should exit with code 0 when max iterations reached (normal termination)
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", exitCode)
 	}
 
-	// State should reflect max iterations error
-	if state.Status != statusError {
-		t.Errorf("Expected status error, got %s", state.Status)
+	// State should reflect completed status
+	if state.Status != statusCompleted {
+		t.Errorf("Expected status completed, got %s", state.Status)
 	}
 
 	if state.ErrorMessage != "max iterations reached" {
@@ -126,8 +126,8 @@ func TestRunner_Run_MaxIterations(t *testing.T) {
 		t.Fatalf("Failed to load state: %v", err)
 	}
 
-	if loadedState.Status != statusError {
-		t.Errorf("Expected saved status error, got %s", loadedState.Status)
+	if loadedState.Status != statusCompleted {
+		t.Errorf("Expected saved status completed, got %s", loadedState.Status)
 	}
 }
 
@@ -489,8 +489,8 @@ func TestRunner_Run_ConsecutiveErrorsReset(t *testing.T) {
 	exitCode := runner.Run(ctx)
 
 	// Should hit max iterations since errors never reach 3 consecutive
-	if exitCode != 1 {
-		t.Errorf("Expected exit code 1 (max iterations), got %d", exitCode)
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0 (max iterations), got %d", exitCode)
 	}
 
 	if state.ErrorMessage != "max iterations reached" {

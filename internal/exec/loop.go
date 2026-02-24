@@ -306,13 +306,15 @@ func (r *Runner) Run(ctx context.Context) int {
 		fmt.Println("\n✓ Iteration complete.")
 	}
 
-	// Max iterations reached
+	// Max iterations reached — normal termination, not an error.
+	// Exit 0 so the container reports "stopped" rather than "exited".
 	fmt.Printf("\n⚠️  Max iterations (%d) reached\n", r.config.MaxIterations)
-	r.state.Status = statusError
+	r.state.Status = statusCompleted
+	r.state.CompletedAt = time.Now()
 	r.state.ErrorMessage = "max iterations reached"
 	_ = r.saveState()
 
-	return 1
+	return 0
 }
 
 // waitForRateLimit waits for the rate limit period with a countdown.

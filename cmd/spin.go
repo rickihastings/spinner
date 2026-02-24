@@ -171,15 +171,8 @@ EXAMPLES:
 				}
 			}
 
-			// Print phase header then validate prerequisites
-			fmt.Printf("Spinning up %s\n\n  Setup\n", spinImage)
-
-			if !isValidGitURL(spinRepo) {
-				fmt.Fprintln(os.Stderr, "✗ Error: Repository must be a valid git URL (https://, http://, or git@)")
-				return fmt.Errorf("repository must be a valid git URL (https://, http://, or git@)")
-			}
-
-			// Resolve all secrets from the encrypted store (no env var fallback)
+			// Resolve secrets before printing phase headers so the passphrase
+			// prompt (if triggered) doesn't appear in the middle of the output.
 			store := spinStoreFactory()
 
 			resolved, err := secret.Resolve(store, spinSecrets)
@@ -192,6 +185,14 @@ EXAMPLES:
 			key, blob, err := secret.EncryptBlobWithKey(resolved)
 			if err != nil {
 				return fmt.Errorf("encrypting secrets: %w", err)
+			}
+
+			// Print phase header then validate prerequisites
+			fmt.Printf("Spinning up %s\n\n  Setup\n", spinImage)
+
+			if !isValidGitURL(spinRepo) {
+				fmt.Fprintln(os.Stderr, "✗ Error: Repository must be a valid git URL (https://, http://, or git@)")
+				return fmt.Errorf("repository must be a valid git URL (https://, http://, or git@)")
 			}
 
 			fmt.Println("  ✓ Prerequisites validated")
