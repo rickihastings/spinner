@@ -51,6 +51,9 @@ func autoStyleNoMargin() ansi.StyleConfig {
 	style.Code.Prefix = ""
 	style.Code.Suffix = ""
 
+	// Use plain ASCII bullet instead of "•" which renders as emoji in some terminals
+	style.Item.BlockPrefix = "- "
+
 	return style
 }
 
