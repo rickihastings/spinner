@@ -283,7 +283,7 @@ func readPassphraseFromTTYOrStdin() ([]byte, error) {
 	if ttyErr == nil {
 		defer func() { _ = syscall.Close(fd) }()
 
-		return readPassword(fd)
+		return readPassword(int(fd))
 	}
 
 	return readPassword(int(os.Stdin.Fd()))
